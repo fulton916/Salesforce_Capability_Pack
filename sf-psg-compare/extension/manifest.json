@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Salesforce PSG Compare",
-  "version": "0.1.0",
-  "description": "Compare two Salesforce permission set groups: what they contain and what they allow. Read-only; uses your existing Salesforce login.",
+  "name": "Salesforce Capability Pack",
+  "version": "0.2.0",
+  "description": "Admin tools for Salesforce: compare permission set groups and see a user's access. Read-only; uses your existing Salesforce login.",
   "permissions": ["cookies", "activeTab", "tabs"],
   "host_permissions": [
     "https://*.salesforce.com/*",
@@ -15,7 +15,7 @@
     "https://*.sfcrmproducts.cn/*"
   ],
   "action": {
-    "default_title": "Salesforce PSG Compare",
+    "default_title": "Salesforce Capability Pack",
     "default_popup": "popup.html"
   },
   "icons": {

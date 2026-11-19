@@ -25,6 +25,8 @@ async function test(name, fn) {
   }
 }
 
+await (await import("./user_access_tests.mjs")).run(test);
+
 // ---------- fakes ----------
 
 function fakeCookies(list) {

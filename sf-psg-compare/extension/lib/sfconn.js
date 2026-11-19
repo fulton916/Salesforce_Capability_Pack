@@ -133,3 +133,10 @@ export function chunk(arr, n) {
   for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
   return out;
 }
+
+/** Escape text for the inside of a SOQL LIKE pattern (no quotes, no wildcards added).
+ * Backslash, % and _ lose their special meaning, and a single quote is escaped for the literal.
+ * Use it as: `Name LIKE '%${soqlLike(text)}%'`. */
+export function soqlLike(v) {
+  return String(v).replace(/[\\%_']/g, (c) => "\\" + c);
+}
