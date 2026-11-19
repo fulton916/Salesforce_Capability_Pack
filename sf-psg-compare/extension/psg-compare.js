@@ -93,12 +93,12 @@ function orgKind(o) {
 
 function showOrg(o, host, via) {
   const [kind, cls] = orgKind(o);
-  $("#org").replaceChildren(
+  $("#org").replaceChildren(...[
     el("strong", { text: o.name || o.id }), " ",
     el("span", { class: `badge ${cls}`, text: kind }),
     via ? el("span", { class: "badge demo", text: via }) : null,
-    el("span", { class: "host", text: host })
-  );
+    host ? el("span", { class: "host", text: host }) : null
+  ].filter(Boolean));
   document.title = `Compare permission set groups – ${o.name || host}`;
 }
 

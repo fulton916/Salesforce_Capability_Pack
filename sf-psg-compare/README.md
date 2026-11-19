@@ -179,8 +179,12 @@ users are marked "Inactive". Add a second user under "Second user (optional, to 
 | Public groups, Queues | direct membership only. Membership through roles or groups inside groups is not shown |
 | Territories | the territories the user is assigned to |
 
-With two users, each card says how many items only one has, or "✓ Same in both". A permission set
-one user has directly and the other gets through a group is marked "Different".
+With two users, each list card always shows how many items both users have, how many only the first
+has and how many only the second has (for example "5 permission set groups both have", "0 only Ann
+has", "1 only Bob has"), then "✓ Same in both" when nothing differs. Profile and role cards show the
+actual value for each user. The tab numbers count differences only, and the list starts on "Only
+differences". A permission set one user has directly and the other gets through a group is marked
+"Different".
 **Download** offers "This list, as shown (CSV for Excel)" and "Everything (CSV for Excel)". Nothing
 about users is saved: there are no user files, because they hold usernames.
 

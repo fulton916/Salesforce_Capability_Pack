@@ -8,7 +8,7 @@ import path from "node:path";
 import { SfApi, soqlLike } from "../extension/lib/sfconn.js";
 import { searchUsers, readUserAccess } from "../extension/lib/useraccess.js";
 import {
-  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText,
+  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
 } from "../extension/lib/usercompare.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -303,6 +303,76 @@ export async function run(test) {
 
   await test("a missing user gets a plain message", async () => {
     await assert.rejects(readUserAccess(apiFor([[/FROM User WHERE/, () => []]]), "005X"), /could not be found.*Search again/);
+  });
+
+  // ---- comparison cards ----
+  const mk = (name, sections) => validateAccess({
+    schema: "sf-user-access/1", user: { id: name, name, username: `${name}@x.test`, isActive: true },
+    sections: Object.fromEntries(SECTION_KEYS.map((k) => [k, (sections[k] || []).map((x) => (typeof x === "string" ? { key: x, label: x } : x))])),
+  });
+  const say = (lines) => lines.map((l) => l.segs.map((g) => g.text).join(""));
+  const five = ["g1", "g2", "g3", "g4", "g5"];
+
+  await test("cards: 5 shared groups and 1 only for the second user", () => {
+    const r = compareUsers(mk("Ann", { permissionSetGroups: five }), mk("Bob", { permissionSetGroups: [...five, "g6"] }));
+    assert.deepEqual(say(userCardLines(r, "permissionSetGroups")), ["5 permission set groups both have", "0 only Ann has", "1 only Bob has"]);
+    const lines = userCardLines(r, "permissionSetGroups");
+    assert.equal(lines[1].segs[2].side, "a");
+    assert.equal(lines[2].segs[2].side, "b");
+    assert.equal(lines[0].segs[0].bold, true);
+  });
+
+  await test("cards: singular noun, thousands separators, same-in-both line after the numbers", () => {
+    const r = compareUsers(mk("Ann", { queues: ["q"] }), mk("Bob", { queues: ["q"] }));
+    assert.deepEqual(say(userCardLines(r, "queues")), ["1 queue both have", "0 only Ann has", "0 only Bob has", "✓ Same in both"]);
+    const many = Array.from({ length: 1200 }, (_, i) => `t${i}`);
+    const big = compareUsers(mk("Ann", { territories: many }), mk("Bob", {}));
+    assert.equal(say(userCardLines(big, "territories"))[1], "1,200 only Ann has");
+  });
+
+  await test("cards: permission sets show the assigned-differently line", () => {
+    const direct = { key: "ps1", label: "ps1", direct: true, groups: [] };
+    const viaGroup = { key: "ps1", label: "ps1", direct: false, groups: [{ key: "g", label: "G" }] };
+    const r = compareUsers(mk("Ann", { permissionSets: [direct, "ps2"] }), mk("Bob", { permissionSets: [viaGroup] }));
+    assert.deepEqual(say(userCardLines(r, "permissionSets")), [
+      "1 permission set both have", "1 only Ann has", "0 only Bob has", "1 of those assigned differently (directly or through a group)"]);
+    // other areas never show that line
+    assert.equal(userCardLines(r, "queues").length, 1);
+  });
+
+  await test("cards: neither has any", () => {
+    const r = compareUsers(mk("Ann", {}), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "publicGroups")), ["Neither has any"]);
+  });
+
+  await test("cards: profile and role show the value", () => {
+    const r = compareUsers(mk("Ann", { profile: ["Standard"], role: ["East"] }), mk("Bob", { profile: ["Standard"], role: [] }));
+    assert.deepEqual(say(userCardLines(r, "profile")), ["✓ Same in both: Standard"]);
+    assert.deepEqual(say(userCardLines(r, "role")), ["Ann: East", "Bob: no role"]);
+    const d = compareUsers(mk("Ann", { profile: ["Standard"] }), mk("Bob", { profile: ["Admin"] }));
+    assert.deepEqual(say(userCardLines(d, "profile")), ["Ann: Standard", "Bob: Admin"]);
+  });
+
+  await test("cards: neither has a role or profile reads as same", () => {
+    const r = compareUsers(mk("Ann", {}), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "role")), ["✓ Same in both: no role"]);
+    assert.deepEqual(say(userCardLines(r, "profile")), ["✓ Same in both: no profile"]);
+    assert.equal(userCardLines(r, "role")[0].cls, "same");
+    assert.equal(r.counts.role.onlyA + r.counts.role.onlyB + r.counts.role.differ, 0);
+  });
+
+  await test("cards: one has a role, the other none", () => {
+    const r = compareUsers(mk("Ann", { role: ["East"] }), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "role")), ["Ann: East", "Bob: no role"]);
+    const r2 = compareUsers(mk("Ann", {}), mk("Bob", { role: ["West"] }));
+    assert.deepEqual(say(userCardLines(r2, "role")), ["Ann: no role", "Bob: West"]);
+  });
+
+  await test("org header leaves out missing parts instead of printing null", () => {
+    const org = { name: "Acme", isSandbox: true };
+    assert.deepEqual(orgParts(org, "h.example.com", null).map((p) => p.text), ["Acme", "Sandbox", "h.example.com"]);
+    assert.deepEqual(orgParts(org, "", "DEV SERVER").map((p) => p.text), ["Acme", "Sandbox", "DEV SERVER"]);
+    for (const p of orgParts(org, null, undefined)) assert.ok(p && p.text && p.text !== "null");
   });
 
   await test("the new files never use innerHTML, localStorage or chrome.storage", () => {
