@@ -255,3 +255,17 @@ details.notes ul { margin: 10px 0 0; padding-left: 20px; color: var(--muted); fo
   .tablewrap { box-shadow: inset -12px 0 10px -10px rgba(0, 0, 0, .25); }
   .vs { grid-template-columns: 1fr; gap: 8px; }
 }
+
+/* ---- wording pass additions ---- */
+.verdict-note { color: var(--muted); font-size: 14px; margin: 4px 0 0; }
+.alert { color: var(--risk); background: var(--risk-bg); border-left: 3px solid var(--risk); border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-weight: 600; }
+.card-totals { color: var(--muted); font-size: 13px; margin-bottom: 6px; line-height: 1.4; }
+.card-totals .who-a, .card-totals .who-b { font-weight: 600; }
+.card-line { font-weight: 600; }
+.card-line b { font-weight: 700; }
+.error details.tech { margin-top: 6px; font-size: 12px; }
+.error details.tech summary { cursor: pointer; }
+.error details.tech div { margin-top: 4px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.menu-items hr { border: 0; border-top: 1px solid var(--line); margin: 4px 0; }
+.risk-tag { cursor: help; }
+#compareHint[hidden] { display: none; }

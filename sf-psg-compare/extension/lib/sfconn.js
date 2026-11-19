@@ -45,8 +45,9 @@ export async function findSession(uiHost, cookies) {
 }
 
 export class SalesforceError extends Error {
-  constructor(message, { status, errorCode, url } = {}) {
+  constructor(message, { status, errorCode, url, detail } = {}) {
     super(message);
+    this.detail = detail; // the raw Salesforce text, for a folded "Technical details"
     this.status = status;
     this.errorCode = errorCode;
     this.url = url;
@@ -77,7 +78,7 @@ export class SfApi {
       const err = Array.isArray(body) ? body[0] : body;
       const msg = err?.message || text || `HTTP ${res.status}`;
       if (res.status === 401) {
-        throw new SalesforceError(`Session expired or not valid for the API (${msg}). Reload the Salesforce tab and try again.`, { status: 401, errorCode: err?.errorCode, url });
+        throw new SalesforceError("Your Salesforce session has expired. Reload the Salesforce tab, then try again.", { status: 401, errorCode: err?.errorCode, url, detail: msg });
       }
       throw new SalesforceError(msg, { status: res.status, errorCode: err?.errorCode, url });
     }
