@@ -47,8 +47,20 @@
         <button id="expandAll">Expand all</button>
         <button id="collapseAll">Collapse all</button>
         <label class="check"><input type="checkbox" id="showApi"> Show API names</label>
+        <span class="usersctl">
+          <label for="showUsers">Show users</label>
+          <select id="showUsers">
+            <option value="none">Don't show</option>
+            <option value="name">Name</option>
+            <option value="username">Username</option>
+            <option value="email">Email</option>
+            <option value="id">Salesforce ID</option>
+          </select>
+          <label class="check" id="inactiveLabel" hidden><input type="checkbox" id="inactive"> Include inactive users</label>
+        </span>
         <button id="download" class="primary">Download for Excel (.csv)</button>
       </div>
+      <p class="usersmsg" id="usersMsg" role="status" hidden></p>
       <div class="treewrap"><ul class="tree" id="tree"></ul></div>
       <div class="empty" id="empty" hidden></div>
     </div>

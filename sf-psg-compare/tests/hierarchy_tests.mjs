@@ -8,8 +8,9 @@ import path from "node:path";
 import { SfApi, SalesforceError } from "../extension/lib/sfconn.js";
 import {
   buildTree, flatten, pathOf, branchOf, searchNodes, exportRows, exportFileName, summaryText, treeNotes, statsOf, defaultModel, toCsv,
+  attachUsers, listUsers, countUsers, usersSummary,
 } from "../extension/lib/hierarchy.js";
-import { readTerritoryModels, readTerritories, readRoles } from "../extension/lib/hierarchyread.js";
+import { readTerritoryModels, readTerritories, readRoles, readRoleUsers, readTerritoryUsers } from "../extension/lib/hierarchyread.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "../extension", ...p);
@@ -386,5 +387,272 @@ export async function run(test) {
   await test("hierarchy: the tool is in the popup menu and the manifest version moved on", () => {
     assert.match(readFileSync(ext("popup.js"), "utf-8"), /page: "hierarchy\.html"[\s\S]*?title: "Territory & role hierarchy"/);
     assert.equal(JSON.parse(readFileSync(ext("manifest.json"), "utf-8")).version, "0.3.0");
+  });
+
+  // ---------- users in each role / territory ----------
+
+  const U = (id, nodeId, name, active = true) => ({
+    id, nodeId, name, username: `${name.split(" ")[0].toLowerCase()}@demo.example.com`, email: `${name.split(" ")[0].toLowerCase()}@example.com`, active,
+  });
+  /** On the small tree: UK (id 4) has three people (one inactive), Global (id 1) has one of the same people. */
+  const smallUsers = () => [
+    U("U1", "4", "Zoe Zane"),
+    U("U2", "4", "adam Able"),
+    U("U3", "4", "Bea Baker", false),
+    U("U1", "1", "Zoe Zane"), // the same person in a second node
+    U("U4", "999", "Nobody Known"), // a node that is not in the tree
+    U("U2", "4", "adam Able"), // listed twice for one node
+  ];
+
+  await test("hierarchy users: attached to nodes; a person in two nodes; unknown nodes and repeats ignored", () => {
+    const t = buildTree(small());
+    const { byNode, unmatched } = attachUsers(t, smallUsers());
+    assert.deepEqual([...byNode.keys()].sort(), ["1", "4"]);
+    assert.deepEqual(byNode.get("4").map((u) => u.id), ["U1", "U2", "U3"]);
+    assert.deepEqual(byNode.get("1").map((u) => u.id), ["U1"]);
+    assert.deepEqual(unmatched.map((u) => u.id), ["U4"]);
+    assert.equal(t.order[0].users, undefined, "the tree is not changed");
+    // counts: people, not rows
+    const all = flatten(t.roots);
+    assert.deepEqual(countUsers(byNode, all), { active: 2, inactive: 1, activeAssignments: 3, inactiveAssignments: 1 });
+    assert.equal(usersSummary(countUsers(byNode, all), false, "territories"), "2 active people in 3 territory assignments");
+    assert.equal(usersSummary(countUsers(byNode, all), true, "territories"), "2 active and 1 inactive people in 4 territory assignments");
+    assert.equal(usersSummary({ active: 1, inactive: 0, activeAssignments: 1, inactiveAssignments: 0 }, false, "territories"), "1 active person in 1 territory assignment");
+    assert.equal(usersSummary({ active: 5812, inactive: 0 }, false), "5,812 active users");
+    assert.equal(usersSummary({ active: 1, inactive: 3 }, false), "1 active user");
+    assert.equal(usersSummary({ active: 2, inactive: 3 }, true), "2 active users, 3 inactive");
+    // a branch counts only its own nodes
+    const emea = t.order.find((n) => n.name === "EMEA");
+    assert.deepEqual(countUsers(byNode, flatten([emea])), { active: 2, inactive: 1, activeAssignments: 2, inactiveAssignments: 1 });
+    const apac = t.order.find((n) => n.name === "APAC");
+    assert.deepEqual(countUsers(byNode, flatten([apac])), { active: 0, inactive: 0, activeAssignments: 0, inactiveAssignments: 0 });
+    // records without an id or node are skipped, active defaults to true
+    const odd = attachUsers(t, [{ id: "", nodeId: "4" }, { id: "X", nodeId: "" }, { id: "Y", nodeId: "4", name: "Yan" }]);
+    assert.deepEqual(odd.byNode.get("4").map((u) => [u.id, u.active]), [["Y", true]]);
+  });
+
+  await test("hierarchy users: inactive filter, sorting by the chosen field, nothing to show", () => {
+    const t = buildTree(small());
+    const { byNode } = attachUsers(t, smallUsers());
+    const uk = t.order.find((n) => n.name === "UK");
+    const names = (inc, field = "name") => listUsers(byNode, uk, field, inc).map((u) => u.display);
+    assert.deepEqual(names(false), ["adam Able", "Zoe Zane"]); // case-insensitive: adam before Zoe
+    assert.deepEqual(names(true), ["adam Able", "Bea Baker (inactive)", "Zoe Zane"]);
+    assert.deepEqual(names(true, "email"), ["adam@example.com", "bea@example.com (inactive)", "zoe@example.com"]);
+    assert.deepEqual(names(true, "username"), ["adam@demo.example.com", "bea@demo.example.com (inactive)", "zoe@demo.example.com"]);
+    assert.deepEqual(names(true, "id"), ["U1", "U2", "U3 (inactive)"]);
+    assert.equal(listUsers(byNode, uk, "name", true)[1].text, "Bea Baker");
+    assert.equal(listUsers(byNode, uk, "name", true)[1].active, false);
+    const emea = t.order.find((n) => n.name === "EMEA");
+    assert.deepEqual(listUsers(byNode, emea, "name", true), []);
+    // an empty value says so, so the cell is never blank
+    const blank = attachUsers(t, [{ id: "B1", nodeId: "4", name: "", email: "" }]);
+    assert.equal(listUsers(blank.byNode, uk, "email")[0].display, "(no email)");
+    assert.equal(listUsers(blank.byNode, uk, "name")[0].display, "(no name)");
+    // sorted the same way for the same people, whatever order they came in
+    const rev = attachUsers(t, smallUsers().reverse());
+    assert.deepEqual(listUsers(rev.byNode, uk, "name", true).map((u) => u.id), listUsers(byNode, uk, "name", true).map((u) => u.id));
+  });
+
+  await test("hierarchy users: export cells, whole tree, each field, inactive marked, header width", () => {
+    const t = buildTree(small());
+    const { byNode } = attachUsers(t, smallUsers());
+    const head = ["Level 1", "Level 2", "Level 3", "API name", "Path"];
+    // users off: exactly as before
+    assert.deepEqual(exportRows(t, null, null), exportRows(t));
+    assert.deepEqual(exportRows(t)[0], head);
+    // name, active only: most on one row is 2
+    const rows = exportRows(t, null, { byNode, field: "name", includeInactive: false });
+    assert.deepEqual(rows, [
+      [...head, "Users", "User 1", "User 2"],
+      ["Global", "", "", "Global", "Global", "1", "Zoe Zane", ""],
+      ["", "APAC", "", "APAC", "Global › APAC", "0", "", ""],
+      ["", "", "Region 2", "Region_2", "Global › APAC › Region 2", "0", "", ""],
+      ["", "", "Region 10", "Region_10", "Global › APAC › Region 10", "0", "", ""],
+      ["", "EMEA", "", "EMEA", "Global › EMEA", "0", "", ""],
+      ["", "", "Germany", "Germany", "Global › EMEA › Germany", "0", "", ""],
+      ["", "", "UK", "UK", "Global › EMEA › UK", "2", "adam Able", "Zoe Zane"],
+    ]);
+    // inactive included: a third column and the marker
+    const inc = exportRows(t, null, { byNode, field: "email", includeInactive: true });
+    assert.deepEqual(inc[0].slice(5), ["Users", "User 1", "User 2", "User 3"]);
+    assert.deepEqual(inc[7].slice(5), ["3", "adam@example.com", "bea@example.com (inactive)", "zoe@example.com"]);
+    assert.deepEqual(inc[1].slice(5), ["1", "zoe@example.com", "", ""]);
+    assert.ok(inc.every((r) => r.length === inc[0].length));
+    const ids = exportRows(t, null, { byNode, field: "id", includeInactive: true });
+    assert.deepEqual(ids[7].slice(5), ["3", "U1", "U2", "U3 (inactive)"]);
+    const un = exportRows(t, null, { byNode, field: "username", includeInactive: false });
+    assert.deepEqual(un[7].slice(5), ["2", "adam@demo.example.com", "zoe@demo.example.com"]);
+    // nobody anywhere: just the count column
+    const none = exportRows(t, null, { byNode: new Map(), field: "name", includeInactive: false });
+    assert.deepEqual(none[0], [...head, "Users"]);
+    assert.deepEqual(none[1].slice(5), ["0"]);
+  });
+
+  await test("hierarchy users: export of a branch has only that branch's users and a header sized to it", () => {
+    const t = buildTree(small());
+    const { byNode } = attachUsers(t, smallUsers());
+    const emea = t.order.find((n) => n.name === "EMEA");
+    assert.deepEqual(exportRows(t, emea, { byNode, field: "name", includeInactive: false }), [
+      ["Level 1", "Level 2", "API name", "Path", "Users", "User 1", "User 2"],
+      ["EMEA", "", "EMEA", "Global › EMEA", "0", "", ""],
+      ["", "Germany", "Germany", "Global › EMEA › Germany", "0", "", ""],
+      ["", "UK", "UK", "Global › EMEA › UK", "2", "adam Able", "Zoe Zane"],
+    ]);
+    // a branch where the most is 1: one User column (Global's person is not in this branch)
+    const apac = t.order.find((n) => n.name === "APAC");
+    assert.deepEqual(exportRows(t, apac, { byNode, field: "name", includeInactive: false })[0], ["Level 1", "Level 2", "API name", "Path", "Users"]);
+    const global = t.order[0];
+    assert.deepEqual(exportRows(t, global, { byNode, field: "name", includeInactive: false })[0].slice(-4), ["Path", "Users", "User 1", "User 2"]);
+    // a person's name that looks like a formula is guarded by toCsv
+    const evil = attachUsers(t, [U("E1", "4", "=HYPERLINK(x)")]);
+    const csv = toCsv(exportRows(t, emea, { byNode: evil.byNode, field: "name", includeInactive: false }));
+    assert.ok(csv.includes("'=HYPERLINK(x)"), csv);
+  });
+
+  await test("hierarchy notes: in a branch only the nodes on screen are counted", () => {
+    const recs = [rec("1", null, "Top"), rec("2", "1", "Mid"), rec("3", "1", "Leaf"), rec("8", "MISSING", "Lost A"), rec("9", "MISSING2", "Lost B"),
+      rec("10", "11", "Loop A"), rec("11", "10", "Loop B")];
+    const t = buildTree(recs);
+    assert.equal(treeNotes(t, "territories").length, 2);
+    assert.match(treeNotes(t, "territories")[0], /^2 territories have a parent that is not in this list/);
+    // a branch with no problems says nothing
+    const top = t.order.find((n) => n.name === "Top");
+    assert.deepEqual(treeNotes(t, "territories", flatten([top])), []);
+    // a branch with one problem counts one
+    const lostA = t.order.find((n) => n.name === "Lost A");
+    const notes = treeNotes(t, "territories", flatten([lostA]));
+    assert.equal(notes.length, 1);
+    assert.match(notes[0], /^1 territory has a parent that is not in this list/);
+    // a branch with part of the loop
+    const loop = t.order.find((n) => n.inLoop && n.loopCut);
+    const ln = treeNotes(t, "roles", flatten([loop]));
+    assert.equal(ln.length, 1);
+    assert.match(ln[0], /^2 roles have parents that lead back to themselves/);
+    // the whole tree (no items) is unchanged
+    assert.equal(treeNotes(t, "roles", null).length, 2);
+  });
+
+  await test("hierarchy users reads: SELECT only, model id escaped, no role in territory read", async () => {
+    const log = [];
+    const api = fakeApi([
+      [/FROM UserTerritory2Association/, () => [
+        { UserId: "005A", Territory2Id: "0MI1", User: { Name: "Ann Example", Username: "ann@demo.example.com", Email: "ann@example.com", IsActive: true } },
+        { UserId: "005B", Territory2Id: "0MI2", User: { Name: "Ben Sample", Username: "ben@demo.example.com", Email: "ben@example.com", IsActive: false } },
+      ]],
+      [/COUNT\(\) FROM User WHERE UserRoleId != null AND UserRole\.PortalType != 'None' AND IsActive = true/, () => ({ total: 4 })],
+      [/COUNT\(\) FROM User WHERE UserRoleId != null AND UserRole\.PortalType != 'None'/, () => ({ total: 9 })],
+      [/^SELECT Id, Name.* FROM User WHERE UserRoleId != null AND UserRole\.PortalType = 'None'/, () => [
+        { Id: "005A", Name: "Ann Example", Username: "ann@demo.example.com", Email: "ann@example.com", IsActive: true, UserRoleId: "00E1" },
+      ]],
+    ], { log });
+    const tu = await readTerritoryUsers(api, "0Mo1' OR Name != '");
+    assert.deepEqual(tu.users, [
+      { id: "005A", nodeId: "0MI1", name: "Ann Example", username: "ann@demo.example.com", email: "ann@example.com", active: true },
+      { id: "005B", nodeId: "0MI2", name: "Ben Sample", username: "ben@demo.example.com", email: "ben@example.com", active: false },
+    ]);
+    assert.deepEqual(tu.warnings, []);
+    const ru = await readRoleUsers(api);
+    assert.deepEqual(ru.users, [{ id: "005A", nodeId: "00E1", name: "Ann Example", username: "ann@demo.example.com", email: "ann@example.com", active: true }]);
+    assert.deepEqual(ru.portalUsers, { active: 4, all: 9 });
+    assert.deepEqual(ru.warnings, []);
+    const q = log.filter((l) => l.q).map((l) => l.q);
+    assert.ok(q.every((s) => /^SELECT /.test(s)));
+    assert.ok(log.every((l) => l.method === "GET"));
+    assert.ok(!q.some((s) => /RoleInTerritory2/.test(s)));
+    assert.ok(q.includes("SELECT UserId, Territory2Id, User.Name, User.Username, User.Email, User.IsActive FROM UserTerritory2Association WHERE Territory2.Territory2ModelId = '0Mo1\\' OR Name != \\''"));
+    assert.ok(q.includes("SELECT Id, Name, Username, Email, IsActive, UserRoleId FROM User WHERE UserRoleId != null AND UserRole.PortalType = 'None'"));
+    assert.ok(q.includes("SELECT COUNT() FROM User WHERE UserRoleId != null AND UserRole.PortalType != 'None'"));
+    assert.ok(q.includes("SELECT COUNT() FROM User WHERE UserRoleId != null AND UserRole.PortalType != 'None' AND IsActive = true"));
+    // the count fails: the users still come back, no count, the reason is kept
+    const api3 = fakeApi([
+      [/COUNT\(\)/, () => ({ fail: "Unsupported filter", code: "INVALID_FIELD" })],
+      [/FROM User WHERE UserRoleId != null/, () => [{ Id: "005A", Name: "Ann Example", Username: "a@demo.example.com", Email: "a@example.com", IsActive: true, UserRoleId: "00E1" }]],
+    ]);
+    const ru3 = await readRoleUsers(api3);
+    assert.equal(ru3.users.length, 1);
+    assert.equal(ru3.portalUsers, null);
+    assert.match(ru3.warnings[0], /Unsupported filter/);
+    // a real failure is thrown (the page turns it into a message about the users only)
+    const bad = fakeApi([[/FROM UserTerritory2Association/, () => ({ fail: "insufficient access", code: "INSUFFICIENT_ACCESS" })]]);
+    await assert.rejects(() => readTerritoryUsers(bad, "0Mo1"), /insufficient access/);
+    const bad2 = fakeApi([[/FROM User /, () => ({ fail: "insufficient access", code: "INSUFFICIENT_ACCESS" })]]);
+    await assert.rejects(() => readRoleUsers(bad2), /insufficient access/);
+  });
+
+  await test("hierarchy users: the page reads users only on request and a failure stays soft", () => {
+    const page = readFileSync(ext("hierarchy.js"), "utf-8");
+    // loadUsers catches, keeps the message on the entry, and nothing in show()/loadTree() reads users
+    assert.match(page, /function loadUsers\(tree\) \{[\s\S]*?try \{[\s\S]*?catch \(err\)[\s\S]*?status = "error"/);
+    assert.ok(!/source\.(roleUsers|territoryUsers)/.test(page.slice(page.indexOf("async function loadTree"), page.indexOf("async function show"))), "loadTree reads users");
+    assert.match(page, /state\.show !== "none"/);
+    // no whole-org portal-role note in a branch; names are separated by real text
+    assert.match(page, /k === "roles" && !state\.branch && state\.roles\.portalCount/);
+    assert.match(page, /class: "sep", text: "; "/);
+    assert.ok(!/RoleInTerritory2/.test(readFileSync(ext("lib/hierarchyread.js"), "utf-8").replace(/\/\*\*[\s\S]*?\*\//g, "")));
+    // the field change does not read: "change" on the select goes to applyUsers, which reads only when nothing is loaded
+    assert.match(page, /if \(!e \|\| e\.status !== "ok"\) \{[\s\S]*?await loadUsers\(tree\)/);
+    // the file download uses the same field, order and inactive choice as the page
+    assert.match(page, /exportRows\(state\.tree, state\.branch, users\)/);
+    const html = readFileSync(ext("hierarchy.html"), "utf-8");
+    for (const t of ["Don't show", ">Name<", ">Username<", ">Email<", ">Salesforce ID<", "Include inactive users", "Show users"]) assert.ok(html.includes(t), t);
+    assert.match(html, /<option value="none">/);
+  });
+
+  await test("hierarchy users: 6,000 users on 3,600 nodes attach, sort and export quickly", () => {
+    const recs = [];
+    for (let i = 0; i < 3600; i++) recs.push(rec(String(i), i ? String(Math.floor((i - 1) / 4)) : null, `Terr ${(i * 7) % 3600}`, `T_${i}`));
+    const t = buildTree(recs);
+    const users = [];
+    for (let i = 0; i < 6000; i++) users.push({ id: `005${String(i).padStart(12, "0")}AAA`, nodeId: String(i % 3 ? (i * 13) % 3600 : 5), name: `User ${(i * 17) % 6000}`, username: `u${i}@demo.example.com`, email: `u${i}@example.com`, active: i % 20 !== 0 });
+    const t0 = performance.now();
+    const { byNode } = attachUsers(t, users);
+    for (const field of ["name", "username", "email", "id"]) {
+      for (const { node } of t.order.map((node) => ({ node }))) listUsers(byNode, node, field, true);
+    }
+    const rows = exportRows(t, null, { byNode, field: "email", includeInactive: false });
+    const ms = performance.now() - t0;
+    assert.equal(rows.length, 3601);
+    assert.ok(rows[0].includes("Users"));
+    assert.ok(ms < 2000, `took ${ms.toFixed(0)} ms`);
+  });
+
+  await test("hierarchy samples: users are synthetic and cover the cases the demo is for", () => {
+    const roles = sample("hierarchy_roles.json");
+    const terr = sample("hierarchy_territories.json");
+    const sets = [["roles", roles.roles, roles.users]];
+    for (const m of terr.models) sets.push([m.name, m.territories, m.users]);
+    const NAME = /^[A-Z][a-z]+ (Example|Sample|Demo|Testfield|Placeholder|Mockridge|Fakeman|Sandbox)\d*$/;
+    for (const [label, nodes, users] of sets) {
+      assert.ok(users && users.length, `${label} has users`);
+      const ids = new Set(nodes.map((n) => n.id));
+      for (const u of users) {
+        assert.match(u.id, /^005\d{12}AAA$/, `${label} id ${u.id}`);
+        assert.match(u.name, NAME, `${label} name ${u.name}`);
+        assert.match(u.email, /^[a-z]+\.[a-z0-9]+@example\.com$/, `${label} email ${u.email}`);
+        assert.match(u.username, /^[a-z]+\.[a-z0-9]+@demo\.example\.com$/, `${label} username ${u.username}`);
+        assert.equal(typeof u.active, "boolean");
+        assert.ok(ids.has(u.nodeId) || label === "roles", `${label} node ${u.nodeId}`);
+      }
+    }
+    // the demo cases
+    const live = terr.models.find((m) => m.state === "Active");
+    const count = (users) => { const c = new Map(); for (const u of users) c.set(u.nodeId, (c.get(u.nodeId) || 0) + 1); return c; };
+    for (const [label, nodes, users] of [["roles", roles.roles, roles.users], ["territories", live.territories, live.users]]) {
+      const c = count(users);
+      assert.ok([...c.values()].some((n) => n >= 25), `${label}: a node with 25 or more users`);
+      assert.ok(users.some((u) => !u.active), `${label}: inactive users`);
+      assert.ok(nodes.some((n) => !c.has(n.id)), `${label}: nodes with none`);
+    }
+    const per = new Map();
+    for (const u of live.users) per.set(u.id, (per.get(u.id) || new Set()).add(u.nodeId));
+    assert.ok([...per.values()].some((s) => s.size >= 2), "a user in two territories");
+    assert.ok(roles.users.some((u) => !roles.roles.some((r) => r.id === u.nodeId)), "a user whose role is not shown");
+    // the sample works end to end
+    const t = buildTree(live.territories);
+    const { byNode, unmatched } = attachUsers(t, live.users);
+    assert.equal(unmatched.length, 0);
+    const rows = exportRows(t, null, { byNode, field: "name", includeInactive: true });
+    assert.ok(rows[0].length >= 5 + 1 + 27);
   });
 }

@@ -49,20 +49,35 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
   parent goes to the top level; a loop is cut at its first member by name (`loopCut`), and every member is flagged `inLoop`; iterative walks, so deep
   chains are safe), `flatten`, `pathOf`, `branchOf`, `searchNodes` (pick.js words, limit 50, results carry
   the path), `exportRows` (stepped "Level 1..N", "API name", "Path"), `exportFileName`, `summaryText`,
-  `treeNotes`. Re-exports `toCsv` from `compare.js` (which guards cells starting with = + - @ tab CR).
+  `treeNotes` (with a branch's items it counts only the nodes on screen), and the user helpers `attachUsers`,
+  `listUsers`, `countUsers`, `usersSummary`, `USER_FIELDS`; `exportRows(tree, top, users)` adds "Users" and
+  "User 1..N" columns when `users` is `{byNode, field, includeInactive}`. Re-exports `toCsv` from `compare.js` (which guards cells starting with = + - @ tab CR).
 - `extension/lib/hierarchyread.js` — `readTerritoryModels` (`{on: false}` when the org has no
   territories: the `Territory2Model` query fails with INVALID_TYPE; no describeGlobal call, it was slow), `readTerritories(api,
-  modelId)`, `readRoles` (portal roles left out, counted with `COUNT()`).
+  modelId)`, `readRoles` (portal roles left out, counted with `COUNT()`), and the user reads (SELECT only,
+  only when "Show users" is turned on): `readRoleUsers` (`User WHERE UserRoleId != null AND UserRole.PortalType = 'None'`, active and inactive,
+  filtered in memory so the tick box needs no new read; portal and community users are not read, only counted
+  with two `COUNT()`s, all and `IsActive = true`, each with `UserRoleId != null` because `!= 'None'` alone also matches
+  people without a role; returns `portalUsers {active, all}`, or null with the reason in `warnings` if a count fails) and `readTerritoryUsers(api, modelId)`
+  (`UserTerritory2Association` with `User.*`; `RoleInTerritory2` is deliberately not read: on real orgs it holds
+  bare numbers). `countUsers` returns people (`active`, `inactive`) and assignments (`activeAssignments`,
+  `inactiveAssignments`); `usersSummary(counts, includeInactive, kind)` words Territories as people in assignments.
 - `extension/hierarchy.js` — the page. Flat rows built once with a DocumentFragment; folding only
   toggles `hidden` on a row range; "Show API names" is a CSS class; the search renders at most 50
-  list items. `?host=`, `?dev=1`, `?demo=1` as elsewhere. Demo:
+  list items. Show users: each row has a `.people` block filled in place (no re-render, no org call) when the
+  field or the inactive box changes; users are cached per tree in a `WeakMap`, memory only; a failed user
+  read is kept on the entry and shown as a message about users only (raw text in Notes). `?host=`, `?dev=1`, `?demo=1` as elsewhere. Demo:
   `http://127.0.0.1:8765/hierarchy.html?demo=1`.
 - Samples: `extension/samples/hierarchy_territories.json`, `hierarchy_roles.json` (made-up, written
-  by hand; `make_samples.py` does not rebuild them).
+  by hand; `make_samples.py` does not rebuild them). Each has made-up users (`users` on the role file and on
+  each model: `{id, nodeId, name, username, email, active}`; Ids like `005000000000001AAA`, example.com
+  addresses). A test checks they stay synthetic.
 - Tests: `tests/hierarchy_tests.mjs`, run from `tests/run_tests.mjs` (includes the no-innerHTML,
   no-storage guard for the new files).
-- Rules that matter: reads only; org text only through `textContent` / `el()`; nothing stored; names
-  that repeat are told apart by path, never by name alone.
+- Rules that matter: reads only; org text only through `textContent` / `el()`; nothing stored (user data
+  lives in memory for the page session; the only copy is the CSV the person downloads, which contains
+  usernames or emails, so say so); names that repeat are told apart by path, never by name alone; the tree's
+  load does not read users.
 
 ## When to use it
 

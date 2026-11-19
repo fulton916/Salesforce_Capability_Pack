@@ -55,13 +55,35 @@ works like the other pages (same stylesheet, org name with Sandbox or Production
   folded nodes. The tree is in the cells: columns "Level 1" to "Level N", one name per row in the
   column for its level, then "API name" and "Path" (the full path from the top of the whole hierarchy).
   The file name has Territories or Roles, the model, and the branch name.
+- **Show users** (next to "Show API names"): who is in each role or territory. Choose what to show for
+  each person: Name, Username, Email or Salesforce ID ("Don't show" is the default, and then the page is
+  as above). "Include inactive users" (off by default, shown only when users are shown) adds inactive
+  users, marked "(inactive)". Each role or territory shows a count ("3 users", or "No users") and its
+  users in muted text, sorted by what is shown; when there are more than 10, "Show all 25" opens the
+  rest. Names in a list are separated by "; " (real text, so copying keeps them apart). The summary adds
+  "5,812 active users" on Roles. On Territories it counts people and assignments separately, for example
+  "2,971 active people in 6,207 territory assignments": a person in two territories is one person but
+  appears in both rows, and the rows and the download count assignments. Users are read the first time this is turned on for
+  a view and kept only while the page is open; changing the field or the inactive box does not read the
+  org again. If the users cannot be read (for example your user may not see users) the page says so
+  next to the tree and the tree still works. In a branch, only that branch's users are shown and counted.
+  On Roles, people in portal or community roles are not read or shown; a note (whole tree only, not in a branch) gives how many (active ones, or all of them when "Include inactive users" is on). If that count cannot be read, the note is left out and the reason goes under Notes.
+- The download, when users are shown, adds after "Path" a "Users" column (the count) and then "User 1",
+  "User 2", ... in the same row as their role or territory, as many as the busiest row needs. Each cell
+  holds what is chosen on the page, in the same order, with " (inactive)" when inactive users are
+  included. **That file contains people's usernames or emails: handle it like the user list it is.** A role or territory with many users makes a wide file, one column per person (one role with about 1,650 users gives about 1,650 columns). This is on purpose: each person sits in their own cell, so Excel functions such as COUNTIF, XLOOKUP and filters work on them.
+  With "Don't show" the file is exactly as before.
 
 It reads (all `SELECT`, nothing else): `Territory2Model`, `Territory2` (one model), `UserRole` (roles
-that are not portal roles, plus a `COUNT()` of the portal ones). Your user needs API Enabled and View
-Setup and Configuration. Nothing is saved, in the browser or in a file.
+that are not portal roles, plus a `COUNT()` of the portal ones). Only when "Show users" is turned on it
+also reads `User` (users in roles that are not portal roles, plus two `COUNT()`s of the portal ones; Roles view) or `UserTerritory2Association` with the user's
+name, username, email and active flag (the model on screen; Territories view).
+Active and inactive users are read together and filtered in the page. Your user needs API Enabled and
+View Setup and Configuration, and to be allowed to see users for "Show users". Nothing is saved in the
+browser. The only file is the CSV you download.
 
 Try it: `python tools/dev_server.py --no-org`, then open
-<http://127.0.0.1:8765/hierarchy.html?demo=1> (made-up territories and roles). Against an org through
+<http://127.0.0.1:8765/hierarchy.html?demo=1> (made-up territories, roles and users). Against an org through
 the dev server: `?dev=1`. The popup opens it as `hierarchy.html?host=<org host>`.
 
 Not checked against a live org yet: the reads were tested only against faked answers, and the page only
@@ -322,5 +344,5 @@ tool as `<page>?host=<org host>`.
 | `extension/lib/pick.js` | Matching for the group search box |
 | `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `extension/samples/` | Two synthetic snapshots, two synthetic users, and a synthetic territory model set and role list for the demos and the tests (the hierarchy samples are written by hand, not by `make_samples.py`) |
+| `extension/samples/` | Two synthetic snapshots, two synthetic users, and a synthetic territory model set and role list, each with made-up users (example.com addresses), for the demos and the tests (the hierarchy samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |

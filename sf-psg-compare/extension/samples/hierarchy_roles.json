@@ -1,6 +1,6 @@
 {
  "schema": "sf-hierarchy-sample/1",
- "note": "Made-up roles for the demo and the tests.",
+ "note": "Made-up roles and users for the demo and the tests.",
  "portalCount": 7,
  "roles": [
   {
@@ -200,6 +200,568 @@
    "parentId": "00E000000000031",
    "name": "Developer",
    "apiName": "Developer"
+  }
+ ],
+ "users": [
+  {
+   "id": "005000000000001AAA",
+   "name": "Blair Example",
+   "username": "blair.example1@demo.example.com",
+   "email": "blair.example1@example.com",
+   "active": true,
+   "nodeId": "00E000000000001"
+  },
+  {
+   "id": "005000000000002AAA",
+   "name": "Casey Example",
+   "username": "casey.example2@demo.example.com",
+   "email": "casey.example2@example.com",
+   "active": true,
+   "nodeId": "00E000000000002"
+  },
+  {
+   "id": "005000000000003AAA",
+   "name": "Drew Example",
+   "username": "drew.example3@demo.example.com",
+   "email": "drew.example3@example.com",
+   "active": true,
+   "nodeId": "00E000000000003"
+  },
+  {
+   "id": "005000000000004AAA",
+   "name": "Emery Example",
+   "username": "emery.example4@demo.example.com",
+   "email": "emery.example4@example.com",
+   "active": true,
+   "nodeId": "00E000000000003"
+  },
+  {
+   "id": "005000000000005AAA",
+   "name": "Finley Example",
+   "username": "finley.example5@demo.example.com",
+   "email": "finley.example5@example.com",
+   "active": true,
+   "nodeId": "00E000000000004"
+  },
+  {
+   "id": "005000000000006AAA",
+   "name": "Gray Example",
+   "username": "gray.example6@demo.example.com",
+   "email": "gray.example6@example.com",
+   "active": true,
+   "nodeId": "00E000000000004"
+  },
+  {
+   "id": "005000000000007AAA",
+   "name": "Harper Example",
+   "username": "harper.example7@demo.example.com",
+   "email": "harper.example7@example.com",
+   "active": true,
+   "nodeId": "00E000000000004"
+  },
+  {
+   "id": "005000000000008AAA",
+   "name": "Indigo Example",
+   "username": "indigo.example8@demo.example.com",
+   "email": "indigo.example8@example.com",
+   "active": true,
+   "nodeId": "00E000000000006"
+  },
+  {
+   "id": "005000000000009AAA",
+   "name": "Jules Example",
+   "username": "jules.example9@demo.example.com",
+   "email": "jules.example9@example.com",
+   "active": true,
+   "nodeId": "00E000000000006"
+  },
+  {
+   "id": "005000000000010AAA",
+   "name": "Kai Example",
+   "username": "kai.example10@demo.example.com",
+   "email": "kai.example10@example.com",
+   "active": true,
+   "nodeId": "00E000000000005"
+  },
+  {
+   "id": "005000000000011AAA",
+   "name": "Lane Example",
+   "username": "lane.example11@demo.example.com",
+   "email": "lane.example11@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000012AAA",
+   "name": "Morgan Example",
+   "username": "morgan.example12@demo.example.com",
+   "email": "morgan.example12@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000013AAA",
+   "name": "Noel Example",
+   "username": "noel.example13@demo.example.com",
+   "email": "noel.example13@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000014AAA",
+   "name": "Oakley Example",
+   "username": "oakley.example14@demo.example.com",
+   "email": "oakley.example14@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000015AAA",
+   "name": "Parker Example",
+   "username": "parker.example15@demo.example.com",
+   "email": "parker.example15@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000016AAA",
+   "name": "Quinn Example",
+   "username": "quinn.example16@demo.example.com",
+   "email": "quinn.example16@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000017AAA",
+   "name": "Reese Example",
+   "username": "reese.example17@demo.example.com",
+   "email": "reese.example17@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000018AAA",
+   "name": "Sage Example",
+   "username": "sage.example18@demo.example.com",
+   "email": "sage.example18@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000019AAA",
+   "name": "Tatum Example",
+   "username": "tatum.example19@demo.example.com",
+   "email": "tatum.example19@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000020AAA",
+   "name": "Alex Sample",
+   "username": "alex.sample20@demo.example.com",
+   "email": "alex.sample20@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000021AAA",
+   "name": "Blair Sample",
+   "username": "blair.sample21@demo.example.com",
+   "email": "blair.sample21@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000022AAA",
+   "name": "Casey Sample",
+   "username": "casey.sample22@demo.example.com",
+   "email": "casey.sample22@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000023AAA",
+   "name": "Drew Sample",
+   "username": "drew.sample23@demo.example.com",
+   "email": "drew.sample23@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000024AAA",
+   "name": "Emery Sample",
+   "username": "emery.sample24@demo.example.com",
+   "email": "emery.sample24@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000025AAA",
+   "name": "Finley Sample",
+   "username": "finley.sample25@demo.example.com",
+   "email": "finley.sample25@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000026AAA",
+   "name": "Gray Sample",
+   "username": "gray.sample26@demo.example.com",
+   "email": "gray.sample26@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000027AAA",
+   "name": "Harper Sample",
+   "username": "harper.sample27@demo.example.com",
+   "email": "harper.sample27@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000028AAA",
+   "name": "Indigo Sample",
+   "username": "indigo.sample28@demo.example.com",
+   "email": "indigo.sample28@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000029AAA",
+   "name": "Jules Sample",
+   "username": "jules.sample29@demo.example.com",
+   "email": "jules.sample29@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000030AAA",
+   "name": "Kai Sample",
+   "username": "kai.sample30@demo.example.com",
+   "email": "kai.sample30@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000031AAA",
+   "name": "Lane Sample",
+   "username": "lane.sample31@demo.example.com",
+   "email": "lane.sample31@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000032AAA",
+   "name": "Morgan Sample",
+   "username": "morgan.sample32@demo.example.com",
+   "email": "morgan.sample32@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000033AAA",
+   "name": "Noel Sample",
+   "username": "noel.sample33@demo.example.com",
+   "email": "noel.sample33@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000034AAA",
+   "name": "Oakley Sample",
+   "username": "oakley.sample34@demo.example.com",
+   "email": "oakley.sample34@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000035AAA",
+   "name": "Parker Sample",
+   "username": "parker.sample35@demo.example.com",
+   "email": "parker.sample35@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000036AAA",
+   "name": "Quinn Sample",
+   "username": "quinn.sample36@demo.example.com",
+   "email": "quinn.sample36@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000037AAA",
+   "name": "Reese Sample",
+   "username": "reese.sample37@demo.example.com",
+   "email": "reese.sample37@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000038AAA",
+   "name": "Sage Sample",
+   "username": "sage.sample38@demo.example.com",
+   "email": "sage.sample38@example.com",
+   "active": true,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000039AAA",
+   "name": "Tatum Sample",
+   "username": "tatum.sample39@demo.example.com",
+   "email": "tatum.sample39@example.com",
+   "active": true,
+   "nodeId": "00E000000000008"
+  },
+  {
+   "id": "005000000000040AAA",
+   "name": "Alex Demo",
+   "username": "alex.demo40@demo.example.com",
+   "email": "alex.demo40@example.com",
+   "active": true,
+   "nodeId": "00E000000000009"
+  },
+  {
+   "id": "005000000000041AAA",
+   "name": "Blair Demo",
+   "username": "blair.demo41@demo.example.com",
+   "email": "blair.demo41@example.com",
+   "active": true,
+   "nodeId": "00E000000000009"
+  },
+  {
+   "id": "005000000000042AAA",
+   "name": "Casey Demo",
+   "username": "casey.demo42@demo.example.com",
+   "email": "casey.demo42@example.com",
+   "active": true,
+   "nodeId": "00E000000000009"
+  },
+  {
+   "id": "005000000000043AAA",
+   "name": "Drew Demo",
+   "username": "drew.demo43@demo.example.com",
+   "email": "drew.demo43@example.com",
+   "active": true,
+   "nodeId": "00E000000000009"
+  },
+  {
+   "id": "005000000000044AAA",
+   "name": "Emery Demo",
+   "username": "emery.demo44@demo.example.com",
+   "email": "emery.demo44@example.com",
+   "active": true,
+   "nodeId": "00E000000000012"
+  },
+  {
+   "id": "005000000000045AAA",
+   "name": "Finley Demo",
+   "username": "finley.demo45@demo.example.com",
+   "email": "finley.demo45@example.com",
+   "active": true,
+   "nodeId": "00E000000000013"
+  },
+  {
+   "id": "005000000000046AAA",
+   "name": "Gray Demo",
+   "username": "gray.demo46@demo.example.com",
+   "email": "gray.demo46@example.com",
+   "active": true,
+   "nodeId": "00E000000000013"
+  },
+  {
+   "id": "005000000000047AAA",
+   "name": "Harper Demo",
+   "username": "harper.demo47@demo.example.com",
+   "email": "harper.demo47@example.com",
+   "active": true,
+   "nodeId": "00E000000000013"
+  },
+  {
+   "id": "005000000000048AAA",
+   "name": "Indigo Demo",
+   "username": "indigo.demo48@demo.example.com",
+   "email": "indigo.demo48@example.com",
+   "active": true,
+   "nodeId": "00E000000000016"
+  },
+  {
+   "id": "005000000000049AAA",
+   "name": "Jules Demo",
+   "username": "jules.demo49@demo.example.com",
+   "email": "jules.demo49@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000050AAA",
+   "name": "Kai Demo",
+   "username": "kai.demo50@demo.example.com",
+   "email": "kai.demo50@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000051AAA",
+   "name": "Lane Demo",
+   "username": "lane.demo51@demo.example.com",
+   "email": "lane.demo51@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000052AAA",
+   "name": "Morgan Demo",
+   "username": "morgan.demo52@demo.example.com",
+   "email": "morgan.demo52@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000053AAA",
+   "name": "Noel Demo",
+   "username": "noel.demo53@demo.example.com",
+   "email": "noel.demo53@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000054AAA",
+   "name": "Oakley Demo",
+   "username": "oakley.demo54@demo.example.com",
+   "email": "oakley.demo54@example.com",
+   "active": true,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000055AAA",
+   "name": "Parker Demo",
+   "username": "parker.demo55@demo.example.com",
+   "email": "parker.demo55@example.com",
+   "active": true,
+   "nodeId": "00E000000000018"
+  },
+  {
+   "id": "005000000000056AAA",
+   "name": "Quinn Demo",
+   "username": "quinn.demo56@demo.example.com",
+   "email": "quinn.demo56@example.com",
+   "active": true,
+   "nodeId": "00E000000000018"
+  },
+  {
+   "id": "005000000000057AAA",
+   "name": "Reese Demo",
+   "username": "reese.demo57@demo.example.com",
+   "email": "reese.demo57@example.com",
+   "active": true,
+   "nodeId": "00E000000000018"
+  },
+  {
+   "id": "005000000000058AAA",
+   "name": "Sage Demo",
+   "username": "sage.demo58@demo.example.com",
+   "email": "sage.demo58@example.com",
+   "active": true,
+   "nodeId": "00E000000000027"
+  },
+  {
+   "id": "005000000000059AAA",
+   "name": "Tatum Demo",
+   "username": "tatum.demo59@demo.example.com",
+   "email": "tatum.demo59@example.com",
+   "active": true,
+   "nodeId": "00E000000000029"
+  },
+  {
+   "id": "005000000000060AAA",
+   "name": "Alex Testfield",
+   "username": "alex.testfield60@demo.example.com",
+   "email": "alex.testfield60@example.com",
+   "active": true,
+   "nodeId": "00E000000000029"
+  },
+  {
+   "id": "005000000000061AAA",
+   "name": "Blair Testfield",
+   "username": "blair.testfield61@demo.example.com",
+   "email": "blair.testfield61@example.com",
+   "active": true,
+   "nodeId": "00E000000000032"
+  },
+  {
+   "id": "005000000000062AAA",
+   "name": "Casey Testfield",
+   "username": "casey.testfield62@demo.example.com",
+   "email": "casey.testfield62@example.com",
+   "active": true,
+   "nodeId": "00E000000000032"
+  },
+  {
+   "id": "005000000000063AAA",
+   "name": "Drew Testfield",
+   "username": "drew.testfield63@demo.example.com",
+   "email": "drew.testfield63@example.com",
+   "active": true,
+   "nodeId": "00E000000000033"
+  },
+  {
+   "id": "005000000000064AAA",
+   "name": "Emery Testfield",
+   "username": "emery.testfield64@demo.example.com",
+   "email": "emery.testfield64@example.com",
+   "active": true,
+   "nodeId": "00E000000000033"
+  },
+  {
+   "id": "005000000000065AAA",
+   "name": "Finley Testfield",
+   "username": "finley.testfield65@demo.example.com",
+   "email": "finley.testfield65@example.com",
+   "active": true,
+   "nodeId": "00E000000000033"
+  },
+  {
+   "id": "005000000000066AAA",
+   "name": "Gray Testfield",
+   "username": "gray.testfield66@demo.example.com",
+   "email": "gray.testfield66@example.com",
+   "active": false,
+   "nodeId": "00E000000000011"
+  },
+  {
+   "id": "005000000000067AAA",
+   "name": "Harper Testfield",
+   "username": "harper.testfield67@demo.example.com",
+   "email": "harper.testfield67@example.com",
+   "active": false,
+   "nodeId": "00E000000000017"
+  },
+  {
+   "id": "005000000000068AAA",
+   "name": "Indigo Testfield",
+   "username": "indigo.testfield68@demo.example.com",
+   "email": "indigo.testfield68@example.com",
+   "active": false,
+   "nodeId": "00E000000000033"
+  },
+  {
+   "id": "005000000000069AAA",
+   "name": "Jules Testfield",
+   "username": "jules.testfield69@demo.example.com",
+   "email": "jules.testfield69@example.com",
+   "active": false,
+   "nodeId": "00E000000000029"
+  },
+  {
+   "id": "005000000000070AAA",
+   "name": "Kai Testfield",
+   "username": "kai.testfield70@demo.example.com",
+   "email": "kai.testfield70@example.com",
+   "active": true,
+   "nodeId": "00E999999999999"
   }
  ]
 }

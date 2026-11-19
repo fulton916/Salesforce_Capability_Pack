@@ -135,15 +135,112 @@ export function summaryText({ count, levels }, kind) {
   return `${num(count)} ${count === 1 ? nn.one : nn.many}, ${levels} ${levels === 1 ? "level" : "levels"}`;
 }
 
-/** Plain-words notes about records that did not fit the tree. */
-export function treeNotes(tree, kind) {
+/** Plain-words notes about records that did not fit the tree. With `items` (the flattened list of a
+ *  branch), only the nodes on screen are counted, so a branch does not report problems elsewhere. */
+export function treeNotes(tree, kind, items = null) {
   const nn = NOUNS[kind];
   const notes = [];
-  const n = tree.missingParent;
+  let n = tree.missingParent;
+  let l = tree.loopNodes;
+  if (items) {
+    n = 0; l = 0;
+    for (const { node } of items) { if (node.orphan) n++; if (node.inLoop) l++; }
+  }
   if (n) notes.push(`${num(n)} ${n === 1 ? nn.one : nn.many} ${n === 1 ? "has a parent that is not in this list, so it is" : "have a parent that is not in this list, so they are"} shown at the top level.`);
-  const l = tree.loopNodes;
   if (l) notes.push(`${num(l)} ${l === 1 ? nn.one : nn.many} ${l === 1 ? "is its own parent" : "have parents that lead back to themselves"}. The loop is cut and one of them is shown at the top level; each one in the loop is marked "Parent loop".`);
   return notes;
+}
+
+// ---------- users in each role / territory ----------
+
+/** What the person can choose to show for each user. */
+export const USER_FIELDS = {
+  name: { label: "Name", short: "name" },
+  username: { label: "Username", short: "username" },
+  email: { label: "Email", short: "email" },
+  id: { label: "Salesforce ID", short: "Salesforce ID" },
+};
+
+const USER_COLLATOR = new Intl.Collator("en", { sensitivity: "base" });
+
+/** The text shown (and exported) for one user in the chosen field. */
+export function userValue(u, field) {
+  const v = String(u[field] ?? "").trim();
+  return v || `(no ${USER_FIELDS[field]?.short || field})`;
+}
+
+/** Put users on the nodes of a tree. `records` are {id, nodeId, name, username, email, active}:
+ *  one per person per role/territory (a person in two territories appears twice). Records for a node that
+ *  is not in the tree are not attached; they come back in `unmatched` (one entry per person).
+ *  A person listed twice for the same node is kept once. Returns {byNode: Map(nodeId -> users[]), unmatched}.
+ *  The tree itself is not changed. */
+export function attachUsers(tree, records) {
+  const ids = new Set(tree.order.map((n) => n.id));
+  const byNode = new Map();
+  const seen = new Set();
+  const unmatchedIds = new Set();
+  const unmatched = [];
+  for (const r of records || []) {
+    const id = String(r.id ?? "");
+    const nodeId = String(r.nodeId ?? "");
+    if (!id || !nodeId) continue;
+    const user = { id, name: String(r.name ?? ""), username: String(r.username ?? ""), email: String(r.email ?? ""), active: r.active !== false };
+    if (!ids.has(nodeId)) {
+      if (!unmatchedIds.has(id)) { unmatchedIds.add(id); unmatched.push(user); }
+      continue;
+    }
+    const key = `${nodeId}|${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (!byNode.has(nodeId)) byNode.set(nodeId, []);
+    byNode.get(nodeId).push(user);
+  }
+  return { byNode, unmatched };
+}
+
+/** The users of one node as they are shown: inactive ones only when `includeInactive`, sorted by the chosen
+ *  field (case-insensitive, then by Id). Each is {id, text, active, display}; `display` is `text`
+ *  with " (inactive)" added for an inactive user. */
+export function listUsers(byNode, node, field, includeInactive = false) {
+  const users = byNode.get(node.id) || [];
+  const out = [];
+  for (const u of users) {
+    if (!u.active && !includeInactive) continue;
+    const text = userValue(u, field);
+    out.push({ id: u.id, text, active: u.active, display: u.active ? text : `${text} (inactive)` });
+  }
+  out.sort((a, b) => USER_COLLATOR.compare(a.text, b.text) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  return out;
+}
+
+/** On the listed nodes: {active, inactive} count different people (a person in two nodes counts once);
+ *  {activeAssignments, inactiveAssignments} count person-in-node pairs (what the rows and the CSV show). */
+export function countUsers(byNode, items) {
+  const active = new Set();
+  const inactive = new Set();
+  let activeAssignments = 0;
+  let inactiveAssignments = 0;
+  for (const { node } of items) {
+    for (const u of byNode.get(node.id) || []) {
+      (u.active ? active : inactive).add(u.id);
+      if (u.active) activeAssignments++; else inactiveAssignments++;
+    }
+  }
+  return { active: active.size, inactive: inactive.size, activeAssignments, inactiveAssignments };
+}
+
+/** Roles: "5,812 active users" (and ", 40 inactive" when inactive users are included).
+ *  Territories: "2,971 active people in 6,207 territory assignments" (a person in two territories is one
+ *  person and two assignments; with inactive included: "2,971 active and 40 inactive people in 6,300 ..."). */
+export function usersSummary({ active, inactive, activeAssignments = 0, inactiveAssignments = 0 }, includeInactive, kind = "roles") {
+  if (kind === "territories") {
+    const a = activeAssignments + (includeInactive ? inactiveAssignments : 0);
+    const who = includeInactive ? `${num(active)} active and ${num(inactive)} inactive people` : `${num(active)} active ${active === 1 ? "person" : "people"}`;
+    return `${who} in ${num(a)} territory ${a === 1 ? "assignment" : "assignments"}`;
+  }
+  let t = `${num(active)} active ${active === 1 ? "user" : "users"}`;
+  if (includeInactive) t += `, ${num(inactive)} inactive`;
+  return t;
 }
 
 /** Territory models, Active first, then Planning, then Archived, then by name. */
@@ -184,14 +281,19 @@ export function searchNodes(tree, text, limit = 50) {
 /** Rows for Excel, a stepped layout: "Level 1" ... "Level N" (N = deepest level exported), "API name",
  *  "Path". Each row has its name in the column for its depth (the exported top is Level 1) and the
  *  other level columns empty. "Path" is the full path from the top of the whole hierarchy.
- *  `top` is a node for one branch, or null for everything. The first row is the header. */
-export function exportRows(tree, top = null) {
+ *  `top` is a node for one branch, or null for everything. The first row is the header.
+ *  `users` (optional) is {byNode, field, includeInactive}: then "Users" (the count) follows "Path", and
+ *  then "User 1", "User 2", ... up to the most users on one row; each cell holds the chosen field, in the
+ *  order shown on the page, with " (inactive)" for an inactive user. Without `users` the rows are unchanged. */
+export function exportRows(tree, top = null, users = null) {
   const items = top ? flatten([top]) : flatten(tree.roots);
   const above = top ? pathOf(top).slice(0, -1).map((n) => n.name) : [];
   const { levels } = statsOf(items);
   const width = Math.max(levels, 1);
   const rows = [[...Array.from({ length: width }, (_, i) => `Level ${i + 1}`), "API name", "Path"]];
   const names = above.slice();
+  const lists = [];
+  let most = 0;
   for (const { node, depth } of items) {
     const abs = above.length + depth;
     names.length = abs;
@@ -201,6 +303,17 @@ export function exportRows(tree, top = null) {
     row[width] = node.apiName;
     row[width + 1] = names.join(PATH_SEP);
     rows.push(row);
+    if (users) {
+      const list = listUsers(users.byNode, node, users.field, users.includeInactive).map((u) => u.display);
+      lists.push(list);
+      if (list.length > most) most = list.length;
+    }
+  }
+  if (users) {
+    rows[0].push("Users", ...Array.from({ length: most }, (_, i) => `User ${i + 1}`));
+    lists.forEach((list, i) => {
+      rows[i + 1].push(String(list.length), ...list, ...new Array(most - list.length).fill(""));
+    });
   }
   return rows;
 }
