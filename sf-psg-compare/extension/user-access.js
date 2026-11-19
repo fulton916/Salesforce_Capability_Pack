@@ -80,7 +80,7 @@ function showOrg(o, host, via) {
     via ? el("span", { class: "badge demo", text: via }) : null,
     el("span", { class: "host", text: host })
   );
-  document.title = `Look up user access – ${o.name || host}`;
+  document.title = `User access summary and comparison – ${o.name || host}`;
 }
 
 async function connect() {

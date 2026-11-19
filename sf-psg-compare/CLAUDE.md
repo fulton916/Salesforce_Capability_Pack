@@ -3,7 +3,7 @@
 ## What this is
 
 A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with three read-only tools,
-named in the toolbar menu "Compare permission set groups", "Look up user access" and "Territory & role hierarchy". It reads the
+named in the toolbar menu "Compare permission set groups", "User access summary and comparison" and "Territory & role hierarchy". It reads the
 org through the REST API with the user's existing browser session and never writes to the org.
 Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
 Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
@@ -18,7 +18,7 @@ Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and deve
 - `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
 - `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
-## Look up user access (second tool)
+## User access summary and comparison (second tool)
 
 A read-only page, `extension/user-access.html`, that shows one user's access (profile and license,
 role, permission set groups, permission sets with "directly / through group", permission set
@@ -68,7 +68,7 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
   "is the sandbox PSG the same as production?" → Compare permission set groups.
-- "What can this user access?", "how do these two users differ?" → Look up user access.
+- "What can this user access?", "how do these two users differ?" → User access summary and comparison.
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
 - "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.

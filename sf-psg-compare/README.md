@@ -1,7 +1,7 @@
 # sf-psg-compare
 
-A Chrome extension with three read-only tools: **Compare permission set groups**, **Look up user
-access**, and **Territory & role hierarchy**.
+A Chrome extension with three read-only tools: **Compare permission set groups**, **User access summary and comparison**,
+and **Territory & role hierarchy**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -13,7 +13,7 @@ Compare permission set groups:
 - Does group X have anything group Y doesn't?
 - Is the sandbox version of a group the same as production?
 
-Look up user access:
+User access summary and comparison:
 - What can this user access, and how do they get it (directly or through a group)?
 - How do two users' access differ?
 
@@ -27,7 +27,7 @@ Territory & role hierarchy:
   server (see "What has been tested").
 - A group is only read correctly when its Status is **Updated**. If it is Outdated or Failed, the
   page says so; recalculate the group in Setup and compare again.
-- Look up user access does not cover field or object access, what a permission set contains,
+- User access summary and comparison does not cover field or object access, what a permission set contains,
   sharing and record access, login history, or any change to a user.
 
 ## Territory & role hierarchy
@@ -83,7 +83,7 @@ push it by policy.
 
 - API Enabled.
 - View Setup and Configuration (to read permission sets, groups and their permissions).
-- For Look up user access, also access to see users.
+- For User access summary and comparison, also access to see users.
 - To name Apex classes and pages: read access to them is normal with View Setup. Items it cannot
   name are kept by Id with a note at the top.
 
@@ -92,7 +92,7 @@ push it by policy.
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
    and three buttons: **Compare permission set groups** ("Find out how two permission set groups
-   differ"), **Look up user access** ("See what a user can access, or compare two users") and
+   differ"), **User access summary and comparison** ("See what a user can access, or compare two users") and
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"). On
    any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
 3. The tool opens in a new tab, connected to that org.
@@ -162,7 +162,7 @@ Read and Edit; Edit muted removes Edit only. Saved group files from before this 
 their muted items are shown as "Removed by muting (not confirmed, older saved file)" because they
 cannot say whether anything was removed.
 
-### Look up user access
+### User access summary and comparison
 
 Type part of a name or username (words in any order) and pick the user from the list. Inactive
 users are marked "Inactive". Add a second user under "Second user (optional, to compare)" to compare;
@@ -210,7 +210,7 @@ Compare permission set groups:
     not report that as removed by muting.
   - Timing: about 4 to 5 seconds per large group, about 10 to 15 seconds to compare two large groups.
 
-Look up user access:
+User access summary and comparison:
 - A Developer Edition org (search, permission sets, licenses and compare worked; territories are off
   there and are handled) and a large sandbox with about 6,000 users. On the sandbox, a user with 3
   permission set groups, 18 permission sets (9 only through groups), 11 licenses, 3 public groups,
@@ -252,7 +252,7 @@ mute to the aggregate, hence the "Removed by muting" check above. Per group it r
 | Muting | the muting set's own permissions, fields, objects and tabs; then, for those items only, what the other permission sets give (`FieldPermissions`, `ObjectPermissions`, `PermissionSetTabSetting`, the muted `Permissions*` fields, `SetupEntityAccess`) |
 | Assignments | `COUNT()` on `PermissionSetAssignment` |
 
-Look up user access reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
+User access summary and comparison reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
 `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`, `UserLicense`,
 `PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
 `UserTerritory2Association`. The user search runs in the org (LIKE, limit 50), so it works with
@@ -310,7 +310,7 @@ tool as `<page>?host=<org host>`.
 | `extension/manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs; Salesforce hosts only) |
 | `extension/popup.*` | Toolbar popup: a menu of tools. Detects the org in the current tab and opens the chosen page |
 | `extension/psg-compare.*` | The Compare permission set groups page |
-| `extension/user-access.*` | The Look up user access page (html, js, and a little extra css on top of `psg-compare.css`) |
+| `extension/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `psg-compare.css`) |
 | `extension/lib/useraccess.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
 | `extension/lib/usercompare.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
 | `extension/hierarchy.*` | The Territory & role hierarchy page (html, js, and extra css on top of `psg-compare.css`) |

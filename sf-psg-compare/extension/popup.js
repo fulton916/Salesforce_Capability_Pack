@@ -9,7 +9,7 @@ const TOOLS = [
   },
   {
     page: "user-access.html",
-    title: "Look up user access",
+    title: "User access summary and comparison",
     description: "See what a user can access, or compare two users",
   },
   {
