@@ -1,5 +1,5 @@
 {
-  "schema": "sf-psg-snapshot/1",
+  "schema": "sf-psg-snapshot/2",
   "takenAt": "2026-11-18T15:00:00.000Z",
   "org": {
     "id": "00D000000000001EAA",
@@ -244,6 +244,18 @@
     "Widget__c": "DefaultOn",
     "standard-Forecasting3": "DefaultOn",
     "Quota__c": "DefaultOn"
+  },
+  "objectLabels": {
+    "Widget__c": "Widget",
+    "Quota__c": "Sales Quota"
+  },
+  "fieldLabels": {
+    "Account.Industry": "Industry",
+    "Account.AnnualRevenue": "Annual Revenue",
+    "Account.Rating": "Account Rating",
+    "Widget__c.Color__c": "Shade",
+    "Widget__c.Size__c": "Dimensions",
+    "Quota__c.Target__c": "Quota Target"
   },
   "warnings": []
 }

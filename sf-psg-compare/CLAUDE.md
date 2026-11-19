@@ -9,7 +9,7 @@ browser session and never writes to the org.
 - `extension/lib/sfconn.js` — finds the API session from the `sid` cookie; `SfApi.query` pages
   through `nextRecordsUrl`.
 - `extension/lib/snapshot.js` — `takeSnapshot(api, psgId)` reads one group into a JSON snapshot
-  (`schema: "sf-psg-snapshot/1"`). Permissions come from the group's aggregate permission set
+  (`schema: "sf-psg-snapshot/2"`; `/1` files still load, see `ACCEPTED_SCHEMAS`). Permissions come from the group's aggregate permission set
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights}`. Pure.
 - `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.

@@ -48,6 +48,16 @@ the muting permission set. It is what a user assigned to the group actually gets
 It is only current when the group's Status is **Updated**. If a group is `Outdated` or `Failed`,
 the tool says so at the top. Recalculate the group in Setup and compare again.
 
+### What muting really takes away
+
+A muting permission set can list things no permission set in the group gives, and Salesforce does
+not always apply a mute to the aggregate. So "Taken away by muting" lists an item only if it is
+muted, at least one permission set in the group gives it, and the aggregate no longer has it. On a
+field, Read muted takes away Read and Edit; Edit muted takes away Edit only. The notes add one line
+with how many muted items took nothing away. Snapshot files saved before this check
+(`sf-psg-snapshot/1`) still load; their muted items are shown under "Muted (may not have been
+given)" because they cannot say whether anything was removed.
+
 ### Compare across orgs (sandbox vs production)
 
 "Save snapshot A/B" downloads the group as a JSON file. Load that file on either side later, in
@@ -117,7 +127,7 @@ Open <http://127.0.0.1:8765/psg-compare.html?dev=1>.
 ## How it reads the org
 
 All requests go from the extension page straight to `https://<your org>/services/data/v62.0/`.
-Nothing is sent anywhere else. Per group it runs about 15 to 25 queries:
+Nothing is sent anywhere else. Per group it runs about 25 to 30 queries (all reads):
 
 | Read | Query |
 |---|---|
@@ -125,8 +135,10 @@ Nothing is sent anywhere else. Per group it runs about 15 to 25 queries:
 | Contents | `PermissionSetGroupComponent`, then `PermissionSet` / `MutingPermissionSet`, licence names |
 | System permissions | every boolean `Permissions*` field of `PermissionSet` (from describe), in chunks |
 | Objects / fields | `ObjectPermissions`, `FieldPermissions` where `ParentId` = aggregate permission set |
-| Setup access | `SetupEntityAccess`, then the named object per type (some through the Tooling API) |
+| Field labels | `FieldDefinition` (real field labels), one query per 20 objects, at most 3 at a time. Labels are the ones Setup shows, which can occasionally differ from the label in a page layout or describe (for example a standard field renamed in one place). Fields the reading user cannot see keep a name made from the API name. If the query fails, labels are made from API names and the notes say so |
+| Setup access | `SetupEntityAccess`, then the named object per type (external credential principals through the Tooling API). Items that cannot be named are listed as "Name not available (Id …)" with a count in the notes |
 | Tabs | `PermissionSetTabSetting` |
+| Muting | the muting set's own permissions, fields, objects and tabs; then, for those items only, what the other permission sets give (`FieldPermissions`, `ObjectPermissions`, `PermissionSetTabSetting`, the muted `Permissions*` fields, `SetupEntityAccess`) |
 | Assignments | `COUNT()` on `PermissionSetAssignment` |
 
 The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector

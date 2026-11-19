@@ -1,5 +1,5 @@
 {
-  "schema": "sf-psg-snapshot/1",
+  "schema": "sf-psg-snapshot/2",
   "takenAt": "2026-11-18T15:00:00.000Z",
   "org": {
     "id": "00D000000000001EAA",
@@ -61,7 +61,8 @@
     "name": "Sales_Rep_Muting",
     "label": "Sales Rep Muting",
     "userPermissions": {
-      "PermissionsExportReport": "Export Reports"
+      "PermissionsExportReport": "Export Reports",
+      "PermissionsManageUsers": "Manage Users"
     },
     "objectPermissions": {
       "Opportunity": {
@@ -79,6 +80,36 @@
         "Read": false,
         "Edit": true
       }
+    },
+    "tabSettings": {
+      "standard-Forecasting3": "DefaultOn"
+    },
+    "effective": {
+      "userPermissions": {
+        "PermissionsExportReport": "Export Reports"
+      },
+      "objectPermissions": {
+        "Opportunity": {
+          "Read": false,
+          "Create": false,
+          "Edit": false,
+          "Delete": true,
+          "ViewAllFields": false,
+          "ViewAllRecords": false,
+          "ModifyAllRecords": false
+        }
+      },
+      "fieldPermissions": {
+        "Account.AnnualRevenue": {
+          "Read": false,
+          "Edit": true
+        }
+      },
+      "tabSettings": {
+        "standard-Forecasting3": "DefaultOn"
+      },
+      "setupAccess": {},
+      "nothingToTake": 1
     }
   },
   "assignments": {
@@ -214,6 +245,16 @@
     "standard-Opportunity": "DefaultOn",
     "Widget__c": "DefaultOff",
     "standard-Campaign": "DefaultOff"
+  },
+  "objectLabels": {
+    "Widget__c": "Widget"
+  },
+  "fieldLabels": {
+    "Account.Industry": "Industry",
+    "Account.AnnualRevenue": "Annual Revenue",
+    "Account.Rating": "Account Rating",
+    "Widget__c.Color__c": "Shade",
+    "Widget__c.Size__c": "Dimensions"
   },
   "warnings": []
 }

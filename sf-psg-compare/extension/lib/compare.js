@@ -77,10 +77,22 @@ export const SECTION_HELP = {
   tabs: "Which tabs users see in the app navigation.",
 };
 
+/** A 15 or 18 character Salesforce Id (letters and digits, at least one digit). */
+export function looksLikeId(v) {
+  return /^(?=.*\d)[A-Za-z0-9]{15}([A-Za-z0-9]{3})?$/.test(String(v || ""));
+}
+
+/** Trim a label from the org and collapse inner whitespace. */
+export function clean(v) {
+  return typeof v === "string" ? v.replace(/\s+/g, " ").trim() : v;
+}
+
 /** Turn an API name into words: "Account_to_Account_Relation__c" -> "Account to Account Relation". */
 export function humanize(api) {
-  return String(api || "")
-    .replace(/^[A-Za-z0-9]+__(?=.+__)/, "") // namespace prefix
+  const raw = String(api || "");
+  if (looksLikeId(raw)) return raw; // never split an Id into word pieces
+  return raw
+    .replace(/^[A-Za-z0-9]+__(?!(c|r|mdt|e|x|b|kav|ka|share|history|feed)$)(?=.)/i, "") // namespace prefix
     .replace(/__(c|r|mdt|e|x|b|kav|ka|share|history|feed)$/i, "")
     .replace(/_/g, " ")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
@@ -90,7 +102,13 @@ export function humanize(api) {
 }
 
 function objectName(labels, api) {
-  return (labels && labels[api]) || humanize(api);
+  return clean(labels && labels[api]) || humanize(api);
+}
+
+/** The field's label from the snapshot, or words made from its API name. */
+function fieldLabel(fieldLabels, key) {
+  const dot = key.indexOf(".");
+  return clean(fieldLabels && fieldLabels[key]) || humanize(dot < 0 ? key : key.slice(dot + 1));
 }
 
 function flagsOn(flags) {
@@ -130,7 +148,7 @@ function tally(rows) {
 
 const byLabel = (x, y) => (x.group || "").localeCompare(y.group || "") || x.label.localeCompare(y.label);
 
-function compareComponents(a, b, labels) {
+function compareComponents(a, b, labels, fieldLabels) {
   const map = (s) => Object.fromEntries((s.components || []).map((c) => [c.name, c]));
   const ma = map(a);
   const mb = map(b);
@@ -140,7 +158,7 @@ function compareComponents(a, b, labels) {
     const c = ca || cb;
     return {
       key: k,
-      label: c.label || humanize(k),
+      label: clean(c.label) || humanize(k),
       group: c.isMuting ? "Muting permission set" : "Permission set",
       status: presence(!!ca, !!cb),
       a: ca ? ca.licence || "Included" : null,
@@ -148,44 +166,59 @@ function compareComponents(a, b, labels) {
     };
   });
   // What each muting permission set takes away, matched by permission (not by muting set name).
-  const mutedA = mutedItems(a, labels);
-  const mutedB = mutedItems(b, labels);
-  const muted = keysOf(mutedA, mutedB).map((k) => {
-    const m = mutedA[k] || mutedB[k];
+  const mutedA = mutedItems(a, labels, fieldLabels);
+  const mutedB = mutedItems(b, labels, fieldLabels);
+  // Older snapshots do not say whether a mute removed anything, so they cannot claim it did.
+  const groupName = mutedA.legacy || mutedB.legacy ? MUTED_LEGACY : MUTED_GROUP;
+  const muted = keysOf(mutedA.items, mutedB.items).map((k) => {
+    const m = mutedA.items[k] || mutedB.items[k];
     return {
       key: m.key,
       label: m.label,
-      group: "Taken away by muting",
-      status: presence(k in mutedA, k in mutedB),
-      a: k in mutedA ? mutedA[k].what : null,
-      b: k in mutedB ? mutedB[k].what : null,
+      group: groupName,
+      status: presence(k in mutedA.items, k in mutedB.items),
+      a: k in mutedA.items ? mutedA.items[k].what : null,
+      b: k in mutedB.items ? mutedB.items[k].what : null,
     };
   });
   return [...sets.sort(byLabel), ...muted.sort(byLabel)];
 }
 
-function mutedItems(s, labels) {
+export const MUTED_GROUP = "Taken away by muting";
+export const MUTED_LEGACY = "Muted (may not have been given)";
+
+/**
+ * Items of a snapshot's muting permission set, as { items, legacy }.
+ * With `muting.effective` (snapshot v2) only what muting really removes is listed.
+ * Without it (v1) every muted item is listed and `legacy` is true.
+ */
+function mutedItems(s, labels, fieldLabels) {
   const m = s.muting;
-  const out = {};
-  if (!m) return out;
-  for (const [k, label] of Object.entries(m.userPermissions || {})) {
-    out[`muted|user|${k}`] = { key: k, label, what: "General permission" };
+  const items = {};
+  if (!m) return { items, legacy: false };
+  const e = m.effective;
+  const names = (flags) => flagsOn(flags).map((f) => FLAG_LABELS[f] || f).join(", ");
+  const add = (kind, k, label, what) => { items[`muted|${kind}|${k}`] = { key: k, label, what }; };
+  const src = e || m;
+  for (const [k, label] of Object.entries(src.userPermissions || {})) add("user", k, clean(label), "General permission");
+  for (const [k, flags] of Object.entries(src.objectPermissions || {})) {
+    if (flagsOn(flags).length) add("object", k, objectName(labels, k), names(flags));
   }
-  for (const [k, flags] of Object.entries(m.objectPermissions || {})) {
+  for (const [k, flags] of Object.entries(src.fieldPermissions || {})) {
     const on = flagsOn(flags);
-    if (on.length) out[`muted|object|${k}`] = { key: k, label: objectName(labels, k), what: on.map((f) => FLAG_LABELS[f] || f).join(", ") };
+    if (on.length) add("field", k, fieldName(labels, fieldLabels, k), on.join(", "));
   }
-  for (const [k, flags] of Object.entries(m.fieldPermissions || {})) {
-    const on = flagsOn(flags);
-    if (on.length) out[`muted|field|${k}`] = { key: k, label: fieldName(labels, k), what: on.join(", ") };
+  for (const [k, vis] of Object.entries(src.tabSettings || {})) {
+    add("tab", k, `${objectName(labels, k.replace(/^standard-/, ""))} (tab)`, e ? "Tab" : TAB_LABELS[vis] || "Tab");
   }
-  return out;
+  for (const [k, entry] of Object.entries(e?.setupAccess || {})) add("setup", k, setupLabel(entry), entry.typeLabel || entry.type);
+  return { items, legacy: !e };
 }
 
-function fieldName(labels, key) {
+function fieldName(labels, fieldLabels, key) {
   const dot = key.indexOf(".");
   if (dot < 0) return humanize(key);
-  return `${objectName(labels, key.slice(0, dot))} › ${humanize(key.slice(dot + 1))}`;
+  return `${objectName(labels, key.slice(0, dot))} › ${fieldLabel(fieldLabels, key)}`;
 }
 
 function compareUserPermissions(a, b) {
@@ -193,7 +226,7 @@ function compareUserPermissions(a, b) {
   const ub = b.userPermissions || {};
   return keysOf(ua, ub).map((k) => ({
     key: k,
-    label: ua[k] || ub[k] || HIGH_RISK[k] || humanize(k.replace(/^Permissions/, "")),
+    label: clean(ua[k] || ub[k]) || HIGH_RISK[k] || humanize(k.replace(/^Permissions/, "")),
     highRisk: k in HIGH_RISK,
     status: presence(k in ua, k in ub),
     a: k in ua,
@@ -220,7 +253,7 @@ function fieldAccess(f) {
   return "No access";
 }
 
-function compareFields(a, b, labels) {
+function compareFields(a, b, labels, fieldLabels) {
   const fa = a.fieldPermissions || {};
   const fb = b.fieldPermissions || {};
   const rows = [];
@@ -231,7 +264,7 @@ function compareFields(a, b, labels) {
     const obj = dot > 0 ? k.slice(0, dot) : "";
     rows.push({
       key: k,
-      label: dot > 0 ? humanize(k.slice(dot + 1)) : humanize(k),
+      label: fieldLabel(fieldLabels, k),
       group: objectName(labels, obj),
       status,
       a: fieldAccess(fa[k]),
@@ -243,6 +276,12 @@ function compareFields(a, b, labels) {
   return rows.sort(byLabel);
 }
 
+/** Label of a setup item: its own label, a plain note when only the Id is known, or words from its name. */
+function setupLabel(e) {
+  if (e.byId || looksLikeId(e.name)) return `Name not available (Id ${e.name})`;
+  return clean(e.label) || humanize(e.name);
+}
+
 function compareSetup(a, b) {
   const sa = a.setupAccess || {};
   const sb = b.setupAccess || {};
@@ -250,7 +289,7 @@ function compareSetup(a, b) {
     const e = sa[k] || sb[k];
     return {
       key: e.name,
-      label: e.label || humanize(e.name),
+      label: setupLabel(e),
       group: e.typeLabel || e.type,
       status: presence(k in sa, k in sb),
       a: k in sa,
@@ -359,6 +398,13 @@ function highlights(a, b, sections) {
     push("note", "info", `The groups come from different orgs (${orgLabel(a.org)} and ${orgLabel(b.org)}). Items are matched by API name.`);
   }
   for (const [s, name] of [[a, A], [b, B]]) {
+    const n = s.muting?.effective?.nothingToTake;
+    if (n) {
+      const it = n === 1 ? "it" : "them";
+      push("note", "info", `${name}: ${plural(n, "other item")} in the muting permission set had nothing to take away (no permission set in the group gives ${it}, or the group's access still includes ${it}).`);
+    }
+  }
+  for (const [s, name] of [[a, A], [b, B]]) {
     for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}`);
   }
   return out;
@@ -366,11 +412,12 @@ function highlights(a, b, sections) {
 
 export function compareSnapshots(a, b) {
   const labels = { ...(b.objectLabels || {}), ...(a.objectLabels || {}) };
+  const fieldLabels = { ...(b.fieldLabels || {}), ...(a.fieldLabels || {}) };
   const sections = {
-    components: compareComponents(a, b, labels),
+    components: compareComponents(a, b, labels, fieldLabels),
     userPermissions: compareUserPermissions(a, b),
     objectPermissions: compareObjects(a, b, labels),
-    fieldPermissions: compareFields(a, b, labels),
+    fieldPermissions: compareFields(a, b, labels, fieldLabels),
     setupAccess: compareSetup(a, b),
     tabs: compareTabs(a, b, labels),
   };
@@ -419,7 +466,9 @@ export function toRows(result, onlySection = null) {
 /** RFC 4180 CSV with a BOM so Excel opens UTF-8 correctly. */
 export function toCsv(rows) {
   const esc = (v) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    // Org text opened in Excel: a leading = + - @ tab or CR would run as a formula.
+    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return "﻿" + rows.map((r) => r.map(esc).join(",")).join("\r\n") + "\r\n";

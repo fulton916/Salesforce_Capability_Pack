@@ -218,7 +218,8 @@ await test("setup access is named across 15/18-character Ids; unknown types are 
   assert.ok(s.setupAccess["ApexClass|acme__Svc"], JSON.stringify(Object.keys(s.setupAccess)));
   assert.equal(s.setupAccess["CustomPermission|Can_Do"].label, "Can Do");
   assert.ok(s.setupAccess["MysteryType|0XYAAA000000001AAA"]);
-  assert.ok(s.warnings.some((w) => w.includes("MysteryType")));
+  assert.ok(s.warnings.some((w) => /1 mystery type could not be named in this org.*listed by Id/.test(w)), s.warnings.join("; "));
+  assert.equal(s.setupAccess["MysteryType|0XYAAA000000001AAA"].byId, true);
 });
 
 await test("a group that is not Updated gets a warning", async () => {
@@ -339,6 +340,199 @@ await test("CSV export: BOM, header, escaping, one section", () => {
   const opp = objs.find((r) => r[3] === "Opportunity");
   assert.equal(opp[8], "Delete, View All, Modify All");
   assert.equal(opp[4], "Different");
+});
+
+
+// ---------- muting, labels, setup names (snapshot v2) ----------
+
+const AGGID = "0PSAGG000000001AAA";
+const MUTEID = "0QMMUTE0000001AAA";
+const C1 = "0PSCOMP00000001AAA";
+const C2 = "0PSCOMP00000002AAA";
+
+/** A group whose muting set mutes things that are, and are not, really taken away. */
+function mutingRoutes() {
+  const isMute = (q) => q.includes(`ParentId = '${MUTEID}'`) || q.includes(`Id = '${MUTEID}'`);
+  const isAgg = (q) => q.includes(`ParentId = '${AGGID}'`) || q.includes(`Id = '${AGGID}'`);
+  return {
+    describe: (s) => ({ fields: s === "PermissionSet" || s === "MutingPermissionSet" ? PS_FIELDS : s === "ObjectPermissions" ? OP_FIELDS : [] }),
+    query: [
+      [/FROM PermissionSetGroup WHERE Id/, () => [{ Id: "0PG1", DeveloperName: "G", MasterLabel: "G", Status: "Updated" }]],
+      [/FROM PermissionSet WHERE PermissionSetGroupId/, () => [{ Id: AGGID, Type: "Group" }]],
+      [/FROM PermissionSetGroupComponent/, () => [{ PermissionSetId: C1 }, { PermissionSetId: C2 }, { PermissionSetId: MUTEID }]],
+      [/SELECT Id, Name, Label.*FROM PermissionSet WHERE Id IN/, () => [
+        { Id: C1, Name: "One", Label: " One  ", Type: "Regular" }, { Id: C2, Name: "Two", Label: "Two", Type: "Regular" },
+        { Id: MUTEID, Name: "Mute", Label: "Mute", Type: "Muting" },
+      ]],
+      // what the components give, read for the muted permissions only
+      [/FROM PermissionSet WHERE Id IN/, (q) => {
+        assert.ok(q.includes(C1) && q.includes(C2) && !q.includes(MUTEID), q);
+        assert.ok(!q.includes("PermissionsP002"), "only muted permissions are read: " + q);
+        return [{ Id: C1, PermissionsP005: true, PermissionsP001: true, PermissionsModifyAllData: false }, { Id: C2, PermissionsP005: false }];
+      }],
+      [/FROM PermissionSet WHERE Id = /, (q) => {
+        const rec = { Id: isMute(q) ? MUTEID : AGGID };
+        const on = isMute(q) ? ["PermissionsP005", "PermissionsP001", "PermissionsModifyAllData"] : ["PermissionsP001"];
+        for (const f of on) if (q.includes(f)) rec[f] = true;
+        return [rec];
+      }],
+      [/FROM ObjectPermissions/, (q) => {
+        const row = (o, ...on) => ({ SobjectType: o, ...Object.fromEntries(OP_FIELDS.map((f) => [f.name, on.includes(f.name)])) });
+        if (isMute(q)) return [row("Account", "PermissionsDelete"), row("Order", "PermissionsEdit")];
+        if (isAgg(q)) return [row("Account", "PermissionsRead"), row("Order", "PermissionsRead", "PermissionsEdit")];
+        return [row("Account", "PermissionsRead", "PermissionsDelete"), row("Order", "PermissionsRead", "PermissionsEdit")]; // components
+      }],
+      [/FROM FieldPermissions/, (q) => {
+        const f = (Field, PermissionsRead, PermissionsEdit) => ({ Field, PermissionsRead, PermissionsEdit });
+        if (isMute(q)) return [f("Account.F1__c", true, true), f("Account.F2__c", false, true), f("Account.F3__c", true, false), f("Account.F4__c", false, true), f("Account.F5__c", true, false)];
+        if (isAgg(q)) return [f("Account.F2__c", true, false), f("Account.Plain__c", true, false)];
+        return [f("Account.F1__c", true, true), f("Account.F2__c", true, true), f("Account.F4__c", true, true), f("Account.F5__c", true, true)]; // F3 is given by no component
+      }],
+      [/FROM PermissionSetTabSetting/, (q) => {
+        if (isMute(q)) return [{ Name: "LogEntry__c", Visibility: "DefaultOff" }, { Name: "standard-Visit", Visibility: "DefaultOff" }];
+        if (isAgg(q)) return [{ Name: "standard-Account", Visibility: "DefaultOn" }];
+        return [{ Name: "LogEntry__c", Visibility: "DefaultOn" }];
+      }],
+      [/FROM SetupEntityAccess/, () => []],
+      [/FROM FieldDefinition/, () => [
+        { QualifiedApiName: "F1__c", Label: "  Customer   Segmentation ", EntityDefinition: { QualifiedApiName: "Account" } },
+        { QualifiedApiName: "Plain__c", Label: "Plain", EntityDefinition: { QualifiedApiName: "Account" } },
+        { QualifiedApiName: "NotAsked__c", Label: "Nobody asked", EntityDefinition: { QualifiedApiName: "Account" } },
+      ]],
+      [/SELECT COUNT\(\) FROM PermissionSetAssignment/, () => Object.assign([], { totalSize: 1 })],
+    ],
+  };
+}
+
+await test("muting: only what is given by a component and missing from the aggregate counts as taken away", async () => {
+  const s = await takeSnapshot(apiWith(mutingRoutes()), "0PG1");
+  const e = s.muting.effective;
+  // general permissions: P005 yes; Modify All Data given by nobody; P001 muted but the aggregate still has it
+  assert.deepEqual(Object.keys(e.userPermissions), ["PermissionsP005"]);
+  // objects: Account loses Delete only; Order keeps Edit although muted (the Salesforce quirk)
+  assert.deepEqual(e.objectPermissions, { Account: { Delete: true } });
+  // fields: a Read mute takes Read and Edit; an Edit mute takes Edit only; F3 is given by nobody
+  assert.deepEqual(e.fieldPermissions, { "Account.F1__c": { Read: true, Edit: true }, "Account.F2__c": { Read: false, Edit: true },
+    // F4: Edit-only mute, aggregate has neither flag: Read must not be reported removed
+    "Account.F4__c": { Read: false, Edit: true },
+    // F5: Read-only mute, aggregate has neither flag: Edit goes too
+    "Account.F5__c": { Read: true, Edit: true } });
+  // tabs: LogEntry__c is shown by a component and absent from the aggregate; standard-Visit is given by nobody
+  assert.deepEqual(e.tabSettings, { LogEntry__c: "DefaultOn" });
+  assert.equal(e.nothingToTake, 5); // Modify All Data, P001, Order, F3, Visit
+  assert.deepEqual(Object.keys(s.muting.tabSettings).sort(), ["LogEntry__c", "standard-Visit"]);
+  assert.equal(s.components.find((c) => c.name === "One").label, "One");
+});
+
+await test("muting: compare lists only effective items, in plain words, plus one line for the rest", async () => {
+  const s = await takeSnapshot(apiWith(mutingRoutes()), "0PG1");
+  const r = compareSnapshots(s, s);
+  const muted = r.sections.components.filter((x) => x.group === "Taken away by muting");
+  const got = muted.map((x) => `${x.label}: ${x.a}`).sort();
+  assert.deepEqual(got, [
+    "Customer Account: Delete",
+    "Customer Account › Customer Segmentation: Read, Edit",
+    "Customer Account › F2: Edit",
+    "Customer Account › F4: Edit",
+    "Customer Account › F5: Read, Edit",
+    "Log Entry (tab): Tab",
+    "Perm 5: General permission",
+  ].sort());
+  const note = r.highlights.find((h) => h.text.includes("had nothing to take away"));
+  assert.ok(note && note.text.includes("5 other items"), JSON.stringify(r.highlights));
+});
+
+await test("v1 snapshots still load and compare; their muted items do not claim removal", () => {
+  const v1 = structuredClone(sample("sample_a.json"));
+  v1.schema = "sf-psg-snapshot/1";
+  delete v1.muting.effective;
+  delete v1.muting.tabSettings;
+  delete v1.fieldLabels;
+  validateSnapshot(v1);
+  const r = compareSnapshots(v1, sample("sample_b.json"));
+  const muted = r.sections.components.filter((x) => x.group !== "Muting permission set" && x.group !== "Permission set");
+  assert.ok(muted.length >= 3);
+  assert.ok(muted.every((x) => x.group === "Muted (may not have been given)"), muted.map((x) => x.group).join());
+  assert.equal(r.sections.fieldPermissions.find((x) => x.key === "Account.AnnualRevenue").label, "Annual Revenue");
+});
+
+await test("field labels come from the org in one query; a failed read falls back to API names with one warning", async () => {
+  const log = [];
+  const s = await takeSnapshot(apiWith(mutingRoutes(), log), "0PG1");
+  assert.deepEqual(s.fieldLabels, { "Account.F1__c": "Customer Segmentation", "Account.Plain__c": "Plain" });
+  assert.equal(log.filter((q) => q.includes("FROM FieldDefinition")).length, 1);
+  assert.equal(compareSnapshots(s, s).sections.fieldPermissions.find((x) => x.key === "Account.Plain__c").label, "Plain");
+
+  const routes = mutingRoutes();
+  routes.query.unshift([/FROM FieldDefinition/, () => { throw new Error("boom"); }]);
+  const bad = await takeSnapshot(apiWith(routes), "0PG1");
+  assert.deepEqual(bad.fieldLabels, {});
+  assert.equal(bad.warnings.filter((w) => w.includes("field names could not be read")).length, 1);
+  assert.equal(compareSnapshots(bad, bad).sections.fieldPermissions.find((x) => x.key === "Account.Plain__c").label, "Plain");
+});
+
+await test("component permission sets are read in chunks, not one huge IN list", async () => {
+  const ids = Array.from({ length: 450 }, (_, i) => `0PSC${String(i).padStart(11, "0")}AAA`);
+  const routes = snapshotRoutes();
+  routes.query.unshift([/FROM PermissionSetGroupComponent/, () => ids.map((PermissionSetId) => ({ PermissionSetId }))]);
+  routes.query.unshift([/FROM PermissionSet WHERE Id IN/, (q) => {
+    const found = q.match(/'\w+'/g) || [];
+    assert.ok(found.length <= 200, `${found.length} ids in one query`);
+    return found.map((x) => ({ Id: x.slice(1, -1), Name: "N" + x.slice(1, -1), Label: "L", Type: "Regular" }));
+  }]);
+  const log = [];
+  const s = await takeSnapshot(apiWith(routes, log), "0PG1");
+  assert.equal(s.components.length, 450);
+  assert.equal(log.filter((q) => q.includes("FROM PermissionSet WHERE Id IN")).length, 3);
+});
+
+await test("external credential principals are read through the Tooling API; unnamed items are listed by Id with a plain warning", async () => {
+  const routes = snapshotRoutes();
+  const seen = [];
+  routes.query.unshift([/FROM SetupEntityAccess/, () => [
+    { SetupEntityId: "0puAAA000000001AAA", SetupEntityType: "ExternalCredentialParameter" },
+    { SetupEntityId: "0puAAA000000002AAA", SetupEntityType: "ExternalCredentialParameter" },
+    { SetupEntityId: "0puAAA000000003AAA", SetupEntityType: "ExternalCredentialParameter" },
+    { SetupEntityId: "0xIAAA000000001AAA", SetupEntityType: "ExternalClientApplication" },
+  ]]);
+  routes.query.unshift([/FROM ExternalCredentialParameter/, (q, tooling) => {
+    seen.push(tooling);
+    return [{ Id: "0puAAA000000001AAA", ParameterName: "Auth", ExternalCredential: { DeveloperName: "Cred_One" } }];
+  }]);
+  routes.query.unshift([/FROM ExternalClientApplication/, (q, tooling) => {
+    assert.ok(!tooling);
+    return [{ Id: "0xIAAA000000001AAA", DeveloperName: "Sync_App", NamespacePrefix: null, MasterLabel: "Sync App" }];
+  }]);
+  const s = await takeSnapshot(apiWith(routes), "0PG1");
+  assert.deepEqual(seen, [true]);
+  assert.equal(s.setupAccess["ExternalCredentialParameter|Cred_One.Auth"].typeLabel, "External credential principal");
+  assert.equal(s.setupAccess["ExternalClientApplication|Sync_App"].label, "Sync App");
+  assert.equal(Object.values(s.setupAccess).filter((e) => e.byId).length, 2);
+  assert.ok(s.warnings.includes("2 external credential principals could not be named in this org; they are listed by Id, which differs between orgs."), s.warnings.join("\n"));
+  const row = compareSnapshots(s, s).sections.setupAccess.find((x) => x.key === "0puAAA000000002AAA");
+  assert.equal(row.label, "Name not available (Id 0puAAA000000002AAA)");
+  assert.equal(row.group, "External credential principal");
+});
+
+await test("humanize never splits an Id; namespaces are dropped from setup labels; labels are trimmed", () => {
+  assert.equal(humanize("0puZz0000000AbCDEF"), "0puZz0000000AbCDEF");
+  assert.equal(humanize("01pZz0000000AbC"), "01pZz0000000AbC");
+  assert.equal(humanize("acme__Widget_Page_Nearby"), "Widget Page Nearby");
+  assert.equal(humanize("zeta__Phone_Check_Validation"), "Phone Check Validation");
+  assert.equal(humanize("Quota__c"), "Quota");
+  const a = structuredClone(A);
+  a.setupAccess["ApexClass|acme__Nearby_Lookup"] = { type: "ApexClass", typeLabel: "Apex class", name: "acme__Nearby_Lookup", label: null };
+  a.objectLabels = { Widget__c: "  Data Action   Job Summary " };
+  a.fieldLabels = { "Account.Rating": " Spaced   Out " };
+  const r = compareSnapshots(a, B);
+  assert.equal(r.sections.setupAccess.find((x) => x.key === "acme__Nearby_Lookup").label, "Nearby Lookup");
+  assert.equal(r.sections.objectPermissions.find((x) => x.key === "Widget__c").label, "Data Action Job Summary");
+  assert.equal(r.sections.fieldPermissions.find((x) => x.key === "Account.Rating").label, "Spaced Out");
+});
+
+await test("CSV export neutralises cells that would run as formulas in Excel", () => {
+  const csv = toCsv([["=1+1", "+cmd", "-2+3", "@SUM(A1)", "\tx", "\rx", "safe=1", 5, "-"]]);
+  assert.equal(csv, "﻿'=1+1,'+cmd,'-2+3,'@SUM(A1),'\tx,\"'\rx\",safe=1,5,'-\r\n");
 });
 
 // ---------- friendly names and search ----------
