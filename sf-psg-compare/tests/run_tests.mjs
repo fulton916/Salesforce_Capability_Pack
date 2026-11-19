@@ -27,6 +27,7 @@ async function test(name, fn) {
 
 await (await import("./user_access_tests.mjs")).run(test);
 await (await import("./hierarchy_tests.mjs")).run(test);
+await (await import("./record_access_tests.mjs")).run(test);
 
 // ---------- fakes ----------
 

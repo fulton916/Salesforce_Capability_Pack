@@ -1,4 +1,5 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
+import { recordIdFromUrl } from "./lib/recordaccess.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
 const TOOLS = [
@@ -17,6 +18,14 @@ const TOOLS = [
     title: "Territory & role hierarchy",
     description: "See the whole territory or role tree; export it for Excel",
   },
+  {
+    page: "record-access.html",
+    title: "Why can a user see this record?",
+    description: "Explain who can see the record open in this tab, and why",
+    // Needs the record open in this tab: its Id goes in the address of the page.
+    needsRecord: true,
+    noRecordDescription: "Open a record first, then explain who can see it and why",
+  },
 ];
 
 const state = document.getElementById("state");
@@ -28,6 +37,7 @@ let tab = null;
 try {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 } catch { /* not running as an extension */ }
+const recordId = recordIdFromUrl(tab?.url || "");
 let host = null;
 try { host = new URL(tab?.url || "").hostname; } catch { /* not a URL */ }
 
@@ -49,11 +59,12 @@ for (const tool of TOOLS) {
   title.textContent = tool.title;
   const desc = document.createElement("span");
   desc.className = "tool-desc";
-  desc.textContent = tool.description;
+  desc.textContent = tool.needsRecord && !recordId ? tool.noRecordDescription : tool.description;
   btn.append(title, desc);
   if (inOrg) {
     btn.addEventListener("click", async () => {
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}`) });
+      const record = tool.needsRecord && recordId ? `&record=${encodeURIComponent(recordId)}` : "";
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${record}`) });
       window.close();
     });
   }

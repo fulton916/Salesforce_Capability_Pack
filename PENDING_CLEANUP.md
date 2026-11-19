@@ -26,4 +26,10 @@ same change.
 
 ## Open items
 
-None.
+### "null" in the org header of the first three tools
+- Date: 2026-11-19
+- File(s): sf-psg-compare/extension/psg-compare.js, sf-psg-compare/extension/user-access.js, sf-psg-compare/extension/hierarchy.js (function `showOrg`)
+- Change: `showOrg` passes `via ? el(...) : null` to `replaceChildren`; with no `via` (opened from the toolbar against a real org) the browser inserts the text "null". Leave the null out (e.g. build the list and filter out falsy items) in all three files, as `record-access.js` already does; add a test.
+- Deferred because: found while building the record-access tool; those pages were outside that task's scope.
+- Belongs to: branch claude/record-visibility-comparison-5a2175
+- Added by: project-manager session

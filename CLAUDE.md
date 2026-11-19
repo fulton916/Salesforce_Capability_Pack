@@ -18,7 +18,7 @@ Org administration:
 - `sf-country-state-codes`: CLI. Export State and Country/Territory picklists to Excel.
 - `sf-territory-export`: CLI. Read-only Territory Management export to Excel.
 - `sf-user-access-teardown`: CLI. Query, and only with `--execute` plus confirmation, remove user access.
-- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with three read-only tools: "Compare permission set groups" (PSG Compare; compares two groups), "User access summary and comparison" (looks up or compares users' access) and "Territory & role hierarchy" (shows the whole territory or role tree, narrows it to one branch, exports it for Excel).
+- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with four read-only tools: "Compare permission set groups" (PSG Compare; compares two groups), "User access summary and comparison" (looks up or compares users' access), "Territory & role hierarchy" (shows the whole territory or role tree, narrows it to one branch, exports it for Excel) and "Why can a user see this record?" (explains how one user, or why one of two users, can see the record open in the tab).
 
 CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need `openpyxl`
 (`pip install -r requirements.txt` in the package). Node is needed only for the extension's tests.
@@ -54,7 +54,7 @@ decides.
 - Org-touching tools are read-only by default. Writes need a dry run, an explicit flag and a confirmation.
 - No real org data, credentials, tokens, user lists or snapshots in the repo. Fixtures are synthetic.
 - No imports across package folders.
-- `sf-psg-compare` (all three tools): read-only, never inserts org data as HTML, no remote code, never stores the
+- `sf-psg-compare` (all four tools): read-only, never inserts org data as HTML, no remote code, never stores the
   session id, matches across orgs by API name, not Id.
 - `sf-user-password-reset/` is a local one-off tool, not part of the pack. It is git-ignored and never committed.
 
