@@ -35,7 +35,8 @@ Start with **PASS** or **FAIL**. Then:
 - each acceptance criterion: met / not met, with evidence (test output lines, page text,
   screenshot description);
 - bugs found, with steps to reproduce;
-- what you could not check, and why.
+- what you could not check, and why;
+- changes needed in files the brief forbids, flagged as deferred edits.
 
 ## Never
 

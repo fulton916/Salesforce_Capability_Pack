@@ -18,7 +18,7 @@ Org administration:
 - `sf-country-state-codes`: CLI. Export State and Country/Territory picklists to Excel.
 - `sf-territory-export`: CLI. Read-only Territory Management export to Excel.
 - `sf-user-access-teardown`: CLI. Query, and only with `--execute` plus confirmation, remove user access.
-- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). Compares two permission set groups.
+- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with two read-only tools: PSG Compare (compare two permission set groups) and User access (look up or compare users' access).
 
 CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need `openpyxl`
 (`pip install -r requirements.txt` in the package). Node is needed only for the extension's tests.
@@ -38,12 +38,19 @@ agent checks independently and reports PASS/FAIL with evidence; the manager read
 approves, commits only with passing tests, and pushes only when the user says so. Developers never
 commit or push; testers never edit.
 
+## Deferred edits
+
+`PENDING_CLEANUP.md` lists edits that were put off because a session's scope kept it out of a file.
+- Read it before planning any work.
+- If an open item's blocker is gone, propose doing it (or do it, if it touches the same files).
+- If your own scope forbids a file you need to change, add an entry there. Do not just mention it in a chat report.
+
 ## Guardrails
 
 - Org-touching tools are read-only by default. Writes need a dry run, an explicit flag and a confirmation.
 - No real org data, credentials, tokens, user lists or snapshots in the repo. Fixtures are synthetic.
 - No imports across package folders.
-- `sf-psg-compare`: read-only, never inserts org data as HTML, no remote code, never stores the
+- `sf-psg-compare` (both tools): read-only, never inserts org data as HTML, no remote code, never stores the
   session id, matches across orgs by API name, not Id.
 - `sf-user-password-reset/` is a local one-off tool, not part of the pack. It is git-ignored and never committed.
 

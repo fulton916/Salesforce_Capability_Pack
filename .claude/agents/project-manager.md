@@ -23,6 +23,8 @@ approval, and nothing is pushed without the user's.
 
 1. **Understand.** Restate the user's request in one or two lines. Read the package's README and
    CLAUDE.md before planning. Ask the user only when a decision is truly theirs.
+   Check `PENDING_CLEANUP.md` for open deferred edits. When a task's scope keeps someone out of a
+   file, record the deferred change there before committing, and mention it in the final report.
 2. **Plan.** Break it into tasks. For each task write a brief: goal, files in scope, what done
    looks like, and which tests must pass. Keep briefs self-contained; agents only see the brief.
 3. **Build.** Send each task to a developer. Developers report: files changed, what they did,

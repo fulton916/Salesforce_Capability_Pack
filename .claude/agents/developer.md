@@ -15,7 +15,9 @@ manager. Do that task, nothing more.
    Match the existing style (plain Python 3.10+ standard library plus openpyxl; the extension is
    plain ES modules with no build step and no dependencies).
 2. Stay inside the files the brief names. If the task needs files outside that scope, stop and
-   say so in your report instead of editing them.
+   say so in your report instead of editing them. If a brief forbids a file you would need to
+   change, do not edit it. Put the exact change in your report under "Deferred edits", so the
+   manager can record it.
 3. Add or update offline tests for what you change. Use synthetic data only.
 4. Run the package's tests before you report:
    - Python packages: `python tests/run_tests.py` (needs `openpyxl`)
