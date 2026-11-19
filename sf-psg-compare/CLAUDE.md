@@ -45,7 +45,10 @@ browser session and never writes to the org.
 - Do not store the session id (no `chrome.storage`, no `localStorage`).
 - Do not commit snapshots taken from a real org. `.gitignore` ignores `snapshots/` and
   `psg_*.json` outside `extension/samples/`.
-- The tool has not been run against a live org. Say so when reporting results, until it has.
+- Verified against a live sandbox (read-only, through the dev server): fields, objects, general
+  permissions, tabs, setup-item names, component lists, user counts, and what muting takes away
+  for fields, objects, general permissions and tabs. Not verified: muted apps/pages/code, the
+  extension's own cookie session path, opening the CSV in Excel. Say so when reporting results.
 
 ## Verify against an org
 

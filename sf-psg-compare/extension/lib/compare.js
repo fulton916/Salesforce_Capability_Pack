@@ -151,6 +151,8 @@ const byLabel = (x, y) => (x.group || "").localeCompare(y.group || "") || x.labe
 export const MUTED_GROUP = "Taken away by muting";
 export const MUTED_LEGACY = "Muted (may not have been given)";
 export const PART_SETS = "Permission sets in each group";
+export const PART_SETS_HELP = "The permission sets each group is built from. A user in the group gets everything these give, minus what the muting permission set takes away.";
+const MUTING_SET_GROUP = "Muting permission set";
 export const PART_MUTED = "Taken away by the muting permission set";
 
 const KIND_WORDS = { user: "General permission", object: "Object", field: "Field", tab: "Tab", setup: "App, page or code" };
@@ -168,7 +170,7 @@ function compareComponents(a, b, labels, fieldLabels) {
     return {
       key: k,
       label: clean(c.label) || humanize(k),
-      group: c.isMuting ? "Muting permission set" : "Permission set",
+      group: c.isMuting ? MUTING_SET_GROUP : "Permission set",
       part: "sets",
       status: presence(!!ca, !!cb),
       a: ca ? "Included" : null,
@@ -402,7 +404,7 @@ function highlights(a, b, sections) {
 
   const gives = givesCounts(sections);
   const num = (n) => n.toLocaleString("en-US");
-  const things = (n) => `${num(n)} ${n === 1 ? "thing" : "things"}`;
+  const things = (n) => `${num(n)} ${n === 1 ? "item" : "items"} of access`;
   if (!gives.a && !gives.b) push("verdict", "good", "Both groups give exactly the same access.");
   else if (gives.a && !gives.b) push("verdict", "info", `${A} gives everything ${B} gives, and more (${things(gives.a)} that ${B} does not).`);
   else if (gives.b && !gives.a) push("verdict", "info", `${B} gives everything ${A} gives, and more (${things(gives.b)} that ${A} does not).`);
@@ -420,8 +422,8 @@ function highlights(a, b, sections) {
     const ex = [...hits].sort((x, y) => /__/.test(x.key) - /__/.test(y.key) || x.label.localeCompare(y.label)).slice(0, 3).map((r) => r.label);
     const list = ex.length > 1 ? `${ex.slice(0, -1).join(", ")} and ${ex.at(-1)}` : ex[0];
     const text = hits.length === 1
-      ? `${who} can View All or Modify All records of the object ${list}; ${other} cannot. See Objects.`
-      : `${who} can View All or Modify All records of ${num(hits.length)} objects that ${other} cannot${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
+      ? `${who} has View All or Modify All on the object ${list}, where ${other} has less. See Objects.`
+      : `${who} has View All or Modify All on ${num(hits.length)} objects where ${other} has less${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
     out.push({ kind: "risk", area: "objects", level: "risk", text });
   }
 
@@ -468,7 +470,9 @@ export function compareSnapshots(a, b) {
   };
   sections.overview = overview(a, b, sections);
   const counts = Object.fromEntries(Object.entries(sections).map(([k, rows]) => [k, tally(rows)]));
-  counts.componentSets = tally(sections.components.filter((r) => r.part === "sets"));
+  // Regular permission sets and the muting permission set itself are counted apart.
+  counts.componentSets = tally(sections.components.filter((r) => r.part === "sets" && r.group !== MUTING_SET_GROUP));
+  counts.componentMutingSet = tally(sections.components.filter((r) => r.part === "sets" && r.group === MUTING_SET_GROUP));
   counts.componentMuted = tally(sections.components.filter((r) => r.part === "muted"));
   const mutedLegacy = { a: !!a.muting && !a.muting.effective, b: !!b.muting && !b.muting.effective };
   return { a, b, sections, counts, gives: givesCounts(sections), mutedLegacy, highlights: highlights(a, b, sections) };

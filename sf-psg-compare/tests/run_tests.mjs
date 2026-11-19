@@ -266,7 +266,7 @@ await test("objects: flag-level differences in both directions", () => {
   assert.equal(row("objectPermissions", "Campaign").status, "onlyA");
   assert.equal(row("objectPermissions", "Quota__c").status, "onlyB");
   assert.equal(row("objectPermissions", "Widget__c").status, "same");
-  assert.ok(texts.some((t) => /^Sales Manager can View All or Modify All records of .*Opportunity/.test(t)), texts.join("\n"));
+  assert.ok(texts.some((t) => /^Sales Manager has View All or Modify All on 2 objects where Sales Rep has less.*Opportunity/.test(t)), texts.join("\n"));
 });
 
 await test("fields: read vs edit", () => {
@@ -297,7 +297,7 @@ await test("contents, setup access and tabs", () => {
 await test("overview and verdict", () => {
   assert.equal(row("overview", "Users assigned").a, "398 active (412 in total)");
   assert.equal(row("overview", "Muting permission set").b, "None");
-  assert.ok(texts.includes(`Each group gives access the other does not: Sales Rep gives ${R.gives.a} things Sales Manager doesn't; Sales Manager gives ${R.gives.b} things Sales Rep doesn't.`), texts.join("\n"));
+  assert.ok(texts.includes(`Each group gives access the other does not: Sales Rep gives ${R.gives.a} items of access Sales Manager doesn't; Sales Manager gives ${R.gives.b} items of access Sales Rep doesn't.`), texts.join("\n"));
   assert.ok(R.gives.a > 0 && R.gives.b > R.gives.a);
   assert.equal(R.counts.userPermissions.onlyB, 5);
 });
@@ -315,7 +315,7 @@ await test("superset is detected", () => {
   bigger.psg.label = "Rep Plus";
   bigger.userPermissions.PermissionsManageUsers = "Manage Users";
   const r = compareSnapshots(bigger, A);
-  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more (1 thing that Sales Rep does not)."));
+  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more (1 item of access that Sales Rep does not)."));
   assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus has “Manage Users”."));
 });
 
@@ -379,10 +379,10 @@ await test("highlights: general permissions first, objects condensed to one line
   assert.deepEqual(h.map((x) => x.area), ["general", "general", "objects", "objects"]);
   const a = h[2].text;
   // Thing0,2,4,6,8,10 + Account + Lead = 8 objects with View All or Modify All
-  assert.ok(a.startsWith("Big Group can View All or Modify All records of 8 objects that Small Group cannot, including Account, Lead and Thing0"), a);
+  assert.ok(a.startsWith("Big Group has View All or Modify All on 8 objects where Small Group has less, including Account, Lead and Thing0"), a);
   assert.ok(a.endsWith("See Objects."));
   assert.ok(!a.includes("Case"));
-  assert.equal(h[3].text, "Small Group can View All or Modify All records of the object Zed; Big Group cannot. See Objects.");
+  assert.equal(h[3].text, "Small Group has View All or Modify All on the object Zed, where Big Group has less. See Objects.");
 });
 
 await test("verdict counts what each group gives that the other does not", () => {
@@ -391,9 +391,18 @@ await test("verdict counts what each group gives that the other does not", () =>
   // B: Zed__c + Account.F3
   assert.deepEqual(r.gives, { a: 2 + 15 + 2, b: 2 });
   assert.equal(r.highlights.find((x) => x.kind === "verdict").text,
-    "Each group gives access the other does not: Big Group gives 19 things Small Group doesn't; Small Group gives 2 things Big Group doesn't.");
+    "Each group gives access the other does not: Big Group gives 19 items of access Small Group doesn't; Small Group gives 2 items of access Big Group doesn't.");
   assert.deepEqual(givesCounts(compareSnapshots(A, structuredClone(A)).sections), { a: 0, b: 0 });
   assert.ok(compareSnapshots(A, structuredClone(A)).highlights[0].text.startsWith("Both groups"));
+});
+
+await test("objects line: Modify All added on top of View All still reads as 'has less'", () => {
+  const x = structuredClone(A);
+  const y = structuredClone(A);
+  x.objectPermissions.Case = { Read: true, ViewAllRecords: true, ModifyAllRecords: true };
+  y.objectPermissions.Case = { Read: true, ViewAllRecords: true };
+  const t = compareSnapshots(x, y).highlights.find((h) => h.area === "objects").text;
+  assert.ok(/^Sales Rep has View All or Modify All on the object Case, where .* has less\./.test(t), t);
 });
 
 await test("fields: a difference says which side has more", () => {
@@ -405,8 +414,11 @@ await test("permission sets show Included, licence as secondary text; counts are
   const sets = R.sections.components.filter((x) => x.part === "sets");
   assert.ok(sets.every((x) => x.a === null || x.a === "Included"));
   assert.ok(sets.some((x) => x.aSub === "Salesforce licence" || x.bSub === "Salesforce licence"), JSON.stringify(sets));
-  assert.equal(R.counts.componentSets.total, sets.length);
-  assert.equal(R.counts.componentSets.total + R.counts.componentMuted.total, R.counts.components.total);
+  const regular = sets.filter((x) => x.group !== "Muting permission set");
+  assert.equal(R.counts.componentSets.total, regular.length);
+  assert.equal(R.counts.componentMutingSet.total, sets.length - regular.length);
+  assert.ok(R.counts.componentMutingSet.total > 0); // the sample groups have a muting permission set
+  assert.equal(R.counts.componentSets.total + R.counts.componentMutingSet.total + R.counts.componentMuted.total, R.counts.components.total);
 });
 
 await test("muted item on both sides with different values is Different, not Same", () => {

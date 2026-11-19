@@ -147,7 +147,10 @@ details.files summary { cursor: pointer; color: var(--accent); }
 .verdict { font-size: 18px; font-weight: 600; margin: 16px 0 0; }
 .verdict.good { color: var(--good); }
 
-.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; align-items: start; margin-bottom: 16px; } /* 6 cards: 3 x 2 */
+#moreRisks { margin: 0 0 8px; }
+@media (max-width: 640px) { .cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 380px) { .cards { grid-template-columns: 1fr; } }
 .card {
   text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
   padding: 14px 16px; box-shadow: var(--shadow); font-size: 14px; line-height: 1.6;

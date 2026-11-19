@@ -1,6 +1,6 @@
 import { SfApi, findSession } from "./lib/sfconn.js";
 import { listPsgs, readOrg, takeSnapshot, validateSnapshot } from "./lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, filterRows, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_MUTED } from "./lib/compare.js";
+import { compareSnapshots, toRows, toCsv, filterRows, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
 import { matchPsgs } from "./lib/pick.js";
 import { startLiveReload } from "./lib/livereload.js";
 
@@ -303,6 +303,11 @@ async function runCompare() {
     state.allRisks = false;
     state.fieldMode = "auto";
     state.toggled = new Set();
+    if (reading.length) {
+      // Show the last step with a full bar for a moment before the result replaces it.
+      setProgress(`Step ${STEPS.length} of ${STEPS.length}: comparing the two groups…`, 1);
+      await new Promise((resolve) => setTimeout(resolve, 400));
+    }
     setProgress("");
     renderResult();
   } catch (e) {
@@ -343,7 +348,7 @@ function renderResult() {
   $("#cards").replaceChildren(...CARD_TABS.map((k) => {
     // "What's inside" holds two kinds of things; the card counts them separately.
     const parts = k === "components"
-      ? [[r.counts.componentSets, "permission set", "permission sets"], [r.counts.componentMuted, "item taken away by muting", "items taken away by muting"]]
+      ? [[r.counts.componentSets, "permission set", "permission sets"], [r.counts.componentMutingSet, "muting permission set", "muting permission sets"], [r.counts.componentMuted, "item taken away by muting", "items taken away by muting"]]
       : [[r.counts[k], "", ""]];
     const lines = [];
     let diffs = 0;
@@ -377,8 +382,9 @@ function renderRisks() {
   // General permissions first; the object lines (at most one per group) are always shown.
   const general = risks.filter((h) => h.area === "general");
   const rest = risks.filter((h) => h.area !== "general");
-  const shown = [...(state.allRisks ? general : general.slice(0, RISKS_SHOWN)), ...rest];
+  const shown = state.allRisks ? general : general.slice(0, RISKS_SHOWN);
   $("#risks").replaceChildren(...shown.map((h) => el("li", { text: h.text })));
+  $("#riskObjects").replaceChildren(...rest.map((h) => el("li", { text: h.text })));
   const hidden = general.length - RISKS_SHOWN;
   const more = $("#moreRisks");
   more.hidden = hidden <= 0;
@@ -554,7 +560,7 @@ function renderTable() {
     const old = ["a", "b"].filter((k) => lg[k]).map((k) => nameOf(k));
     const intro = "People in this group do not get these, even though a permission set in the group gives them."
       + (old.length ? ` For ${old.join(" and ")} (an older saved file) it is not known whether a permission set in the group really gave them, so those items say “may not have been given”.` : "");
-    wrap.replaceChildren(...part(PART_SETS, "", sets, "sets"), ...(muted.length ? part(PART_MUTED, intro, muted, "muted") : []));
+    wrap.replaceChildren(...part(PART_SETS, PART_SETS_HELP, sets, "sets"), ...(muted.length ? part(PART_MUTED, intro, muted, "muted") : []));
     return;
   }
   const rows = visibleRows();

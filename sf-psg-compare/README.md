@@ -14,16 +14,17 @@ The page is written for admins, not developers. It shows labels ("Account › An
 not API names; "Show API names" adds them.
 
 At the top it says the result in plain words, with how much: "Each group gives access the other
-does not: Sales Rep gives 4 things Sales Manager doesn't; Sales Manager gives 21 things Sales Rep
-doesn't." ("Things" are general permissions, objects, fields, apps/pages/code and tabs that only
-that group gives, or gives more of.) Under that:
+does not: Sales Rep gives 4 items of access Sales Manager doesn't; Sales Manager gives 21 items of
+access Sales Rep doesn't." (An "item of access" is a general permission, object, field,
+app/page/code item or tab that only that group gives, or gives more of.) Under that:
 
 - **A card per area** with how many items only one group has, or "✓ Same in both". Click a card
-  to open its list. "What's inside" counts permission sets and muted items separately.
+  to open its list. "What's inside" counts permission sets, the muting permission set itself, and
+  items taken away by muting separately.
 - **Worth a closer look:** powerful general permissions only one group gives (first), then at most
-  one line per group for View All / Modify All on objects, such as "Sales Manager can View All or
-  Modify All records of 938 objects that Sales Rep cannot, including Account, Case and
-  Opportunity. See Objects."
+  one line per group for View All / Modify All on objects, such as "Sales Manager has View All or
+  Modify All on 938 objects where Sales Rep has less, including Account, Case and Opportunity. See
+  Objects." (Where the other group also has View All and this one adds Modify All, that counts too.)
 - **Technical notes** (folded away): anything the tool could not read, with what to do.
 
 | List | Shows |
@@ -34,7 +35,7 @@ that group gives, or gives more of.) Under that:
 | Fields | No access / Read / Edit per field, in one collapsible block per object ("Account — 212 differences"). Long lists start collapsed; "Expand all / Collapse all"; searching opens the matching objects |
 | Apps, pages & code | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
 | Tabs | shown, available (hidden by default) or hidden |
-| What's inside | two parts: "Permission sets in each group" (with licence), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, General permission, Tab, App/page/code) |
+| What's inside | two parts: "Permission sets in each group" (with licence, and the muting permission set too), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, General permission, Tab, App/page/code) |
 
 Each list shows only the differences until you choose "Everything". The search ignores
 punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is how
@@ -163,13 +164,23 @@ Run against live orgs so far (read-only):
 - A Developer Edition org with 22 groups. For every group, the aggregate permission set's object
   permissions matched its component permission sets. Spot-checked rows matched Setup. A compare
   of two groups takes about 4 seconds.
-- A larger org (about 1,300 field permissions and 300 Apex/app items per group). It showed
-  that `MutingPermissionSet` has no `NamespacePrefix` field (fixed), and that
-  `ExternalCredentialParameter` items needed naming (added).
+- A customer sandbox (Nov 2026) with 120 groups and 66 muting permission sets. Two groups had about
+  2,000 field permissions, 120 objects and 340 apps/pages/code items each, both with muting sets;
+  another pair had about 1,000 objects.
+  - Field rows (Read/Edit), object rows, general permissions, tabs, the names of Apex classes,
+    Visualforce pages, apps, custom permissions, connected apps, custom metadata and external
+    credential principals, the component lists and the user counts matched independent SOQL, line
+    by line.
+  - What a muting permission set takes away was checked item by item: the aggregate equals the
+    components minus the effective mutes, for fields, objects, general permissions and tabs. One
+    Salesforce quirk showed up (a muted object Edit that stayed in the aggregate); the tool does
+    not report that as taken away.
+  - Timing: about 4 to 5 seconds per large group, about 10 to 15 seconds to compare two large groups.
 
-Not yet checked against a live org: field permissions and Apex/app names line by line, and what a
-muting permission set takes away. Before relying on those, compare two groups you know well and
-check a few rows against Setup.
+Not checked: muted apps, pages and code (no muting permission set in that org mutes any); the
+Chrome extension's own cookie session (those checks used the dev server); opening the CSV in
+Excel. Before relying on those, compare two groups you know well and check a few rows against
+Setup.
 
 ## Tests
 
