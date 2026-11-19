@@ -1,6 +1,6 @@
 import { SfApi, findSession } from "./lib/sfconn.js";
 import { listPsgs, readOrg, takeSnapshot, validateSnapshot } from "./lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
+import { compareSnapshots, toRows, toCsv, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, groupStatus, tabDiffText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
 import { matchPsgs } from "./lib/pick.js";
 import { startLiveReload } from "./lib/livereload.js";
 
@@ -50,10 +50,21 @@ const nameOf = (side) => {
   return s ? s.psg.label || s.psg.developerName : side.toUpperCase();
 };
 
-function showError(msg) {
+/** Show a plain message in the error box. Raw text (from Salesforce, a file, the browser) goes in a folded "Technical details". */
+function showError(msg, raw) {
   const box = $("#error");
   box.hidden = !msg;
-  box.textContent = msg || "";
+  box.replaceChildren();
+  if (!msg) return;
+  box.append(msg);
+  if (raw && raw !== msg) box.append(el("details", { class: "tech" }, el("summary", { text: "Technical details" }), el("div", { text: raw })));
+}
+
+/** Show a failure: messages already in plain words (marked `plain`, or a 401 from sfconn.js) as they are, anything else under a plain sentence. */
+function showFailure(e) {
+  if (e?.plain) showError(e.message);
+  else if (e?.status === 401) showError(e.message, e.detail);
+  else showError("Something went wrong while reading from the org. Try again. If it keeps happening, check that your user can see permission sets in Setup.", e?.message);
 }
 
 // snapshot.js reports these texts before each step; the page turns them into "Step n of 5".
@@ -62,7 +73,7 @@ const STEPS = [
   ["Reading component permission sets", "reading the permission sets inside it"],
   ["Reading permissions", "reading its permissions"],
   ["Checking what muting takes away", "checking what muting takes away"],
-  ["Putting it together", "putting it together"],
+  ["Putting it together", "comparing the two groups"],
 ];
 
 /** Show or hide the progress area. `fraction` is 0..1 for the bar. */
@@ -75,7 +86,7 @@ function setProgress(text, fraction = 0) {
 // ---------- connecting ----------
 
 function orgKind(o) {
-  if (o.isSandbox) return ["Sandbox", "sbx"];
+  if (o.isSandbox) return ["Sandbox", "sbx"]; // "sbx" is only the CSS class
   if (/developer|trial/i.test(o.edition || "")) return [o.edition, "sbx"]; // e.g. "Developer Edition"
   return ["Production", "prod"];
 }
@@ -88,12 +99,12 @@ function showOrg(o, host, via) {
     via ? el("span", { class: "badge demo", text: via }) : null,
     el("span", { class: "host", text: host })
   );
-  document.title = `PSG Compare – ${o.name || host}`;
+  document.title = `Compare permission set groups – ${o.name || host}`;
 }
 
 async function connect() {
   if (DEMO) {
-    $("#org").replaceChildren(el("span", { class: "badge demo", text: "DEMO" }), " Made-up sample groups, no org connected");
+    $("#org").replaceChildren(el("span", { class: "badge demo", text: "Demo" }), " Made-up sample groups, no org connected");
     await loadDemo();
     return;
   }
@@ -106,21 +117,21 @@ async function connect() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab, or compare two saved files.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab, or compare two saved group files.";
       $$(".org-only").forEach((n) => (n.hidden = true));
       $(".files").open = true;
       return;
     }
     state.api = new SfApi(session);
-    state.org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
-    showOrg(state.org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
+    state.org = await readOrg(state.api, DEV ? "local test server" : session.apiHost);
+    showOrg(state.org, DEV ? "" : session.apiHost, DEV ? "Local test server" : null);
     state.psgs = await listPsgs(state.api);
     if (!state.psgs.length) showError("This org has no permission set groups, or your user cannot see them.");
     combos.a.skipOpen = true;
     $("#input-a").focus();
   } catch (e) {
-    $("#org").textContent = `Could not connect${HOST ? " to " + HOST : ""}.`;
-    showError(e.message);
+    $("#org").textContent = "Not connected";
+    showError("Could not connect to the org. If you have been away a while, reload the Salesforce tab and try again.", e.message);
   }
 }
 
@@ -158,7 +169,7 @@ function setupCombo(side) {
       onmousedown: (e) => { e.preventDefault(); pick(side, p); },
       onmousemove: () => highlight(side, i),
     }, el("span", { class: "nm", text: p.label }),
-       p.status !== "Updated" ? el("span", { class: "st", text: `needs recalculation (${p.status})` }) : null,
+       p.status !== "Updated" ? el("span", { class: "st", text: "Not up to date" }) : null,
        el("span", { class: "dev", text: p.developerName })));
     if (!items.length) lis.push(el("li", { class: "none", text: state.psgs.length ? "No group matches that name." : "No groups loaded yet." }));
     if (total > items.length) lis.push(el("li", { class: "none", text: `${total - items.length} more. Keep typing to narrow the list.` }));
@@ -226,13 +237,13 @@ function renderChosen(side) {
   if (s.fileName && s.snapshot) {
     const o = s.snapshot.org;
     box.replaceChildren(
-      "From file: ", el("strong", { text: s.snapshot.psg.label }),
+      "From saved group file: ", el("strong", { text: s.snapshot.psg.label }),
       el("div", { class: "sub", text: `${o ? o.name || o.id : "unknown org"} · saved ${s.snapshot.takenAt?.slice(0, 10) || "?"}` }),
-      el("button", { class: "link", text: "Remove file", onclick: () => clearSide(side) })
+      el("button", { class: "link", text: "Remove saved group file", onclick: () => clearSide(side) })
     );
   } else if (s.psgId) {
     const p = state.psgs.find((x) => x.id === s.psgId);
-    box.replaceChildren(p && p.status !== "Updated" ? el("span", { class: "warn-text", text: `Salesforce has not finished recalculating this group (${p.status}). Results may be out of date.` }) : "");
+    box.replaceChildren(p && p.status !== "Updated" ? el("span", { class: "warn-text", text: groupStatus(p.status) }) : "");
   } else {
     box.replaceChildren();
   }
@@ -247,7 +258,9 @@ function clearSide(side) {
 }
 
 function updateCompareButton() {
-  $("#compare").disabled = !["a", "b"].every((k) => state.sides[k].snapshot || state.sides[k].psgId);
+  const ready = ["a", "b"].every((k) => state.sides[k].snapshot || state.sides[k].psgId);
+  $("#compare").disabled = !ready;
+  $("#compareHint").hidden = ready;
 }
 
 for (const side of ["a", "b"]) setupCombo(side);
@@ -263,7 +276,7 @@ for (const input of $$(".snap")) {
       combos[side].input.value = "";
       showError("");
     } catch (err) {
-      showError(`${file.name} is not a saved group file from this tool. (${err.message})`);
+      showError(`${file.name} is not a group file saved by this tool. Pick a file made with Download → Save … to a file.`, err.message);
       input.value = "";
     }
     renderChosen(side);
@@ -288,7 +301,7 @@ async function runCompare() {
     if (reading.length) { setProgress("Starting…", 0); }
     await Promise.all(reading.map(async (side) => {
       const s = state.sides[side];
-      if (!s.psgId) throw new Error(`Choose group ${side.toUpperCase()} first.`);
+      if (!s.psgId) throw Object.assign(new Error("Choose both groups first."), { plain: true });
       s.snapshot = await takeSnapshot(state.api, s.psgId, {
         org: state.org,
         progress: (t) => {
@@ -307,14 +320,14 @@ async function runCompare() {
     state.sort = {};
     if (reading.length) {
       // Show the last step with a full bar for a moment before the result replaces it.
-      setProgress(`Step ${STEPS.length} of ${STEPS.length}: comparing the two groups…`, 1);
+      setProgress(`Step ${STEPS.length} of ${STEPS.length}: ${STEPS[STEPS.length - 1][1]}…`, 1);
       await new Promise((resolve) => setTimeout(resolve, 400));
     }
     setProgress("");
     renderResult();
   } catch (e) {
     setProgress("");
-    showError(e.message);
+    showFailure(e);
   } finally {
     updateCompareButton();
   }
@@ -344,24 +357,31 @@ function renderResult() {
   const verdict = r.highlights.find((h) => h.kind === "verdict");
   $("#verdict").textContent = verdict?.text || "";
   $("#verdict").className = `verdict ${verdict?.level || ""}`;
+  $("#verdictNote").textContent = verdict?.detail || "";
+  $("#saveA").textContent = `Save ${r.a.psg.label || "first group"} to a file`;
+  $("#saveB").textContent = `Save ${r.b.psg.label || "second group"} to a file`;
 
-  // One card per area. Each line is "{number} {words}", with the group's name in its colour.
+  // One card per area: a small muted totals line, then one line per kind of difference "{number} {words}".
   const num = (n) => n.toLocaleString("en-US");
   $("#cards").replaceChildren(...CARD_TABS.map((k) => {
-    const { lines, same } = cardLines(r, k);
+    const { totals, lines, same } = cardLines(r, k);
+    const head = el("div", { class: "card-totals" }, `Total ${totals.noun}: `,
+      el("span", { class: "who-a", text: nameOf("a") }), ` ${num(totals.a)} · `,
+      el("span", { class: "who-b", text: nameOf("b") }), ` ${num(totals.b)}`);
     const rows = lines.map((l) => el("div", { class: "card-line" },
       el("b", { text: num(l.n) }),
       el("span", {}, l.before, l.side ? [" ", el("span", { class: `who-${l.side}`, text: nameOf(l.side) })] : null, l.after ? ` ${l.after}` : "")));
     if (same) rows.push(el("div", { class: "same", text: "✓ Same in both" }));
     return el("button", { class: `card${same ? " ok" : ""}`, onclick: () => openTab(k, true) },
-      el("div", { class: "card-title", text: SECTION_TITLES[k] }), ...rows);
+      el("div", { class: "card-title", text: SECTION_TITLES[k] }), head, ...rows);
   }));
 
   renderRisks();
 
   const notes = r.highlights.filter((h) => h.kind === "note");
   $("#notesPanel").hidden = !notes.length;
-  $("#notesTitle").textContent = `Technical notes (${notes.length})`;
+  $("#notesTitle").textContent = `Notes (${notes.length})`;
+  $("#warnAlert").hidden = !notes.some((h) => h.level === "warn");
   $("#notes").replaceChildren(...notes.map((h) => el("li", { class: h.level, text: h.text })));
 
   renderTabs();
@@ -418,7 +438,7 @@ function renderTabs() {
     return el("button", { role: "tab", "aria-selected": String(state.tab === k), "aria-label": k === "overview" ? null : `${SECTION_TITLES[k]}, ${word}`, onclick: () => openTab(k) },
       SECTION_TITLES[k], k === "overview" ? null : el("span", { class: `n${diffs ? "" : " zero"}`, title: word, text: String(diffs) }));
   }));
-  $("#help").textContent = (SECTION_HELP[state.tab] || "") + (state.tab === "overview" ? "" : " The number on each tab is the same as its card: things only one group has, plus things set up differently.");
+  $("#help").textContent = SECTION_HELP[state.tab] || "";
   $(".seg").hidden = state.tab === "overview";
 }
 
@@ -426,9 +446,12 @@ function renderTabs() {
 
 const YES = "✓";
 const NO = "—";
+const NONE = "No access";
 
 function statusChip(r) {
   if (r.status === "same") return el("span", { class: "chip same", text: "Same" });
+  const tabText = tabDiffText(r, nameOf("a"), nameOf("b"));
+  if (tabText) return el("span", { class: "chip d", text: tabText });
   if (r.status === "differ" && r.more) {
     return el("span", { class: `chip d more-${r.more}`, text: `Different: ${nameOf(r.more)} has more` });
   }
@@ -439,19 +462,19 @@ function statusChip(r) {
 function itemCell(r) {
   return el("td", { class: "item" },
     el("span", { text: r.label }),
-    r.highRisk ? el("span", { class: "risk-tag", text: "Powerful" }) : null,
+    r.highRisk ? el("span", { class: "risk-tag", title: "Powerful: lets people see or change a lot of data or settings.", text: "Powerful" }) : null,
     state.showApi && r.key ? el("div", { class: "api", text: r.key }) : null);
 }
 
-/** One value cell. `sub` is secondary text such as "Salesforce licence". */
-function access(v, sub = "") {
+/** One value cell. `sub` is secondary text such as "needs Salesforce license". `none` is the text for "not in this group": "—" for yes/no columns, "No access" where rights or settings are shown. */
+function access(v, sub = "", none = NO) {
   const extra = sub ? el("span", { class: "sub", text: ` · ${sub}` }) : null;
   if (v === null || v === false || v === undefined || (Array.isArray(v) && !v.length) || v === "No access") {
-    return el("td", { class: "no", text: v === "No access" ? "No access" : NO });
+    return el("td", { class: "no", text: none });
   }
   if (v === true) return el("td", { class: "yes", text: YES });
   if (Array.isArray(v)) return el("td", { text: v.map((f) => FLAG_LABELS[f] || f).join(", ") });
-  return el("td", { class: /^Removed/.test(v) ? "removed" : "" }, String(v), extra);
+  return el("td", { class: /^Removed|removed$/.test(v) ? "removed" : "" }, String(v), extra);
 }
 
 function diffCell(r) {
@@ -480,19 +503,21 @@ function columns(part) {
     case "overview":
       return { head: [h(null, ""), h(null, dotA()), h(null, dotB())], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: blank(r.a) }), el("td", { text: blank(r.b) })] };
     case "objectPermissions":
-      return { head: [h("item", "Object"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffCell(r)] };
+      return { head: [h("item", "Object"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a, "", NONE), access(r.b, "", NONE), diffCell(r)] };
     case "fieldPermissions": // grouped under object headers, so no Object column
-      return { head: [h("item", "Field"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
+      return { head: [h("item", "Field"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a, "", NONE), access(r.b, "", NONE), diffTd(r)] };
     case "setupAccess":
       return { head: [h("type", "Type"), h("item", "Name"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a), access(r.b), diffTd(r)] };
     case "components":
       if (part === "muted") {
-        const may = (side) => (legacy[side] ? "may not have been given" : "");
-        return { part, head: [h("type", "Kind of item"), h("item", "Name"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.kind }), itemCell(r), access(r.a, may("a")), access(r.b, may("b")), diffTd(r)] };
+        const may = (side) => (legacy[side] ? "not confirmed, older saved file" : "");
+        return { part, head: [h("type", "Type"), h("item", "Name"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.kind }), itemCell(r), access(r.a, may("a")), access(r.b, may("b")), diffTd(r)] };
       }
       return { part, head: [h("type", "Type"), h("item", "Permission set"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a, r.aSub), access(r.b, r.bSub), diffTd(r)] };
     default:
-      return { head: [h("item", state.tab === "tabs" ? "Tab" : "Permission"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
+      return state.tab === "tabs"
+        ? { head: [h("item", "Tab"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a, "", NONE), access(r.b, "", NONE), diffTd(r)] }
+        : { head: [h("item", "Permission"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
   }
 }
 
@@ -595,8 +620,8 @@ function renderTable() {
       ].filter(Boolean);
     };
     const old = ["a", "b"].filter((k) => lg[k]).map((k) => nameOf(k));
-    const intro = "People in this group do not get these, even though a permission set in the group gives them."
-      + (old.length ? ` For ${old.join(" and ")} (an older saved file) it is not known whether a permission set in the group really gave them, so those items say “may not have been given”.` : "");
+    const intro = "People in this group do not have these, even though a permission set in the group allows them."
+      + (old.length ? ` For ${old.join(" and ")} (an older saved group file) it is not known whether a permission set in the group really allowed them, so those items say "not confirmed".` : "");
     wrap.replaceChildren(...part(PART_SETS, PART_SETS_HELP, sets, "sets"), ...(muted.length ? part(PART_MUTED, intro, muted, "muted") : []));
     return;
   }

@@ -63,18 +63,18 @@ export const SECTION_TITLES = {
   userPermissions: "System permissions",
   objectPermissions: "Objects",
   fieldPermissions: "Fields",
-  setupAccess: "Apps, pages & code",
-  tabs: "Tabs",
+  setupAccess: "Apps and other access",
+  tabs: "Tab settings",
 };
 
 export const SECTION_HELP = {
   overview: "The two groups side by side.",
-  components: "The permission sets each group is built from, and anything its muting permission set takes away.",
+  components: "The permission sets each group is built from, and anything its muting permission set removes.",
   userPermissions: "System-wide permissions such as Export Reports or View All Data.",
   objectPermissions: "What users can do with each kind of record: read, create, edit, delete, and see or change everyone's records.",
   fieldPermissions: "Whether users can see (Read) or change (Edit) each field.",
-  setupAccess: "Apps, Visualforce pages, Apex classes, custom permissions and other items users are allowed to use.",
-  tabs: "Which tabs users see in the app navigation.",
+  setupAccess: "Apps, custom permissions, Visualforce pages, Apex classes and other things users are allowed to use.",
+  tabs: "How each tab is set for users: shown, available but hidden by default, or hidden.",
 };
 
 /** A 15 or 18 character Salesforce Id (letters and digits, at least one digit). */
@@ -148,14 +148,14 @@ function tally(rows) {
 
 const byLabel = (x, y) => (x.group || "").localeCompare(y.group || "") || x.label.localeCompare(y.label);
 
-export const MUTED_GROUP = "Taken away by muting";
-export const MUTED_LEGACY = "Muted (may not have been given)";
+export const MUTED_GROUP = "Removed by muting";
+export const MUTED_LEGACY = "Removed by muting (not confirmed, older saved file)";
 export const PART_SETS = "Permission sets in each group";
-export const PART_SETS_HELP = "The permission sets each group is built from. A user in the group gets everything these give, minus what the muting permission set takes away.";
+export const PART_SETS_HELP = "The permission sets each group is built from. A user in the group has everything these allow, minus what the muting permission set removes.";
 const MUTING_SET_GROUP = "Muting permission set";
-export const PART_MUTED = "Taken away by the muting permission set";
+export const PART_MUTED = "Removed by muting";
 
-const KIND_WORDS = { user: "System permission", object: "Object", field: "Field", tab: "Tab", setup: "App, page or code" };
+const KIND_WORDS = { user: "System permission", object: "Object", field: "Field", tab: "Tab", setup: "App or other access" };
 const KIND_ORDER = Object.values(KIND_WORDS);
 
 function compareComponents(a, b, labels, fieldLabels) {
@@ -166,15 +166,15 @@ function compareComponents(a, b, labels, fieldLabels) {
     const ca = ma[k] || null;
     const cb = mb[k] || null;
     const c = ca || cb;
-    const sub = (x) => (x && x.licence ? `${x.licence} licence` : "");
+    const sub = (x) => (x && x.licence ? `needs ${x.licence} license` : "");
     return {
       key: k,
       label: clean(c.label) || humanize(k),
       group: c.isMuting ? MUTING_SET_GROUP : "Permission set",
       part: "sets",
       status: presence(!!ca, !!cb),
-      a: ca ? "Included" : null,
-      b: cb ? "Included" : null,
+      a: ca ? "In this group" : null,
+      b: cb ? "In this group" : null,
       aSub: sub(ca),
       bSub: sub(cb),
     };
@@ -218,7 +218,7 @@ function mutedItems(s, labels, fieldLabels) {
   const e = m.effective;
   const names = (flags) => flagsOn(flags).map((f) => FLAG_LABELS[f] || f);
   const add = (kind, k, label, list) => {
-    items[`muted|${kind}|${k}`] = { key: k, label, kind: KIND_WORDS[kind], what: list.length ? `Removed: ${list.join(", ")}` : "Removed" };
+    items[`muted|${kind}|${k}`] = { key: k, label, kind: KIND_WORDS[kind], what: list.length ? `${list.join(", ")} removed` : "Removed" };
   };
   const src = e || m;
   for (const [k, label] of Object.entries(src.userPermissions || {})) add("user", k, clean(label), []);
@@ -230,7 +230,7 @@ function mutedItems(s, labels, fieldLabels) {
     if (on.length) add("field", k, fieldName(labels, fieldLabels, k), on);
   }
   for (const [k, vis] of Object.entries(src.tabSettings || {})) {
-    add("tab", k, `${objectName(labels, k.replace(/^standard-/, ""))} (tab)`, []);
+    add("tab", k, objectName(labels, k.replace(/^standard-/, "")), []);
   }
   for (const [k, entry] of Object.entries(e?.setupAccess || {})) add("setup", k, setupLabel(entry), []);
   return { items, legacy: !e };
@@ -347,6 +347,23 @@ function compareTabs(a, b, labels) {
   }).sort(byLabel);
 }
 
+/**
+ * Plain words for a group's Status. "Updated" is fine; anything else means Salesforce is still
+ * recalculating the group, so what the page shows may be out of date.
+ */
+export function groupStatus(status) {
+  if (status === "Updated") return "Up to date";
+  return `Not up to date (${status || "unknown"}). In Setup, open this group and wait for its status to say Updated.`;
+}
+
+const TAB_PHRASES = { [TAB_LABELS.DefaultOn]: "shown by default", [TAB_LABELS.DefaultOff]: "available but hidden by default", [TAB_LABELS.Hidden]: "hidden" };
+
+/** For a tab set differently in the two groups: "Different: shown by default in A, hidden in B". Otherwise null. */
+export function tabDiffText(r, nameA = "A", nameB = "B") {
+  if (r.status !== "differ" || !(r.a in TAB_PHRASES) || !(r.b in TAB_PHRASES)) return null;
+  return `Different: ${TAB_PHRASES[r.a]} in ${nameA}, ${TAB_PHRASES[r.b]} in ${nameB}`;
+}
+
 function orgLabel(o) {
   if (!o) return "Unknown org";
   return `${o.name || o.id}${o.isSandbox ? " (sandbox)" : ""}`;
@@ -362,15 +379,15 @@ function overview(a, b, sections) {
   add("Name", a.psg.label, b.psg.label);
   add("API name", a.psg.developerName, b.psg.developerName);
   add("Description", a.psg.description, b.psg.description);
-  add("Status", a.psg.status, b.psg.status);
+  add("Status", groupStatus(a.psg.status), groupStatus(b.psg.status));
   add("Users assigned", assigned(a), assigned(b));
-  add("Permission sets inside", (a.components || []).filter((c) => !c.isMuting).length, (b.components || []).filter((c) => !c.isMuting).length);
+  add("Permission sets in the group", (a.components || []).filter((c) => !c.isMuting).length, (b.components || []).filter((c) => !c.isMuting).length);
   add("Muting permission set", a.muting?.label || a.muting?.name || "None", b.muting?.label || b.muting?.name || "None");
-  add("System permissions", has(sections.userPermissions, "a"), has(sections.userPermissions, "b"));
-  add("Objects", has(sections.objectPermissions, "a"), has(sections.objectPermissions, "b"));
-  add("Fields", has(sections.fieldPermissions, "a"), has(sections.fieldPermissions, "b"));
-  add("Apps, pages & code", has(sections.setupAccess, "a"), has(sections.setupAccess, "b"));
-  add("Tabs", has(sections.tabs, "a"), has(sections.tabs, "b"));
+  add("System permissions turned on", has(sections.userPermissions, "a"), has(sections.userPermissions, "b"));
+  add("Objects with access", has(sections.objectPermissions, "a"), has(sections.objectPermissions, "b"));
+  add("Fields with access", has(sections.fieldPermissions, "a"), has(sections.fieldPermissions, "b"));
+  add("Apps and other access items", has(sections.setupAccess, "a"), has(sections.setupAccess, "b"));
+  add("Tabs with a setting", has(sections.tabs, "a"), has(sections.tabs, "b"));
   return rows;
 }
 
@@ -451,51 +468,49 @@ export function tabDiffCount(result, key) {
 }
 
 /**
- * The lines of one card, in the words shown on the page. Each line is { n, side, before, after }:
- * the page prints "{n} {before} {group name for side} {after}". `side` is "a", "b" or null.
- * When the groups are the same for that card only the two totals are returned and `same` is true.
+ * One card, in the words shown on the page: `{ totals, lines, same }`.
+ * `totals` is { noun, a, b }: how many each group has, for a small muted line.
+ * `lines` are only the differences, each { n, side, before, after }: the page prints
+ * "{n} {before} {group name for side} {after}" (`side` is null on every line today).
+ * When the groups are the same for that card `lines` is empty and `same` is true.
  */
 export function cardLines(result, key) {
   const c = cardCounts(result)[key];
-  const L = (n, before, side, after = "") => ({ n, side, before, after });
+  const L = (n, before, side = null, after = "") => ({ n, side, before, after });
+  let noun;
   let lines;
   let same;
   if (key === "userPermissions") {
-    const w = (n) => `system ${pl(n, "permission")}`;
-    lines = [L(c.a, w(c.a), "a", "has"), L(c.b, w(c.b), "b", "has"), L(c.only, "only one group has", null)];
+    noun = "system permissions";
+    lines = [L(c.only, `system ${pl(c.only, "permission")} only one group has`)];
     same = !c.only;
   } else if (key === "objectPermissions") {
-    const w = (n) => pl(n, "object");
-    lines = [L(c.a, w(c.a), "a", "can access"), L(c.b, w(c.b), "b", "can access"),
-      L(c.only, `${w(c.only)} only one group can access`, null),
-      L(c.differ, `${w(c.differ)} both can access, but with different rights (Read, Create, Edit, Delete…)`, null)];
+    noun = "objects";
+    lines = [L(c.only, `${pl(c.only, "object")} only one group can access`),
+      L(c.differ, `${pl(c.differ, "object")} with different rights`)];
     same = !c.only && !c.differ;
   } else if (key === "fieldPermissions") {
-    const w = (n) => pl(n, "field");
-    lines = [L(c.a, w(c.a), "a", "can see"), L(c.b, w(c.b), "b", "can see"),
-      L(c.only, `${w(c.only)} only one group can see`, null),
-      L(c.differ, `${w(c.differ)} both can see, but one can edit and the other can only read`, null)];
+    noun = "fields";
+    lines = [L(c.only, `${pl(c.only, "field")} only one group can see`),
+      L(c.differ, `${pl(c.differ, "field")} where one group can edit and the other can only read`)];
     same = !c.only && !c.differ;
   } else if (key === "setupAccess") {
-    const w = (n) => pl(n, "item");
-    lines = [L(c.a, w(c.a), "a", "can use"), L(c.b, w(c.b), "b", "can use"), L(c.only, "only one group can use", null)];
+    noun = "items";
+    lines = [L(c.only, `${pl(c.only, "item")} only one group can use`)];
     same = !c.only;
   } else if (key === "tabs") {
-    const w = (n) => pl(n, "tab");
-    lines = [L(c.a, w(c.a), "a", "can see"), L(c.b, w(c.b), "b", "can see"),
-      L(c.only, `${w(c.only)} only one group can see`, null),
-      L(c.differ, `${w(c.differ)} both can see, but set differently (shown or hidden by default)`, null)];
+    noun = "tabs";
+    lines = [L(c.only, `${pl(c.only, "tab")} only one group can see`),
+      L(c.differ, `${pl(c.differ, "tab")} set up differently (shown or hidden by default)`)];
     same = !c.only && !c.differ;
   } else {
-    const w = (n) => pl(n, "permission set");
-    const t = (n) => pl(n, "thing");
-    lines = [L(c.a, `${w(c.a)} in`, "a"), L(c.b, `${w(c.b)} in`, "b"),
-      L(c.only, `${w(c.only)} in only one group`, null),
-      L(c.mutedOnly, `${t(c.mutedOnly)} muting takes away in only one group`, null),
-      L(c.mutedDiffer, `${t(c.mutedDiffer)} both groups' muting takes away, but differently`, null)];
+    noun = "permission sets";
+    lines = [L(c.only, `${pl(c.only, "permission set")} in only one group`),
+      L(c.mutedOnly, `${pl(c.mutedOnly, "item")} removed by muting in only one group`),
+      L(c.mutedDiffer, `${pl(c.mutedDiffer, "item")} removed by muting in both, but differently`)];
     same = !c.only && !c.mutedOnly && !c.mutedDiffer;
   }
-  return { lines: same ? lines.slice(0, 2) : lines, same };
+  return { totals: { noun, a: c.a, b: c.b }, lines: same ? [] : lines, same };
 }
 
 // ---------- sorting ----------
@@ -517,6 +532,8 @@ export function sortText(r, col, nameA = "A", nameB = "B") {
         return [r.aExtra?.length ? `Only ${nameA}: ${flags(r.aExtra)}` : "", r.bExtra?.length ? `Only ${nameB}: ${flags(r.bExtra)}` : ""].filter(Boolean).join(" ");
       }
       if (r.status === "differ" && r.more) return `Different: ${r.more === "a" ? nameA : nameB} has more`;
+      const tabText = tabDiffText(r, nameA, nameB);
+      if (tabText) return tabText;
       return statusText(r.status, nameA, nameB);
     }
     default: return "";
@@ -616,16 +633,18 @@ function highlights(a, b, sections) {
 
   const gives = givesCounts(sections);
   const num = (n) => n.toLocaleString("en-US");
-  const things = (n) => `${num(n)} ${n === 1 ? "item" : "items"} of access`;
-  if (!gives.a && !gives.b) push("verdict", "good", "Both groups give exactly the same access.");
-  else if (gives.a && !gives.b) push("verdict", "info", `${A} gives everything ${B} gives, and more (${things(gives.a)} that ${B} does not).`);
-  else if (gives.b && !gives.a) push("verdict", "info", `${B} gives everything ${A} gives, and more (${things(gives.b)} that ${A} does not).`);
-  else push("verdict", "info", `Each group gives access the other does not: ${A} gives ${things(gives.a)} ${B} doesn't; ${B} gives ${things(gives.b)} ${A} doesn't.`);
+  const things = (n) => `${num(n)} ${n === 1 ? "thing" : "things"}`;
+  if (!gives.a && !gives.b) push("verdict", "good", "Both groups have exactly the same access.");
+  else if (gives.a && !gives.b) push("verdict", "info", `${A} has everything ${B} has, and ${num(gives.a)} more.`);
+  else if (gives.b && !gives.a) push("verdict", "info", `${B} has everything ${A} has, and ${num(gives.b)} more.`);
+  else push("verdict", "info", `${A} has ${things(gives.a)} ${B} doesn't. ${B} has ${things(gives.b)} ${A} doesn't.`);
+  // Second, muted line under the verdict: what the numbers count (they do not match one card).
+  out.at(-1).detail = "Counts system permissions, objects, fields, apps and other access, and tabs (not permission sets). If both groups have an item but one has more, such as Edit instead of Read, it counts for that group.";
 
   // System permissions first, one line each.
   for (const r of sections.userPermissions.filter((x) => x.highRisk && x.status !== "same")) {
     const side = r.status === "onlyA" ? "a" : "b";
-    out.push({ kind: "risk", area: "general", level: "risk", side, text: `Only ${side === "a" ? A : B} has “${r.label}”.`, short: `“${r.label}”` });
+    out.push({ kind: "risk", area: "general", level: "risk", side, text: `Only ${side === "a" ? A : B} has ${r.label}.`, short: r.label });
   }
   // Objects: at most one line per side, only for View All / Modify All.
   for (const [side, who, other] of [["a", A, B], ["b", B, A]]) {
@@ -633,11 +652,9 @@ function highlights(a, b, sections) {
     if (!hits.length) continue;
     // Standard objects make the clearest examples; then alphabetical.
     const ex = [...hits].sort((x, y) => /__/.test(x.key) - /__/.test(y.key) || x.label.localeCompare(y.label)).slice(0, 3).map((r) => r.label);
-    const list = ex.length > 1 ? `${ex.slice(0, -1).join(", ")} and ${ex.at(-1)}` : ex[0];
-    const body = hits.length === 1
-      ? `View All or Modify All on the object ${list}, where ${other} has less. See Objects.`
-      : `View All or Modify All on ${num(hits.length)} objects where ${other} has less${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
-    out.push({ kind: "risk", area: "objects", level: "risk", side, text: `${who} has ${body}`, short: body });
+    const list = hits.length > ex.length ? `${ex.join(", ")} and ${num(hits.length - ex.length)} more` : ex.join(", ");
+    const what = `every record on ${num(hits.length)} ${hits.length === 1 ? "object" : "objects"} (${list})`;
+    out.push({ kind: "risk", area: "objects", level: "risk", side, text: `${who} can view or change ${what}, where ${other} has less. See Objects.`, short: `More access to ${what} than ${other}. See Objects.` });
   }
 
   const n = (k, st) => sections[k].filter((r) => r.status === st).length;
@@ -645,7 +662,7 @@ function highlights(a, b, sections) {
     ["userPermissions", "system permission"],
     ["objectPermissions", "object"],
     ["fieldPermissions", "field"],
-    ["setupAccess", "app, page or code item", "apps, pages or code items"],
+    ["setupAccess", "app or other access item", "apps or other access items"],
   ];
   for (const [k, one, many] of summary) {
     const bits = [];
@@ -661,11 +678,11 @@ function highlights(a, b, sections) {
   for (const [s, name] of [[a, A], [b, B]]) {
     const n = s.muting?.effective?.nothingToTake;
     if (n) {
-      push("note", "info", `${name}: ${plural(n, "other item")} in the muting permission set had nothing to take away, so ${n === 1 ? "it is" : "they are"} not listed. No action needed.`);
+      push("note", "info", `${name}: the muting permission set has ${plural(n, "more item")}, but ${n === 1 ? "it removes" : "they remove"} nothing, so ${n === 1 ? "it is" : "they are"} not listed.`);
     }
   }
   for (const [s, name] of [[a, A], [b, B]]) {
-    for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}${/^Could not/.test(w) ? " That part of the result may be incomplete. Try Compare again; if it keeps happening, check that your user can see permission sets in Setup." : ""}`);
+    for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}${/^Could not/.test(w) ? " These results may be incomplete. Try Compare again." : ""}`);
   }
   return out;
 }
