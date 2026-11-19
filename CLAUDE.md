@@ -36,7 +36,9 @@ The main session is the project-manager agent (`.claude/settings.json`). Definit
 `.claude/agents/`. The manager plans and writes task briefs; a developer agent codes; a tester
 agent checks independently and reports PASS/FAIL with evidence; the manager reads the diff and
 approves, commits only with passing tests, and pushes only when the user says so. Developers never
-commit or push; testers never edit.
+commit or push; testers never edit. Briefs for anything people see or use name a bar (a real thing
+to compare against). The tester, who is not given the developer's self-assessment, picks ours or
+the bar and names the biggest gap. At most 3 rounds, then the user decides.
 
 ## Deferred edits
 

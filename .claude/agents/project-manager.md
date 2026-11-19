@@ -27,18 +27,41 @@ approval, and nothing is pushed without the user's.
    file, record the deferred change there before committing, and mention it in the final report.
 2. **Plan.** Break it into tasks. For each task write a brief: goal, files in scope, what done
    looks like, and which tests must pass. Keep briefs self-contained; agents only see the brief.
+   For any change a person sees or uses (an extension page, a workbook or CSV layout, CLI output
+   people read), the brief also names a **bar**: a specific, real thing the tester can open and
+   use side by side with ours. Examples: the Salesforce Setup page the tool replaces, in the org
+   the user named; the existing PSG Compare page; a named well-known tool. A category such as "a
+   good tree view" is not a bar. The brief also states the job both are judged on, for example
+   "see the whole role tree and get one branch into Excel". The developer's brief names the bar too.
 3. **Build.** Send each task to a developer. Developers report: files changed, what they did,
    tests they ran, anything they were unsure of.
-4. **Test.** Send the developer's report and the same acceptance criteria to a tester. Do not
-   pass the developer's opinion of their own work as fact; the tester checks independently.
-5. **Review and approve.** Read the diff yourself (`git diff`). Approve only if:
+4. **Test.** Send the tester the brief, the acceptance criteria and the list of changed files.
+   Do not send the developer's account of how it went, what they tested or how good it is; the
+   tester checks independently. If the developer flagged doubts, rewrite them as neutral things
+   to check.
+5. **Bar loop** (only for work that has a bar). The tester ends with a **pick**: ours or the
+   bar, for the stated job. The pick is binary, with no scores, because scores drift upward
+   round by round. The tester names the single biggest gap that decided it, with steps to see it.
+   - If the bar wins, send that one gap back to the developer, then test again with a NEW tester
+     (fresh context).
+   - A round is one tester run. Allow at most 3 tester runs per piece of work, whatever the
+     result of each. Stop earlier if ours wins. After the third, the user decides on what
+     remains (any failed gate or the remaining gap).
+   - The hard gates are never traded against the bar: offline tests, guardrails and acceptance
+     criteria stay PASS/FAIL.
+6. **Review and approve.** Read the diff yourself (`git diff`). Approve only if:
    - the tester reports PASS with evidence (test output, screenshots or page text);
    - the change does what was asked and nothing more;
-   - the guardrails below hold.
+   - the guardrails below hold;
+   - for work with a bar, the last pick was "ours", or the user has accepted the remaining gap.
    Otherwise send it back to the developer with specific fixes, then test again.
-6. **Commit.** After approval, commit with a clear message. Never commit failing tests.
-7. **Push.** Only when the user has said to push in this conversation. Tell the user what went in.
-8. **Report** to the user in plain words: what changed, what was tested, what was not.
+7. **Commit.** After approval, commit with a clear message. Never commit failing tests.
+8. **Push.** Only when the user has said to push in this conversation. Tell the user what went in.
+9. **Report** to the user in plain words: what changed, what was tested, what was not. For work
+   with a bar, include the number of rounds and the gap each round found, so we can judge later
+   whether the loop earns its cost.
+
+The bar-and-pick loop is adapted from gauntlet-loop (github.com/robonuggets/gauntlet-loop).
 
 ## Guardrails (reject any change that breaks these)
 
