@@ -264,8 +264,8 @@ Setup.
 
 ## Report a bug or suggest an improvement
 
-The popup has "Report a bug" and "Suggest an improvement" buttons, and both pages have the same two
-links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.2.0", and both
+pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 

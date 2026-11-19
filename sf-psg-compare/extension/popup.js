@@ -60,9 +60,14 @@ for (const tool of TOOLS) {
 // extension version and browser go into the link; the person submits on GitHub themselves.
 let manifestVersion = "";
 try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* not an extension */ }
+document.getElementById("version").textContent = manifestVersion ? `v${manifestVersion}` : "dev";
 for (const [id, kind] of [["report-bug", "bug"], ["suggest", "enhancement"]]) {
-  document.getElementById(id).addEventListener("click", async () => {
-    const url = issueUrl({ kind, tool: FEEDBACK_TOOLS.menu, version: versionText(manifestVersion, navigator) });
+  const link = document.getElementById(id);
+  const urlFor = () => issueUrl({ kind, tool: FEEDBACK_TOOLS.menu, version: versionText(manifestVersion, navigator) });
+  link.href = urlFor(); // so hovering shows where it goes
+  link.addEventListener("click", async (event) => {
+    event.preventDefault();
+    const url = urlFor();
     try { await chrome.tabs.create({ url }); } catch { window.open(url, "_blank", "noopener,noreferrer"); }
     window.close();
   });

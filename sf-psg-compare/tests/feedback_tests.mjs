@@ -65,6 +65,18 @@ export async function run(test) {
     assert.ok(!/\bfetch\s*\(/.test(read(ext("popup.js"))));
   });
 
+  await test("feedback: popup footer has two real links and a version taken from the manifest", () => {
+    const html = read(ext("popup.html"));
+    const js = read(ext("popup.js"));
+    assert.ok(/<a id="report-bug" href=/.test(html) && /<a id="suggest" href=/.test(html));
+    assert.ok(!html.includes("Found a problem"));
+    assert.ok(html.includes('id="version"'));
+    assert.ok(js.includes("chrome.runtime.getManifest().version"));
+    assert.ok(js.includes('getElementById("version").textContent = manifestVersion ? `v${manifestVersion}` : "dev"'));
+    assert.ok(js.includes("event.preventDefault()"));
+    assert.ok(/^\d+\.\d+\.\d+/.test(JSON.parse(read(ext("manifest.json"))).version));
+  });
+
   await test("feedback: manifest has no github host permission", () => {
     const m = JSON.parse(read(ext("manifest.json")));
     assert.ok(!JSON.stringify(m.host_permissions).includes("github"));
