@@ -18,9 +18,12 @@ does not: Sales Rep gives 4 items of access Sales Manager doesn't; Sales Manager
 access Sales Rep doesn't." (An "item of access" is a general permission, object, field,
 app/page/code item or tab that only that group gives, or gives more of.) Under that:
 
-- **A card per area** with how many items only one group has, or "✓ Same in both". Click a card
-  to open its list. "What's inside" counts permission sets, the muting permission set itself, and
-  items taken away by muting separately.
+- **A card per area**, under "Differences by area" ("A number next to a group's name is what only
+  that group has"): a number and the group's name for each group that has items the other lacks,
+  "N set up differently", or "✓ Same in both". Click a card to open its list. "What's inside" says
+  what it counts: "Permission sets in one group but not the other" and "Things muting takes away in
+  one group but not the other" (plus "set up differently" for muted items both remove differently).
+  The muting permission set itself is not counted on the card, but is still in the list.
 - **Worth a closer look:** powerful general permissions only one group gives (first), then at most
   one line per group for View All / Modify All on objects, such as "Sales Manager has View All or
   Modify All on 938 objects where Sales Rep has less, including Account, Case and Opportunity. See

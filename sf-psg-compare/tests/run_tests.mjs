@@ -421,6 +421,17 @@ await test("permission sets show Included, licence as secondary text; counts are
   assert.equal(R.counts.componentSets.total + R.counts.componentMutingSet.total + R.counts.componentMuted.total, R.counts.components.total);
 });
 
+await test("card counts match the What's inside list (muting set excluded)", () => {
+  const rows = R.sections.components;
+  const n = (f, st) => rows.filter((r) => f(r) && r.status === st).length;
+  const sets = (r) => r.part === "sets" && r.group !== "Muting permission set";
+  const muted = (r) => r.part === "muted";
+  for (const st of ["onlyA", "onlyB", "differ"]) {
+    assert.equal(R.counts.componentSets[st], n(sets, st));
+    assert.equal(R.counts.componentMuted[st], n(muted, st));
+  }
+});
+
 await test("muted item on both sides with different values is Different, not Same", () => {
   const x = structuredClone(A);
   const y = structuredClone(A);

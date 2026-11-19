@@ -346,18 +346,21 @@ function renderResult() {
   // One card per area: how many differences, in plain words.
   const plural = (n, one, many) => (n === 1 ? one : many);
   $("#cards").replaceChildren(...CARD_TABS.map((k) => {
-    // "What's inside" holds two kinds of things; the card counts them separately.
+    // "What's inside" holds permission sets and muted items; the card counts them separately.
+    // The muting permission set itself is not counted (each group's is normally different).
     const parts = k === "components"
-      ? [[r.counts.componentSets, "permission set", "permission sets"], [r.counts.componentMutingSet, "muting permission set", "muting permission sets"], [r.counts.componentMuted, "item taken away by muting", "items taken away by muting"]]
-      : [[r.counts[k], "", ""]];
+      ? [[r.counts.componentSets, "Permission sets in one group but not the other"], [r.counts.componentMuted, "Things muting takes away in one group but not the other"]]
+      : [[r.counts[k], ""]];
     const lines = [];
     let diffs = 0;
-    for (const [c, one, many] of parts) {
-      diffs += c.onlyA + c.onlyB + c.differ;
-      const noun = (n) => (one ? ` ${plural(n, one, many)}` : "");
-      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), `${noun(c.onlyA)} only in ${nameOf("a")}`));
-      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), `${noun(c.onlyB)} only in ${nameOf("b")}`));
-      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), `${noun(c.differ)} set up differently`));
+    for (const [c, label] of parts) {
+      const d = c.onlyA + c.onlyB + c.differ;
+      diffs += d;
+      // The group name says who has it; the sub-label says what is being counted.
+      if (d && label) lines.push(el("div", { class: "card-kind", text: label }));
+      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), el("span", { text: nameOf("a") })));
+      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), el("span", { text: nameOf("b") })));
+      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), el("span", { text: "set up differently" })));
     }
     if (!diffs) lines.push(el("div", { class: "same", text: r.counts[k].total ? "✓ Same in both" : "Neither group has any" }));
     return el("button", { class: `card${diffs ? "" : " ok"}`, onclick: () => openTab(k, true) },

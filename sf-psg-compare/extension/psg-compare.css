@@ -160,6 +160,14 @@ details.files summary { cursor: pointer; color: var(--accent); }
 .card b { font-size: 16px; }
 .card .ca b { color: var(--a); }
 .card .cb b { color: var(--b); }
+.cards-hint { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
+.cards-title { margin: 0 0 2px; font-weight: 600; color: var(--muted); font-size: 14px; }
+.card .ca, .card .cb { display: flex; gap: 8px; align-items: baseline; }
+.card .ca span { color: var(--a); }
+.card .cb span { color: var(--b); }
+.card div:not(.card-title):not(.card-kind):not(.same):not(.ca):not(.cb) { display: flex; gap: 8px; align-items: baseline; }
+.card b { flex: none; }
+.card-kind { color: var(--muted); font-size: 12px; font-weight: 600; margin-top: 4px; }
 .card .same { color: var(--good); }
 
 .risks { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
