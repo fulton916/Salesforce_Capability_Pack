@@ -1,3 +1,5 @@
+import { searchWords, matchesWords } from "./pick.js";
+
 // Compare two PSG snapshots. Pure functions, no browser or network access.
 //
 // Every row has a status:
@@ -52,8 +54,6 @@ export const FLAG_LABELS = {
   Read: "Read", Create: "Create", Edit: "Edit", Delete: "Delete",
   ViewAllFields: "View All Fields", ViewAllRecords: "View All", ModifyAllRecords: "Modify All",
 };
-const STRONG_OBJECT_FLAGS = new Set(["Delete", "ViewAllRecords", "ModifyAllRecords"]);
-const MAX_OBJECT_HIGHLIGHTS = 8;
 
 const TAB_LABELS = { DefaultOn: "Shown", DefaultOff: "Available (hidden by default)", Hidden: "Hidden" };
 
@@ -148,6 +148,14 @@ function tally(rows) {
 
 const byLabel = (x, y) => (x.group || "").localeCompare(y.group || "") || x.label.localeCompare(y.label);
 
+export const MUTED_GROUP = "Taken away by muting";
+export const MUTED_LEGACY = "Muted (may not have been given)";
+export const PART_SETS = "Permission sets in each group";
+export const PART_MUTED = "Taken away by the muting permission set";
+
+const KIND_WORDS = { user: "General permission", object: "Object", field: "Field", tab: "Tab", setup: "App, page or code" };
+const KIND_ORDER = Object.values(KIND_WORDS);
+
 function compareComponents(a, b, labels, fieldLabels) {
   const map = (s) => Object.fromEntries((s.components || []).map((c) => [c.name, c]));
   const ma = map(a);
@@ -156,36 +164,45 @@ function compareComponents(a, b, labels, fieldLabels) {
     const ca = ma[k] || null;
     const cb = mb[k] || null;
     const c = ca || cb;
+    const sub = (x) => (x && x.licence ? `${x.licence} licence` : "");
     return {
       key: k,
       label: clean(c.label) || humanize(k),
       group: c.isMuting ? "Muting permission set" : "Permission set",
+      part: "sets",
       status: presence(!!ca, !!cb),
-      a: ca ? ca.licence || "Included" : null,
-      b: cb ? cb.licence || "Included" : null,
+      a: ca ? "Included" : null,
+      b: cb ? "Included" : null,
+      aSub: sub(ca),
+      bSub: sub(cb),
     };
   });
   // What each muting permission set takes away, matched by permission (not by muting set name).
   const mutedA = mutedItems(a, labels, fieldLabels);
   const mutedB = mutedItems(b, labels, fieldLabels);
-  // Older snapshots do not say whether a mute removed anything, so they cannot claim it did.
-  const groupName = mutedA.legacy || mutedB.legacy ? MUTED_LEGACY : MUTED_GROUP;
   const muted = keysOf(mutedA.items, mutedB.items).map((k) => {
-    const m = mutedA.items[k] || mutedB.items[k];
+    const x = mutedA.items[k];
+    const y = mutedB.items[k];
+    const m = x || y;
+    let status = presence(!!x, !!y);
+    if (x && y && x.what !== y.what) status = "differ"; // same item, different things removed
     return {
       key: m.key,
       label: m.label,
-      group: groupName,
-      status: presence(k in mutedA.items, k in mutedB.items),
-      a: k in mutedA.items ? mutedA.items[k].what : null,
-      b: k in mutedB.items ? mutedB.items[k].what : null,
+      group: m.kind,
+      kind: m.kind,
+      part: "muted",
+      // Older (v1) snapshots cannot say the item was really given, so only their side says "may not have been given".
+      legacy: (!!x && mutedA.legacy) || (!!y && mutedB.legacy),
+      status,
+      a: x ? x.what : null,
+      b: y ? y.what : null,
     };
   });
-  return [...sets.sort(byLabel), ...muted.sort(byLabel)];
+  const kindRank = (r) => KIND_ORDER.indexOf(r.kind);
+  muted.sort((p, q) => kindRank(p) - kindRank(q) || p.label.localeCompare(q.label));
+  return [...sets.sort(byLabel), ...muted];
 }
-
-export const MUTED_GROUP = "Taken away by muting";
-export const MUTED_LEGACY = "Muted (may not have been given)";
 
 /**
  * Items of a snapshot's muting permission set, as { items, legacy }.
@@ -197,21 +214,23 @@ function mutedItems(s, labels, fieldLabels) {
   const items = {};
   if (!m) return { items, legacy: false };
   const e = m.effective;
-  const names = (flags) => flagsOn(flags).map((f) => FLAG_LABELS[f] || f).join(", ");
-  const add = (kind, k, label, what) => { items[`muted|${kind}|${k}`] = { key: k, label, what }; };
+  const names = (flags) => flagsOn(flags).map((f) => FLAG_LABELS[f] || f);
+  const add = (kind, k, label, list) => {
+    items[`muted|${kind}|${k}`] = { key: k, label, kind: KIND_WORDS[kind], what: list.length ? `Removed: ${list.join(", ")}` : "Removed" };
+  };
   const src = e || m;
-  for (const [k, label] of Object.entries(src.userPermissions || {})) add("user", k, clean(label), "General permission");
+  for (const [k, label] of Object.entries(src.userPermissions || {})) add("user", k, clean(label), []);
   for (const [k, flags] of Object.entries(src.objectPermissions || {})) {
     if (flagsOn(flags).length) add("object", k, objectName(labels, k), names(flags));
   }
   for (const [k, flags] of Object.entries(src.fieldPermissions || {})) {
-    const on = flagsOn(flags);
-    if (on.length) add("field", k, fieldName(labels, fieldLabels, k), on.join(", "));
+    const on = names(flags);
+    if (on.length) add("field", k, fieldName(labels, fieldLabels, k), on);
   }
   for (const [k, vis] of Object.entries(src.tabSettings || {})) {
-    add("tab", k, `${objectName(labels, k.replace(/^standard-/, ""))} (tab)`, e ? "Tab" : TAB_LABELS[vis] || "Tab");
+    add("tab", k, `${objectName(labels, k.replace(/^standard-/, ""))} (tab)`, []);
   }
-  for (const [k, entry] of Object.entries(e?.setupAccess || {})) add("setup", k, setupLabel(entry), entry.typeLabel || entry.type);
+  for (const [k, entry] of Object.entries(e?.setupAccess || {})) add("setup", k, setupLabel(entry), []);
   return { items, legacy: !e };
 }
 
@@ -271,9 +290,17 @@ function compareFields(a, b, labels, fieldLabels) {
       b: fieldAccess(fb[k]),
       aExtra,
       bExtra,
+      more: status === "differ" ? moreSide(fa[k], fb[k]) : null,
     });
   }
   return rows.sort(byLabel);
+}
+
+const ACCESS_RANK = { "No access": 0, Read: 1, Edit: 2 };
+/** Which side has more access to a field: "a", "b", or null when equal. */
+function moreSide(fa, fb) {
+  const d = ACCESS_RANK[fieldAccess(fa)] - ACCESS_RANK[fieldAccess(fb)];
+  return d > 0 ? "a" : d < 0 ? "b" : null;
 }
 
 /** Label of a setup item: its own label, a plain note when only the Id is known, or words from its name. */
@@ -347,6 +374,25 @@ function overview(a, b, sections) {
 
 const plural = (n, one, many = one + "s") => `${n} ${n === 1 ? one : many}`;
 
+/**
+ * How many things each group gives that the other does not, as { a, b }.
+ * Counts rows in permissions, objects, fields, apps/pages/code and tabs. A row counts once for a
+ * side when only that side has it, or when that side has more of it (for example Edit where the
+ * other has Read). A tab shown differently counts for both sides.
+ */
+export function givesCounts(sections) {
+  const t = { a: 0, b: 0 };
+  for (const k of ["userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabs"]) {
+    for (const r of sections[k]) {
+      if (r.status === "same") continue;
+      const tabDiffers = k === "tabs" && r.status === "differ";
+      if (r.status === "onlyA" || r.aExtra?.length || tabDiffers) t.a++;
+      if (r.status === "onlyB" || r.bExtra?.length || tabDiffers) t.b++;
+    }
+  }
+  return t;
+}
+
 /** Plain-language findings. kind: verdict | risk | area | note. */
 function highlights(a, b, sections) {
   const out = [];
@@ -354,29 +400,29 @@ function highlights(a, b, sections) {
   const B = b.psg.label || b.psg.developerName;
   const push = (kind, level, text) => out.push({ kind, level, text });
 
-  const perm = ["userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabs"];
-  const aMore = perm.some((k) => sections[k].some((r) => r.status === "onlyA" || r.aExtra?.length || (k === "tabs" && r.status === "differ")));
-  const bMore = perm.some((k) => sections[k].some((r) => r.status === "onlyB" || r.bExtra?.length || (k === "tabs" && r.status === "differ")));
-  if (!aMore && !bMore) push("verdict", "good", "Both groups give exactly the same access.");
-  else if (aMore && !bMore) push("verdict", "info", `${A} gives everything ${B} gives, and more.`);
-  else if (bMore && !aMore) push("verdict", "info", `${B} gives everything ${A} gives, and more.`);
-  else push("verdict", "info", "Each group gives some access the other does not.");
+  const gives = givesCounts(sections);
+  const num = (n) => n.toLocaleString("en-US");
+  const things = (n) => `${num(n)} ${n === 1 ? "thing" : "things"}`;
+  if (!gives.a && !gives.b) push("verdict", "good", "Both groups give exactly the same access.");
+  else if (gives.a && !gives.b) push("verdict", "info", `${A} gives everything ${B} gives, and more (${things(gives.a)} that ${B} does not).`);
+  else if (gives.b && !gives.a) push("verdict", "info", `${B} gives everything ${A} gives, and more (${things(gives.b)} that ${A} does not).`);
+  else push("verdict", "info", `Each group gives access the other does not: ${A} gives ${things(gives.a)} ${B} doesn't; ${B} gives ${things(gives.b)} ${A} doesn't.`);
 
+  // General permissions first, one line each.
   for (const r of sections.userPermissions.filter((x) => x.highRisk && x.status !== "same")) {
-    push("risk", "risk", `Only ${r.status === "onlyA" ? A : B} has “${r.label}”.`);
+    out.push({ kind: "risk", area: "general", level: "risk", text: `Only ${r.status === "onlyA" ? A : B} has “${r.label}”.` });
   }
-  const objRisks = [];
-  for (const r of sections.objectPermissions) {
-    for (const [extra, who, other] of [[r.aExtra, A, B], [r.bExtra, B, A]]) {
-      const strong = extra.filter((f) => STRONG_OBJECT_FLAGS.has(f));
-      if (strong.length) objRisks.push(`${who} can ${strong.map((f) => FLAG_LABELS[f]).join(", ")} ${r.label} records; ${other} cannot.`);
-    }
-  }
-  // Modify All / View All first; keep the list short, the Objects tab has the rest.
-  objRisks.sort((x, y) => /Modify All|View All/.test(y) - /Modify All|View All/.test(x));
-  for (const t of objRisks.slice(0, MAX_OBJECT_HIGHLIGHTS)) push("risk", "risk", t);
-  if (objRisks.length > MAX_OBJECT_HIGHLIGHTS) {
-    push("risk", "risk", `…and ${objRisks.length - MAX_OBJECT_HIGHLIGHTS} more object differences in Delete, View All or Modify All. See the Objects tab.`);
+  // Objects: at most one line per side, only for View All / Modify All.
+  for (const [side, who, other] of [["a", A, B], ["b", B, A]]) {
+    const hits = sections.objectPermissions.filter((r) => (side === "a" ? r.aExtra : r.bExtra).some((f) => f === "ViewAllRecords" || f === "ModifyAllRecords"));
+    if (!hits.length) continue;
+    // Standard objects make the clearest examples; then alphabetical.
+    const ex = [...hits].sort((x, y) => /__/.test(x.key) - /__/.test(y.key) || x.label.localeCompare(y.label)).slice(0, 3).map((r) => r.label);
+    const list = ex.length > 1 ? `${ex.slice(0, -1).join(", ")} and ${ex.at(-1)}` : ex[0];
+    const text = hits.length === 1
+      ? `${who} can View All or Modify All records of the object ${list}; ${other} cannot. See Objects.`
+      : `${who} can View All or Modify All records of ${num(hits.length)} objects that ${other} cannot${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
+    out.push({ kind: "risk", area: "objects", level: "risk", text });
   }
 
   const n = (k, st) => sections[k].filter((r) => r.status === st).length;
@@ -395,17 +441,16 @@ function highlights(a, b, sections) {
   }
 
   if (a.org?.id && b.org?.id && a.org.id !== b.org.id) {
-    push("note", "info", `The groups come from different orgs (${orgLabel(a.org)} and ${orgLabel(b.org)}). Items are matched by API name.`);
+    push("note", "info", `The groups come from different orgs (${orgLabel(a.org)} and ${orgLabel(b.org)}). Items are matched by their API names, so a renamed item shows up as two separate items. No action needed.`);
   }
   for (const [s, name] of [[a, A], [b, B]]) {
     const n = s.muting?.effective?.nothingToTake;
     if (n) {
-      const it = n === 1 ? "it" : "them";
-      push("note", "info", `${name}: ${plural(n, "other item")} in the muting permission set had nothing to take away (no permission set in the group gives ${it}, or the group's access still includes ${it}).`);
+      push("note", "info", `${name}: ${plural(n, "other item")} in the muting permission set had nothing to take away, so ${n === 1 ? "it is" : "they are"} not listed. No action needed.`);
     }
   }
   for (const [s, name] of [[a, A], [b, B]]) {
-    for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}`);
+    for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}${/^Could not/.test(w) ? " That part of the result may be incomplete. Try Compare again; if it keeps happening, check that your user can see permission sets in Setup." : ""}`);
   }
   return out;
 }
@@ -423,7 +468,10 @@ export function compareSnapshots(a, b) {
   };
   sections.overview = overview(a, b, sections);
   const counts = Object.fromEntries(Object.entries(sections).map(([k, rows]) => [k, tally(rows)]));
-  return { a, b, sections, counts, highlights: highlights(a, b, sections) };
+  counts.componentSets = tally(sections.components.filter((r) => r.part === "sets"));
+  counts.componentMuted = tally(sections.components.filter((r) => r.part === "muted"));
+  const mutedLegacy = { a: !!a.muting && !a.muting.effective, b: !!b.muting && !b.muting.effective };
+  return { a, b, sections, counts, gives: givesCounts(sections), mutedLegacy, highlights: highlights(a, b, sections) };
 }
 
 export function statusText(status, nameA = "A", nameB = "B") {
@@ -438,25 +486,45 @@ function cell(v) {
   return String(v);
 }
 
-/** Flatten a comparison (or one section of it) into rows for CSV export. */
-export function toRows(result, onlySection = null) {
+/**
+ * Rows of one section as shown on screen: optionally only differences, and only those matching
+ * every word of `search` (punctuation such as "›" counts as a separator). The Summary list always
+ * keeps its rows when differences-only is on.
+ */
+export function filterRows(rows, { section = "", diffOnly = false, search = "" } = {}) {
+  const words = searchWords(search);
+  return rows.filter((r) => {
+    if (diffOnly && section !== "overview" && r.status === "same") return false;
+    if (!words.length) return true;
+    return matchesWords([r.key, r.label, r.group].filter(Boolean).join(" "), words);
+  });
+}
+
+/**
+ * Flatten a comparison (or one section of it) into rows for CSV export.
+ * `diffOnly` and `search` narrow the rows the same way the page does.
+ */
+export function toRows(result, onlySection = null, { diffOnly = false, search = "" } = {}) {
   const A = result.a.psg.label || result.a.psg.developerName;
   const B = result.b.psg.label || result.b.psg.developerName;
-  const header = ["Section", "Group", "Item", "API name", "Difference", A, B, `Only ${A}`, `Only ${B}`];
+  const header = ["Section", "Group", "Item", "API name", "Difference", A, B, `Only ${A}`, `Only ${B}`, "Kind of item"];
   const rows = [header];
-  for (const [k, list] of Object.entries(result.sections)) {
+  const withSub = (v, sub) => (v === null ? "No" : sub ? `${cell(v)} · ${sub}` : cell(v));
+  for (const [k, all] of Object.entries(result.sections)) {
     if (onlySection && k !== onlySection) continue;
-    for (const r of list) {
+    for (const r of filterRows(all, { section: k, diffOnly, search })) {
+      const muted = r.part === "muted";
       rows.push([
         SECTION_TITLES[k],
-        r.group || "",
+        muted ? (r.legacy ? MUTED_LEGACY : MUTED_GROUP) : r.group || "",
         r.label,
         r.key,
-        statusText(r.status, A, B),
-        r.a === null ? "No" : cell(r.a),
-        r.b === null ? "No" : cell(r.b),
+        r.status === "differ" && r.more ? `Different (more in ${r.more === "a" ? A : B})` : statusText(r.status, A, B),
+        withSub(r.a, r.aSub),
+        withSub(r.b, r.bSub),
         cell(r.aExtra || []),
         cell(r.bExtra || []),
+        r.kind || "",
       ]);
     }
   }

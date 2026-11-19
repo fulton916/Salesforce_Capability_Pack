@@ -13,28 +13,37 @@ Read-only. It runs SOQL queries and describes. It never writes to the org.
 The page is written for admins, not developers. It shows labels ("Account › Annual Revenue"),
 not API names; "Show API names" adds them.
 
-At the top it says the result in plain words, for example "Sales Manager gives everything Sales
-Rep gives, and more." Under that:
+At the top it says the result in plain words, with how much: "Each group gives access the other
+does not: Sales Rep gives 4 things Sales Manager doesn't; Sales Manager gives 21 things Sales Rep
+doesn't." ("Things" are general permissions, objects, fields, apps/pages/code and tabs that only
+that group gives, or gives more of.) Under that:
 
 - **A card per area** with how many items only one group has, or "✓ Same in both". Click a card
-  to open its list.
-- **Worth a closer look:** powerful access only one group gives, such as "Only Sales Manager has
-  “View All Data”" or "Sales Manager can Delete, View All, Modify All Opportunity records; Sales
-  Rep cannot."
-- **Technical notes** (folded away): anything the tool could not read.
+  to open its list. "What's inside" counts permission sets and muted items separately.
+- **Worth a closer look:** powerful general permissions only one group gives (first), then at most
+  one line per group for View All / Modify All on objects, such as "Sales Manager can View All or
+  Modify All records of 938 objects that Sales Rep cannot, including Account, Case and
+  Opportunity. See Objects."
+- **Technical notes** (folded away): anything the tool could not read, with what to do.
 
 | List | Shows |
 |---|---|
 | Summary | org, name, description, status, users assigned, permission sets inside, muting permission set, and how much each group gives |
 | General permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
 | Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object, and which ones only one group has |
-| Fields | No access / Read / Edit per field, grouped by object |
+| Fields | No access / Read / Edit per field, in one collapsible block per object ("Account — 212 differences"). Long lists start collapsed; "Expand all / Collapse all"; searching opens the matching objects |
 | Apps, pages & code | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
 | Tabs | shown, available (hidden by default) or hidden |
-| What's inside | the permission sets each group is built from (with licence), and what each muting permission set takes away |
+| What's inside | two parts: "Permission sets in each group" (with licence), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, General permission, Tab, App/page/code) |
 
-Each list shows only the differences until you choose "Everything". **Download** saves the list
-or the full comparison as a CSV that opens in Excel, or saves a group to a file for later.
+Each list shows only the differences until you choose "Everything". The search ignores
+punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is how
+many differences it has. While reading big groups the page shows "Step n of 5".
+
+**Download** saves a CSV that opens in Excel: "This list, as shown" (the differences-only choice
+and the search are applied; collapsed objects are still included), the whole comparison with
+differences only, or the whole comparison with everything. It can also save a group to a file for
+later. The CSV has a "Kind of item" column.
 
 Picking a group: type any part of its name or API name (words in any order) and press Enter or
 click it.

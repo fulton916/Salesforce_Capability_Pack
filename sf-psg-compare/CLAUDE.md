@@ -11,7 +11,8 @@ browser session and never writes to the org.
 - `extension/lib/snapshot.js` — `takeSnapshot(api, psgId)` reads one group into a JSON snapshot
   (`schema: "sf-psg-snapshot/2"`; `/1` files still load, see `ACCEPTED_SCHEMAS`). Permissions come from the group's aggregate permission set
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
-- `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights}`. Pure.
+- `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows` and `toRows` (what the page shows and exports). Pure.
+- `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
 - `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
 
 ## When to use it

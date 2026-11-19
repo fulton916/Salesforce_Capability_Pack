@@ -6,8 +6,8 @@ import path from "node:path";
 
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../extension/lib/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../extension/lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, humanize } from "../extension/lib/compare.js";
-import { matchPsgs } from "../extension/lib/pick.js";
+import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts } from "../extension/lib/compare.js";
+import { matchPsgs, searchWords } from "../extension/lib/pick.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sample = (n) => JSON.parse(readFileSync(path.join(here, "../extension/samples", n), "utf-8"));
@@ -266,7 +266,7 @@ await test("objects: flag-level differences in both directions", () => {
   assert.equal(row("objectPermissions", "Campaign").status, "onlyA");
   assert.equal(row("objectPermissions", "Quota__c").status, "onlyB");
   assert.equal(row("objectPermissions", "Widget__c").status, "same");
-  assert.ok(texts.includes("Sales Manager can Delete, View All, Modify All Opportunity records; Sales Rep cannot."), texts.join("\n"));
+  assert.ok(texts.some((t) => /^Sales Manager can View All or Modify All records of .*Opportunity/.test(t)), texts.join("\n"));
 });
 
 await test("fields: read vs edit", () => {
@@ -282,9 +282,11 @@ await test("contents, setup access and tabs", () => {
   assert.equal(row("components", "Team_Oversight").status, "onlyB");
   assert.equal(row("components", "Sales_Rep_Muting").group, "Muting permission set");
   assert.equal(row("components", "Sales_Core").status, "same");
-  const muted = R.sections.components.filter((r) => r.group === "Taken away by muting");
+  const muted = R.sections.components.filter((r) => r.part === "muted");
   const mOpp = muted.find((r) => r.key === "Opportunity");
-  assert.deepEqual([mOpp.status, mOpp.a, mOpp.label], ["onlyA", "Delete", "Opportunity"]);
+  assert.deepEqual([mOpp.status, mOpp.a, mOpp.label, mOpp.kind], ["onlyA", "Removed: Delete", "Opportunity", "Object"]);
+  assert.equal(muted.find((r) => r.label === "Export Reports").a, "Removed");
+  assert.equal(muted.find((r) => r.label === "Export Reports").kind, "General permission");
   assert.ok(muted.some((r) => r.label === "Export Reports"));
   assert.equal(muted.find((r) => r.key === "Account.AnnualRevenue").label, "Account › Annual Revenue");
   assert.equal(row("setupAccess", "Approve_Discounts").status, "onlyB");
@@ -295,7 +297,8 @@ await test("contents, setup access and tabs", () => {
 await test("overview and verdict", () => {
   assert.equal(row("overview", "Users assigned").a, "398 active (412 in total)");
   assert.equal(row("overview", "Muting permission set").b, "None");
-  assert.ok(texts.includes("Each group gives some access the other does not."));
+  assert.ok(texts.includes(`Each group gives access the other does not: Sales Rep gives ${R.gives.a} things Sales Manager doesn't; Sales Manager gives ${R.gives.b} things Sales Rep doesn't.`), texts.join("\n"));
+  assert.ok(R.gives.a > 0 && R.gives.b > R.gives.a);
   assert.equal(R.counts.userPermissions.onlyB, 5);
 });
 
@@ -312,7 +315,7 @@ await test("superset is detected", () => {
   bigger.psg.label = "Rep Plus";
   bigger.userPermissions.PermissionsManageUsers = "Manage Users";
   const r = compareSnapshots(bigger, A);
-  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more."));
+  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more (1 thing that Sales Rep does not)."));
   assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus has “Manage Users”."));
 });
 
@@ -342,6 +345,99 @@ await test("CSV export: BOM, header, escaping, one section", () => {
   assert.equal(opp[4], "Different");
 });
 
+
+// ---------- new on-screen behaviour ----------
+
+console.log("lists, highlights, downloads");
+
+/** Two groups where A has View All / Modify All on many objects, B on none. */
+function heavyPair() {
+  const mk = (label) => ({
+    ...structuredClone(A), psg: { ...A.psg, label, developerName: label.replace(/ /g, "_") },
+    userPermissions: {}, objectPermissions: {}, fieldPermissions: {}, setupAccess: {}, tabs: {}, tabSettings: {},
+    components: [], muting: null, warnings: [], objectLabels: {}, fieldLabels: {},
+  });
+  const x = mk("Big Group");
+  const y = mk("Small Group");
+  for (let i = 0; i < 12; i++) x.objectPermissions[`Thing${i}__c`] = { Read: true, Delete: true, ViewAllRecords: i % 2 === 0, ModifyAllRecords: i === 0 };
+  x.objectPermissions.Account = { Read: true, ViewAllRecords: true };
+  y.objectPermissions.Account = { Read: true };
+  x.objectPermissions.Case = { Read: true, Delete: true }; // Delete alone is not a headline
+  y.objectPermissions.Case = { Read: true };
+  x.objectPermissions.Lead = { Read: true, ViewAllRecords: true };
+  y.objectPermissions.Lead = { Read: true };
+  y.objectPermissions.Zed__c = { Read: true, ModifyAllRecords: true };
+  for (const k of ["PermissionsExportReport", "PermissionsManageUsers"]) x.userPermissions[k] = k;
+  for (const n of ["F1", "F2"]) x.fieldPermissions[`Account.${n}`] = { Read: true, Edit: true };
+  y.fieldPermissions["Account.F2"] = { Read: true }; // A has more
+  y.fieldPermissions["Account.F3"] = { Read: true }; // only B
+  return compareSnapshots(x, y);
+}
+
+await test("highlights: general permissions first, objects condensed to one line per side", () => {
+  const h = heavyPair().highlights.filter((x) => x.kind === "risk");
+  assert.deepEqual(h.map((x) => x.area), ["general", "general", "objects", "objects"]);
+  const a = h[2].text;
+  // Thing0,2,4,6,8,10 + Account + Lead = 8 objects with View All or Modify All
+  assert.ok(a.startsWith("Big Group can View All or Modify All records of 8 objects that Small Group cannot, including Account, Lead and Thing0"), a);
+  assert.ok(a.endsWith("See Objects."));
+  assert.ok(!a.includes("Case"));
+  assert.equal(h[3].text, "Small Group can View All or Modify All records of the object Zed; Big Group cannot. See Objects.");
+});
+
+await test("verdict counts what each group gives that the other does not", () => {
+  const r = heavyPair();
+  // A: 2 general permissions + 14 objects (12 Thing, Account, Case, Lead = 15) + fields F1, F2
+  // B: Zed__c + Account.F3
+  assert.deepEqual(r.gives, { a: 2 + 15 + 2, b: 2 });
+  assert.equal(r.highlights.find((x) => x.kind === "verdict").text,
+    "Each group gives access the other does not: Big Group gives 19 things Small Group doesn't; Small Group gives 2 things Big Group doesn't.");
+  assert.deepEqual(givesCounts(compareSnapshots(A, structuredClone(A)).sections), { a: 0, b: 0 });
+  assert.ok(compareSnapshots(A, structuredClone(A)).highlights[0].text.startsWith("Both groups"));
+});
+
+await test("fields: a difference says which side has more", () => {
+  const f2 = heavyPair().sections.fieldPermissions.find((x) => x.key === "Account.F2");
+  assert.deepEqual([f2.status, f2.more], ["differ", "a"]);
+});
+
+await test("permission sets show Included, licence as secondary text; counts are split", () => {
+  const sets = R.sections.components.filter((x) => x.part === "sets");
+  assert.ok(sets.every((x) => x.a === null || x.a === "Included"));
+  assert.ok(sets.some((x) => x.aSub === "Salesforce licence" || x.bSub === "Salesforce licence"), JSON.stringify(sets));
+  assert.equal(R.counts.componentSets.total, sets.length);
+  assert.equal(R.counts.componentSets.total + R.counts.componentMuted.total, R.counts.components.total);
+});
+
+await test("muted item on both sides with different values is Different, not Same", () => {
+  const x = structuredClone(A);
+  const y = structuredClone(A);
+  x.muting.effective.fieldPermissions = { "Account.AnnualRevenue": { Read: true, Edit: true } };
+  y.muting.effective.fieldPermissions = { "Account.AnnualRevenue": { Read: true } };
+  const m = compareSnapshots(x, y).sections.components.find((r) => r.part === "muted" && r.key === "Account.AnnualRevenue");
+  assert.deepEqual([m.status, m.a, m.b, m.kind], ["differ", "Removed: Read, Edit", "Removed: Read", "Field"]);
+});
+
+await test("filterRows and CSV follow differences-only and search", () => {
+  const rows = R.sections.objectPermissions;
+  assert.ok(filterRows(rows, { section: "objectPermissions", diffOnly: true }).every((r) => r.status !== "same"));
+  assert.ok(filterRows(rows, { section: "objectPermissions" }).length > filterRows(rows, { diffOnly: true }).length);
+  assert.equal(filterRows(R.sections.overview, { section: "overview", diffOnly: true }).length, R.sections.overview.length);
+  assert.ok(toRows(R, "fieldPermissions", { diffOnly: true }).length < toRows(R, "fieldPermissions").length);
+  const s = toRows(R, "fieldPermissions", { search: "account › annual" });
+  assert.ok(s.length > 1 && s.slice(1).every((r) => /Annual/.test(r[2])));
+  assert.ok(toRows(R, null, { diffOnly: true }).slice(1).every((r) => r[0] === "Summary" || r[4] !== "Same"));
+  const kinds = toRows(R, "components").filter((r) => r[1] === "Taken away by muting").map((r) => r[9]);
+  assert.ok(kinds.length && kinds.every((k) => ["Object", "Field", "General permission", "Tab", "App, page or code"].includes(k)), kinds.join());
+});
+
+await test("search treats punctuation as a separator", () => {
+  assert.deepEqual(searchWords("Account › Annual_Revenue"), ["account", "annual", "revenue"]);
+  const n = filterRows(R.sections.fieldPermissions, { search: "Account › Annual" }).length;
+  assert.ok(n > 0);
+  assert.equal(n, filterRows(R.sections.fieldPermissions, { search: "account annual" }).length);
+  assert.equal(matchPsgs([{ id: "1", label: "US Sales", developerName: "US_Sales" }], "us-sales").total, 1);
+});
 
 // ---------- muting, labels, setup names (snapshot v2) ----------
 
@@ -427,16 +523,16 @@ await test("muting: only what is given by a component and missing from the aggre
 await test("muting: compare lists only effective items, in plain words, plus one line for the rest", async () => {
   const s = await takeSnapshot(apiWith(mutingRoutes()), "0PG1");
   const r = compareSnapshots(s, s);
-  const muted = r.sections.components.filter((x) => x.group === "Taken away by muting");
+  const muted = r.sections.components.filter((x) => x.part === "muted");
   const got = muted.map((x) => `${x.label}: ${x.a}`).sort();
   assert.deepEqual(got, [
-    "Customer Account: Delete",
-    "Customer Account › Customer Segmentation: Read, Edit",
-    "Customer Account › F2: Edit",
-    "Customer Account › F4: Edit",
-    "Customer Account › F5: Read, Edit",
-    "Log Entry (tab): Tab",
-    "Perm 5: General permission",
+    "Customer Account: Removed: Delete",
+    "Customer Account › Customer Segmentation: Removed: Read, Edit",
+    "Customer Account › F2: Removed: Edit",
+    "Customer Account › F4: Removed: Edit",
+    "Customer Account › F5: Removed: Read, Edit",
+    "Log Entry (tab): Removed",
+    "Perm 5: Removed",
   ].sort());
   const note = r.highlights.find((h) => h.text.includes("had nothing to take away"));
   assert.ok(note && note.text.includes("5 other items"), JSON.stringify(r.highlights));
@@ -450,9 +546,13 @@ await test("v1 snapshots still load and compare; their muted items do not claim 
   delete v1.fieldLabels;
   validateSnapshot(v1);
   const r = compareSnapshots(v1, sample("sample_b.json"));
-  const muted = r.sections.components.filter((x) => x.group !== "Muting permission set" && x.group !== "Permission set");
+  const muted = r.sections.components.filter((x) => x.part === "muted");
   assert.ok(muted.length >= 3);
-  assert.ok(muted.every((x) => x.group === "Muted (may not have been given)"), muted.map((x) => x.group).join());
+  // only the old file's side says "may not have been given"
+  assert.ok(muted.filter((x) => x.a !== null).every((x) => x.legacy), "A side is legacy");
+  assert.ok(muted.filter((x) => x.a === null).every((x) => !x.legacy), "B side is not");
+  assert.deepEqual(r.mutedLegacy, { a: true, b: false });
+  assert.ok(toRows(r).some((x) => x[1] === "Muted (may not have been given)"));
   assert.equal(r.sections.fieldPermissions.find((x) => x.key === "Account.AnnualRevenue").label, "Annual Revenue");
 });
 
