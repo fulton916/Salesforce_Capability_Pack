@@ -1,0 +1,52 @@
+name: Bug report
+description: Something did not work, or gave a wrong answer.
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste usernames, record data, org IDs, session IDs or screenshots showing org data. Describe the problem with made-up names.
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool?
+      options:
+        - PSG Compare (extension)
+        - User access (extension)
+        - Territory & role hierarchy (extension)
+        - Extension menu / other
+        - sf-country-state-codes
+        - sf-safe-translation-push
+        - sf-territory-export
+        - sf-translation-defect-repair
+        - sf-translation-deploy-triage
+        - sf-translation-field-notes
+        - sf-translation-reconcile
+        - sf-translation-toolkit
+        - sf-user-access-teardown
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: For the extension, this is filled in for you. For the command-line tools, say how you ran it.
+      placeholder: "Extension 0.2.0, Chrome 131"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the problem in your own words. Copy any message exactly as it appears, without names from your org.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do before it happened?
+      description: The steps, in order, if you remember them.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?

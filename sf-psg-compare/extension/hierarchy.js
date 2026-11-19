@@ -5,6 +5,7 @@ import {
   NOUNS, buildTree, flatten, statsOf, summaryText, treeNotes, defaultModel, searchNodes, exportRows, exportFileName, toCsv, PATH_SEP,
 } from "./lib/hierarchy.js";
 import { startLiveReload } from "./lib/livereload.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
@@ -476,3 +477,14 @@ async function start() {
 
 start();
 startLiveReload();
+
+// Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.
+{
+  let manifestVersion = "";
+  try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* dev server */ }
+  const version = versionText(manifestVersion, navigator);
+  const link = (text, kind) => el("a", {
+    href: issueUrl({ kind, tool: FEEDBACK_TOOLS.hierarchy, version }), target: "_blank", rel: "noopener noreferrer", text,
+  });
+  $("#feedback").replaceChildren(link("Report a bug", "bug"), " · ", link("Suggest an improvement", "enhancement"));
+}

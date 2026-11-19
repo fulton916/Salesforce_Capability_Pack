@@ -267,6 +267,19 @@ it. It is held in memory for that tab only and never stored. Visible text says "
 keep the old `licence` spelling so saved files still load. Saved group files use
 `sf-psg-snapshot/2`; `/1` files still load.
 
+## Report a bug or suggest an improvement
+
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.2.0", and all threepages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
+happened, and press Submit yourself.
+
+- Nothing is sent from the extension. It only opens the GitHub page. It never puts your org name,
+  address, user names or anything from the org into the link.
+- You need a GitHub account with access to this repository (it is private). If GitHub shows a "not
+  found" page, you are not signed in with an account that has access.
+- Describe problems with made-up names. Do not paste usernames, record data, org IDs, session IDs
+  or screenshots that show org data.
+
 ## Tests
 
 Offline, Node 18 or later, nothing to install:
@@ -323,6 +336,7 @@ tool as `<page>?host=<org host>`.
 | `extension/lib/sfconn.js` | Session lookup and REST client (query with paging, describe) |
 | `extension/lib/snapshot.js` | Reads one group into a snapshot |
 | `extension/lib/compare.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
+| `extension/lib/feedback.js` | Builds the GitHub new-issue link (tool, version, browser only). Pure, no browser APIs |
 | `extension/lib/pick.js` | Matching for the group search box |
 | `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
