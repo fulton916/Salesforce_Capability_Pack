@@ -12,6 +12,11 @@ const TOOLS = [
     title: "User access",
     description: "See what a user can access, or compare two users",
   },
+  {
+    page: "hierarchy.html",
+    title: "Territory & role hierarchy",
+    description: "See the whole territory or role tree; export it for Excel",
+  },
 ];
 
 const state = document.getElementById("state");

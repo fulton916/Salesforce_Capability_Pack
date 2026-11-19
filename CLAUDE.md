@@ -18,7 +18,7 @@ Org administration:
 - `sf-country-state-codes`: CLI. Export State and Country/Territory picklists to Excel.
 - `sf-territory-export`: CLI. Read-only Territory Management export to Excel.
 - `sf-user-access-teardown`: CLI. Query, and only with `--execute` plus confirmation, remove user access.
-- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with two read-only tools: PSG Compare (compare two permission set groups) and User access (look up or compare users' access).
+- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with three read-only tools: PSG Compare (compare two permission set groups), User access (look up or compare users' access) and Territory & role hierarchy (see the whole territory or role tree, narrow it to one branch, export it for Excel).
 
 CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need `openpyxl`
 (`pip install -r requirements.txt` in the package). Node is needed only for the extension's tests.
@@ -52,7 +52,7 @@ the bar and names the biggest gap. At most 3 rounds, then the user decides.
 - Org-touching tools are read-only by default. Writes need a dry run, an explicit flag and a confirmation.
 - No real org data, credentials, tokens, user lists or snapshots in the repo. Fixtures are synthetic.
 - No imports across package folders.
-- `sf-psg-compare` (both tools): read-only, never inserts org data as HTML, no remote code, never stores the
+- `sf-psg-compare` (all three tools): read-only, never inserts org data as HTML, no remote code, never stores the
   session id, matches across orgs by API name, not Id.
 - `sf-user-password-reset/` is a local one-off tool, not part of the pack. It is git-ignored and never committed.
 

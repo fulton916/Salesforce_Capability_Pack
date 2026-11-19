@@ -156,6 +156,43 @@ through groups), 11 licences, 3 public groups, 24 queues and 1 territory matched
 line, including a muting permission set, and a compare of two users worked. Not yet checked inside
 Chrome from the toolbar button (only through the dev server).
 
+## Territory & role hierarchy
+
+A third page shows the whole **territory** tree (Enterprise Territory Management) or the whole **role**
+tree, already open, so there is no clicking of plus signs as in Setup. It is read-only and looks and
+works like the other pages (same stylesheet, org name with Sandbox or Production, "Show API names").
+
+- **Territories / Roles** switch at the top. It opens on Territories, or on Roles when the org has no
+  territories (the page says so in plain words and Roles still work).
+- **Territory model:** the Active model opens first. A "Territory model" list appears only when the
+  org has more than one model, with each model's state (Active, Planning, Archived).
+- **The tree** opens fully expanded, with guide lines so the level is easy to follow. Each node that
+  has others below it has a button to fold it and says how many are below it. "Expand all" and
+  "Collapse all" do the whole tree. "Show API names" shows the API name next to each name.
+- **Find a territory / Find a role:** type part of a name or API name (words in any order). The matches
+  list under the box with the path above each ("Global › EMEA › UK"), so two nodes with the same name
+  can be told apart. Press Enter or click one: the page shows only that node and everything below it,
+  with "Showing UK and everything below it" and the path above it (each step is a link that goes up to
+  that level). "Show whole hierarchy" goes back.
+- **Summary** such as "412 territories, 7 levels", plus short notes: records whose parent is not in the
+  list (shown at the top level), parents that loop back on themselves (the loop is cut and one of them
+  is shown at the top level, and every one in the loop is marked "Parent loop"), and how many portal and community roles are left out.
+- **Download for Excel (.csv)** saves what is shown (the whole tree, or the chosen branch), including
+  folded nodes. The tree is in the cells: columns "Level 1" to "Level N", one name per row in the
+  column for its level, then "API name" and "Path" (the full path from the top of the whole hierarchy).
+  The file name has Territories or Roles, the model, and the branch name.
+
+It reads (all `SELECT`, nothing else): `Territory2Model`, `Territory2` (one model), `UserRole` (roles
+that are not portal roles, plus a `COUNT()` of the portal ones). Your user needs API Enabled and View
+Setup and Configuration. Nothing is saved, in the browser or in a file.
+
+Try it: `python tools/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/hierarchy.html?demo=1> (made-up territories and roles). Against an org through
+the dev server: `?dev=1`. The popup opens it as `hierarchy.html?host=<org host>`.
+
+Not checked against a live org yet: the reads were tested only against faked answers, and the page only
+in the demo.
+
 ## Install (unpacked, for your own browser)
 
 1. Copy this folder anywhere.
@@ -171,8 +208,8 @@ push it by policy.
 ## Use
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
-2. Click the extension. It is a menu of tools: choose **Compare permission set groups** or
-   **User access**. A new tab opens, connected to that org. The compare page's header shows the org
+2. Click the extension. It is a menu of tools: choose **Compare permission set groups**,
+   **User access** or **Territory & role hierarchy**. A new tab opens, connected to that org. The compare page's header shows the org
    name and whether it is a sandbox or production.
 3. Pick group A and group B (type in the filter box to narrow the list), or load a snapshot file
    on either side.
@@ -282,11 +319,14 @@ node tests/run_tests.mjs
 | `extension/user-access.*` | The User access page (html, js, and a little extra css on top of `psg-compare.css`) |
 | `extension/lib/useraccess.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
 | `extension/lib/usercompare.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
+| `extension/hierarchy.*` | The Territory & role hierarchy page (html, js, and extra css on top of `psg-compare.css`) |
+| `extension/lib/hierarchy.js` | Builds, searches and exports a hierarchy (tree, branch, Excel layout). Pure, no browser APIs |
+| `extension/lib/hierarchyread.js` | Reads territory models, territories and roles from the org (`SELECT` only) |
 | `extension/lib/sfconn.js` | Session lookup and REST client (query with paging, describe) |
 | `extension/lib/snapshot.js` | Reads one group into a snapshot |
 | `extension/lib/compare.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
 | `extension/lib/pick.js` | Matching for the group search box |
 | `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `extension/samples/` | Two synthetic snapshots and two synthetic users for the demos and the tests |
+| `extension/samples/` | Two synthetic snapshots, two synthetic users, and a synthetic territory model set and role list for the demos and the tests (the hierarchy samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |

@@ -1,0 +1,370 @@
+{
+ "schema": "sf-hierarchy-sample/1",
+ "note": "Made-up territories for the demo and the tests.",
+ "models": [
+  {
+   "id": "0Mo000000000001",
+   "name": "FY26 Territories",
+   "developerName": "FY26_Territories",
+   "state": "Active",
+   "territories": [
+    {
+     "id": "0MI900000000002",
+     "parentId": "0MI900000000001",
+     "name": "Holding Pen",
+     "apiName": "Holding_Pen"
+    },
+    {
+     "id": "0MI900000000001",
+     "parentId": "0MIMISSING00001",
+     "name": "Unassigned Accounts",
+     "apiName": "Unassigned_Accounts"
+    },
+    {
+     "id": "0MI000000000051",
+     "parentId": "0MI000000000042",
+     "name": "New Zealand",
+     "apiName": "New_Zealand"
+    },
+    {
+     "id": "0MI000000000050",
+     "parentId": "0MI000000000049",
+     "name": "Suite 1201",
+     "apiName": "Suite_1201"
+    },
+    {
+     "id": "0MI000000000049",
+     "parentId": "0MI000000000048",
+     "name": "Floor 12",
+     "apiName": "Floor_12"
+    },
+    {
+     "id": "0MI000000000048",
+     "parentId": "0MI000000000047",
+     "name": "Tower A",
+     "apiName": "Tower_A"
+    },
+    {
+     "id": "0MI000000000047",
+     "parentId": "0MI000000000046",
+     "name": "Financial District",
+     "apiName": "Financial_District"
+    },
+    {
+     "id": "0MI000000000046",
+     "parentId": "0MI000000000045",
+     "name": "Sydney CBD",
+     "apiName": "Sydney_CBD"
+    },
+    {
+     "id": "0MI000000000045",
+     "parentId": "0MI000000000044",
+     "name": "Sydney",
+     "apiName": "Sydney"
+    },
+    {
+     "id": "0MI000000000044",
+     "parentId": "0MI000000000043",
+     "name": "New South Wales",
+     "apiName": "New_South_Wales"
+    },
+    {
+     "id": "0MI000000000043",
+     "parentId": "0MI000000000042",
+     "name": "Australia",
+     "apiName": "Australia"
+    },
+    {
+     "id": "0MI000000000042",
+     "parentId": "0MI000000000034",
+     "name": "Oceania",
+     "apiName": "Oceania"
+    },
+    {
+     "id": "0MI000000000041",
+     "parentId": "0MI000000000034",
+     "name": "Region 1",
+     "apiName": "Region_1"
+    },
+    {
+     "id": "0MI000000000040",
+     "parentId": "0MI000000000038",
+     "name": "Zone 3",
+     "apiName": "Zone_3"
+    },
+    {
+     "id": "0MI000000000039",
+     "parentId": "0MI000000000038",
+     "name": "Zone 1",
+     "apiName": "Zone_1"
+    },
+    {
+     "id": "0MI000000000038",
+     "parentId": "0MI000000000034",
+     "name": "Region 2",
+     "apiName": "Region_2"
+    },
+    {
+     "id": "0MI000000000037",
+     "parentId": "0MI000000000035",
+     "name": "Zone 11",
+     "apiName": "Zone_11"
+    },
+    {
+     "id": "0MI000000000036",
+     "parentId": "0MI000000000035",
+     "name": "Zone 2",
+     "apiName": "Zone_2"
+    },
+    {
+     "id": "0MI000000000035",
+     "parentId": "0MI000000000034",
+     "name": "Region 10",
+     "apiName": "Region_10"
+    },
+    {
+     "id": "0MI000000000034",
+     "parentId": "0MI000000000001",
+     "name": "APAC",
+     "apiName": "APAC"
+    },
+    {
+     "id": "0MI000000000033",
+     "parentId": "0MI000000000030",
+     "name": "Denmark",
+     "apiName": "Denmark"
+    },
+    {
+     "id": "0MI000000000032",
+     "parentId": "0MI000000000030",
+     "name": "Norway",
+     "apiName": "Norway"
+    },
+    {
+     "id": "0MI000000000031",
+     "parentId": "0MI000000000030",
+     "name": "Sweden",
+     "apiName": "Sweden"
+    },
+    {
+     "id": "0MI000000000030",
+     "parentId": "0MI000000000016",
+     "name": "Nordics",
+     "apiName": "Nordics"
+    },
+    {
+     "id": "0MI000000000029",
+     "parentId": "0MI000000000023",
+     "name": "Switzerland",
+     "apiName": "Switzerland"
+    },
+    {
+     "id": "0MI000000000028",
+     "parentId": "0MI000000000023",
+     "name": "Austria",
+     "apiName": "Austria"
+    },
+    {
+     "id": "0MI000000000027",
+     "parentId": "0MI000000000024",
+     "name": "Munich",
+     "apiName": "Munich"
+    },
+    {
+     "id": "0MI000000000026",
+     "parentId": "0MI000000000024",
+     "name": "Berlin",
+     "apiName": "Berlin"
+    },
+    {
+     "id": "0MI000000000025",
+     "parentId": "0MI000000000024",
+     "name": "Key Accounts",
+     "apiName": "Key_Accounts_3"
+    },
+    {
+     "id": "0MI000000000024",
+     "parentId": "0MI000000000023",
+     "name": "Germany",
+     "apiName": "Germany"
+    },
+    {
+     "id": "0MI000000000023",
+     "parentId": "0MI000000000016",
+     "name": "DACH",
+     "apiName": "DACH"
+    },
+    {
+     "id": "0MI000000000022",
+     "parentId": "0MI000000000017",
+     "name": "Ireland",
+     "apiName": "Ireland"
+    },
+    {
+     "id": "0MI000000000021",
+     "parentId": "0MI000000000018",
+     "name": "Key Accounts",
+     "apiName": "Key_Accounts_2"
+    },
+    {
+     "id": "0MI000000000020",
+     "parentId": "0MI000000000018",
+     "name": "Manchester",
+     "apiName": "Manchester"
+    },
+    {
+     "id": "0MI000000000019",
+     "parentId": "0MI000000000018",
+     "name": "London",
+     "apiName": "London"
+    },
+    {
+     "id": "0MI000000000018",
+     "parentId": "0MI000000000017",
+     "name": "UK",
+     "apiName": "UK"
+    },
+    {
+     "id": "0MI000000000017",
+     "parentId": "0MI000000000016",
+     "name": "UK & Ireland",
+     "apiName": "UK_and_Ireland"
+    },
+    {
+     "id": "0MI000000000016",
+     "parentId": "0MI000000000001",
+     "name": "EMEA",
+     "apiName": "EMEA"
+    },
+    {
+     "id": "0MI000000000015",
+     "parentId": "0MI000000000013",
+     "name": "Mexico",
+     "apiName": "Mexico"
+    },
+    {
+     "id": "0MI000000000014",
+     "parentId": "0MI000000000013",
+     "name": "Brazil",
+     "apiName": "Brazil"
+    },
+    {
+     "id": "0MI000000000013",
+     "parentId": "0MI000000000002",
+     "name": "Latin America",
+     "apiName": "Latin_America"
+    },
+    {
+     "id": "0MI000000000012",
+     "parentId": "0MI000000000003",
+     "name": "Canada",
+     "apiName": "Canada"
+    },
+    {
+     "id": "0MI000000000011",
+     "parentId": "0MI000000000009",
+     "name": "Pod 2",
+     "apiName": "Pod_2_2"
+    },
+    {
+     "id": "0MI000000000010",
+     "parentId": "0MI000000000009",
+     "name": "Pod 1",
+     "apiName": "Pod_1_2"
+    },
+    {
+     "id": "0MI000000000009",
+     "parentId": "0MI000000000003",
+     "name": "US West",
+     "apiName": "US_West"
+    },
+    {
+     "id": "0MI000000000008",
+     "parentId": "0MI000000000004",
+     "name": "Key Accounts",
+     "apiName": "Key_Accounts"
+    },
+    {
+     "id": "0MI000000000007",
+     "parentId": "0MI000000000004",
+     "name": "Pod 1",
+     "apiName": "Pod_1"
+    },
+    {
+     "id": "0MI000000000006",
+     "parentId": "0MI000000000004",
+     "name": "Pod 10",
+     "apiName": "Pod_10"
+    },
+    {
+     "id": "0MI000000000005",
+     "parentId": "0MI000000000004",
+     "name": "Pod 2",
+     "apiName": "Pod_2"
+    },
+    {
+     "id": "0MI000000000004",
+     "parentId": "0MI000000000003",
+     "name": "US East",
+     "apiName": "US_East"
+    },
+    {
+     "id": "0MI000000000003",
+     "parentId": "0MI000000000002",
+     "name": "North America",
+     "apiName": "North_America"
+    },
+    {
+     "id": "0MI000000000002",
+     "parentId": "0MI000000000001",
+     "name": "Americas",
+     "apiName": "Americas"
+    },
+    {
+     "id": "0MI000000000001",
+     "parentId": null,
+     "name": "Global",
+     "apiName": "Global"
+    }
+   ]
+  },
+  {
+   "id": "0Mo000000000002",
+   "name": "FY27 Draft",
+   "developerName": "FY27_Draft",
+   "state": "Planning",
+   "territories": [
+    {
+     "id": "0MI8000000000001",
+     "parentId": null,
+     "name": "Plan Root",
+     "apiName": "Plan_Root"
+    },
+    {
+     "id": "0MI8000000000002",
+     "parentId": "0MI8000000000001",
+     "name": "Alpha",
+     "apiName": "Alpha"
+    },
+    {
+     "id": "0MI8000000000003",
+     "parentId": "0MI8000000000002",
+     "name": "Alpha 1",
+     "apiName": "Alpha_1"
+    },
+    {
+     "id": "0MI8000000000004",
+     "parentId": "0MI8000000000002",
+     "name": "Alpha 2",
+     "apiName": "Alpha_2"
+    },
+    {
+     "id": "0MI8000000000005",
+     "parentId": "0MI8000000000001",
+     "name": "Beta",
+     "apiName": "Beta"
+    }
+   ]
+  }
+ ]
+}

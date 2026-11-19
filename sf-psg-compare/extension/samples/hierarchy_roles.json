@@ -1,0 +1,205 @@
+{
+ "schema": "sf-hierarchy-sample/1",
+ "note": "Made-up roles for the demo and the tests.",
+ "portalCount": 7,
+ "roles": [
+  {
+   "id": "00E000000000001",
+   "parentId": null,
+   "name": "Chief Executive",
+   "apiName": "Chief_Executive"
+  },
+  {
+   "id": "00E000000000002",
+   "parentId": "00E000000000001",
+   "name": "VP Sales",
+   "apiName": "VP_Sales"
+  },
+  {
+   "id": "00E000000000003",
+   "parentId": "00E000000000002",
+   "name": "Western Sales Manager",
+   "apiName": "Western_Sales_Manager"
+  },
+  {
+   "id": "00E000000000004",
+   "parentId": "00E000000000003",
+   "name": "Sales Rep West 1",
+   "apiName": "Sales_Rep_West_1"
+  },
+  {
+   "id": "00E000000000005",
+   "parentId": "00E000000000003",
+   "name": "Sales Rep West 10",
+   "apiName": "Sales_Rep_West_10"
+  },
+  {
+   "id": "00E000000000006",
+   "parentId": "00E000000000003",
+   "name": "Sales Rep West 2",
+   "apiName": "Sales_Rep_West_2"
+  },
+  {
+   "id": "00E000000000007",
+   "parentId": "00E000000000003",
+   "name": "Sales Rep",
+   "apiName": "Sales_Rep"
+  },
+  {
+   "id": "00E000000000008",
+   "parentId": "00E000000000002",
+   "name": "Eastern Sales Manager",
+   "apiName": "Eastern_Sales_Manager"
+  },
+  {
+   "id": "00E000000000009",
+   "parentId": "00E000000000008",
+   "name": "Sales Rep East 1",
+   "apiName": "Sales_Rep_East_1"
+  },
+  {
+   "id": "00E000000000010",
+   "parentId": "00E000000000008",
+   "name": "Sales Rep East 2",
+   "apiName": "Sales_Rep_East_2"
+  },
+  {
+   "id": "00E000000000011",
+   "parentId": "00E000000000008",
+   "name": "Sales Rep",
+   "apiName": "Sales_Rep_2"
+  },
+  {
+   "id": "00E000000000012",
+   "parentId": "00E000000000002",
+   "name": "Sales Operations",
+   "apiName": "Sales_Operations"
+  },
+  {
+   "id": "00E000000000013",
+   "parentId": "00E000000000012",
+   "name": "Sales Analyst",
+   "apiName": "Sales_Analyst"
+  },
+  {
+   "id": "00E000000000014",
+   "parentId": "00E000000000012",
+   "name": "Deal Desk",
+   "apiName": "Deal_Desk"
+  },
+  {
+   "id": "00E000000000015",
+   "parentId": "00E000000000001",
+   "name": "VP Customer Success",
+   "apiName": "VP_Customer_Success"
+  },
+  {
+   "id": "00E000000000016",
+   "parentId": "00E000000000015",
+   "name": "Support Director",
+   "apiName": "Support_Director"
+  },
+  {
+   "id": "00E000000000017",
+   "parentId": "00E000000000016",
+   "name": "Tier 1 Agent",
+   "apiName": "Tier_1_Agent"
+  },
+  {
+   "id": "00E000000000018",
+   "parentId": "00E000000000016",
+   "name": "Tier 2 Agent",
+   "apiName": "Tier_2_Agent"
+  },
+  {
+   "id": "00E000000000019",
+   "parentId": "00E000000000016",
+   "name": "Support Lead",
+   "apiName": "Support_Lead"
+  },
+  {
+   "id": "00E000000000020",
+   "parentId": "00E000000000015",
+   "name": "Onboarding Manager",
+   "apiName": "Onboarding_Manager"
+  },
+  {
+   "id": "00E000000000021",
+   "parentId": "00E000000000020",
+   "name": "Onboarding Specialist",
+   "apiName": "Onboarding_Specialist"
+  },
+  {
+   "id": "00E000000000022",
+   "parentId": "00E000000000001",
+   "name": "VP Marketing",
+   "apiName": "VP_Marketing"
+  },
+  {
+   "id": "00E000000000023",
+   "parentId": "00E000000000022",
+   "name": "Campaign Manager",
+   "apiName": "Campaign_Manager"
+  },
+  {
+   "id": "00E000000000024",
+   "parentId": "00E000000000023",
+   "name": "Content Writer",
+   "apiName": "Content_Writer"
+  },
+  {
+   "id": "00E000000000025",
+   "parentId": "00E000000000023",
+   "name": "Designer",
+   "apiName": "Designer"
+  },
+  {
+   "id": "00E000000000026",
+   "parentId": "00E000000000022",
+   "name": "Events Manager",
+   "apiName": "Events_Manager"
+  },
+  {
+   "id": "00E000000000027",
+   "parentId": "00E000000000001",
+   "name": "Chief Financial Officer",
+   "apiName": "Chief_Financial_Officer"
+  },
+  {
+   "id": "00E000000000028",
+   "parentId": "00E000000000027",
+   "name": "Finance Manager",
+   "apiName": "Finance_Manager"
+  },
+  {
+   "id": "00E000000000029",
+   "parentId": "00E000000000028",
+   "name": "Accountant",
+   "apiName": "Accountant"
+  },
+  {
+   "id": "00E000000000030",
+   "parentId": "00E000000000027",
+   "name": "Legal Counsel",
+   "apiName": "Legal_Counsel"
+  },
+  {
+   "id": "00E000000000031",
+   "parentId": "00E000000000001",
+   "name": "IT Director",
+   "apiName": "IT_Director"
+  },
+  {
+   "id": "00E000000000032",
+   "parentId": "00E000000000031",
+   "name": "System Administrator",
+   "apiName": "System_Administrator"
+  },
+  {
+   "id": "00E000000000033",
+   "parentId": "00E000000000031",
+   "name": "Developer",
+   "apiName": "Developer"
+  }
+ ]
+}

@@ -36,12 +36,38 @@ it links `psg-compare.css` and adds a little in `user-access.css`.
   no `innerHTML`, `localStorage` or `chrome.storage` (a test checks); group and queue membership is
   direct only (say so in help text). Not covered: object/field access, nested group membership.
 
+## Territory & role hierarchy (third tool)
+
+A read-only page, `extension/hierarchy.html`, that shows the whole territory tree (Territory2, one
+model) or role tree (UserRole), opened out, with a search that narrows the page to one branch and a
+CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarchy.css`.
+
+- `extension/lib/hierarchy.js` — pure, tested: `buildTree` (sorted by name, numbers by value; missing
+  parent goes to the top level; a loop is cut at its first member by name (`loopCut`), and every member is flagged `inLoop`; iterative walks, so deep
+  chains are safe), `flatten`, `pathOf`, `branchOf`, `searchNodes` (pick.js words, limit 50, results carry
+  the path), `exportRows` (stepped "Level 1..N", "API name", "Path"), `exportFileName`, `summaryText`,
+  `treeNotes`. Re-exports `toCsv` from `compare.js` (which guards cells starting with = + - @ tab CR).
+- `extension/lib/hierarchyread.js` — `readTerritoryModels` (`{on: false}` when the org has no
+  territories: the `Territory2Model` query fails with INVALID_TYPE; no describeGlobal call, it was slow), `readTerritories(api,
+  modelId)`, `readRoles` (portal roles left out, counted with `COUNT()`).
+- `extension/hierarchy.js` — the page. Flat rows built once with a DocumentFragment; folding only
+  toggles `hidden` on a row range; "Show API names" is a CSS class; the search renders at most 50
+  list items. `?host=`, `?dev=1`, `?demo=1` as elsewhere. Demo:
+  `http://127.0.0.1:8765/hierarchy.html?demo=1`.
+- Samples: `extension/samples/hierarchy_territories.json`, `hierarchy_roles.json` (made-up, written
+  by hand; `make_samples.py` does not rebuild them).
+- Tests: `tests/hierarchy_tests.mjs`, run from `tests/run_tests.mjs` (includes the no-innerHTML,
+  no-storage guard for the new files).
+- Rules that matter: reads only; org text only through `textContent` / `el()`; nothing stored; names
+  that repeat are told apart by path, never by name alone.
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
   "is the sandbox PSG the same as production?" → this tool.
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
+- "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.
 
 ## Working on the code
 

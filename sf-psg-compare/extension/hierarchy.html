@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Territory &amp; role hierarchy</title>
+<link rel="stylesheet" href="psg-compare.css">
+<link rel="stylesheet" href="hierarchy.css">
+</head>
+<body>
+<header class="top">
+  <h1>Territory &amp; role hierarchy</h1>
+  <div class="org" id="org">Not connected</div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="seg kinds" role="group" aria-label="What to look at">
+      <button id="kindTerritories" aria-pressed="false">Territories</button>
+      <button id="kindRoles" aria-pressed="false">Roles</button>
+    </div>
+
+    <div class="modelrow" id="modelRow" hidden>
+      <label for="model">Territory model</label>
+      <select id="model"></select>
+    </div>
+
+    <div class="findrow org-only" id="findRow">
+      <label class="pick-label" for="find" id="findLabel">Find a territory</label>
+      <div class="combo">
+        <input type="text" id="find" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="findList" autocomplete="off" placeholder="Type part of a name">
+        <ul class="psg-list" id="findList" role="listbox" hidden></ul>
+      </div>
+      <p class="hint" id="findHint">Pick a result to see only that branch and everything below it.</p>
+    </div>
+
+    <div id="branchBar" class="branchbar" hidden></div>
+    <div class="actions"><span id="progress" role="status"></span></div>
+    <div id="error" class="error" hidden></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="panel">
+      <p class="summary" id="summary" role="status"></p>
+      <ul class="treenotes" id="treeNotes"></ul>
+      <div class="toolbar" id="toolbar">
+        <button id="expandAll">Expand all</button>
+        <button id="collapseAll">Collapse all</button>
+        <label class="check"><input type="checkbox" id="showApi"> Show API names</label>
+        <button id="download" class="primary">Download for Excel (.csv)</button>
+      </div>
+      <div class="treewrap"><ul class="tree" id="tree"></ul></div>
+      <div class="empty" id="empty" hidden></div>
+    </div>
+
+    <details class="panel notes" id="notesPanel" hidden>
+      <summary id="notesTitle">Technical notes</summary>
+      <ul id="notes"></ul>
+    </details>
+  </section>
+
+  <p class="footer">Read-only: this page only looks at your org, it never changes anything. Nothing is saved.</p>
+</main>
+<script type="module" src="hierarchy.js"></script>
+</body>
+</html>
