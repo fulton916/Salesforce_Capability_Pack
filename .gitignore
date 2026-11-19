@@ -1,0 +1,16 @@
+# One-off tools kept locally, not part of the pack
+sf-user-password-reset/
+
+# Local editor / assistant config
+.claude/
+.vscode/
+.idea/
+
+# Python and Node leftovers
+__pycache__/
+*.pyc
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db

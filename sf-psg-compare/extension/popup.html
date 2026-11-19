@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PSG Compare</title>
+<link rel="stylesheet" href="psg-compare.css">
+<style>
+  body { width: 300px; padding: 14px; }
+  .host { font: 12px/1.4 var(--mono); color: var(--muted); word-break: break-all; margin: 6px 0 12px; }
+  button { width: 100%; }
+</style>
+</head>
+<body>
+  <h1 class="popup-title">PSG Compare</h1>
+  <div id="state">Looking for a Salesforce tab…</div>
+  <div class="host" id="host"></div>
+  <button id="open" class="primary" hidden>Compare permission set groups</button>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

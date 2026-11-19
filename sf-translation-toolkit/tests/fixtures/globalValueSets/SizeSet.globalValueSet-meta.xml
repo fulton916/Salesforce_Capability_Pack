@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GlobalValueSet xmlns="http://soap.sforce.com/2006/04/metadata">
+    <masterLabel>SizeSet</masterLabel>
+    <sorted>false</sorted>
+    <customValue><fullName>LARGE</fullName><label>Large</label></customValue>
+    <customValue><fullName>SMALL</fullName><label>Small</label></customValue>
+</GlobalValueSet>

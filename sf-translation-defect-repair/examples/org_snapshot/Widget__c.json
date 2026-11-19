@@ -1,0 +1,1 @@
+{"result": {"name": "Widget__c", "fields": [{"name": "Color__c", "picklistValues": [{"label": "Red", "value": "RED"}]}, {"name": "Name", "picklistValues": []}]}}

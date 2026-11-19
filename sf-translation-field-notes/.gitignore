@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.sf/
+.sfdx/
+*.xlsx
+*.stf
+out/
+read/
+payload*/
+snapshots/

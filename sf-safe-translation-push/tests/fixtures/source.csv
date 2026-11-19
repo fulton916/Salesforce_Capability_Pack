@@ -1,0 +1,27 @@
+Language,Key,Value
+de,CustomField.Widget__c.Color.FieldLabel,Farbe
+de,CustomField.Widget__c.Color.HelpText,Wähle eine Farbe
+de,PicklistValue.Widget__c.Color.Red,Rot!
+de,PicklistValue.Widget__c.Color.Blue,Blau
+de,CustomField.Widget__c.Size.FieldLabel,Größe
+de,LayoutSection.Widget__c.Widget Layout.Details,Details
+de,RecordType.Widget__c.Big.Name,Groß
+de,RecordType.Widget__c.Big.Description,Ein großes Widget
+de,ValidationFormula.Widget__c.Size_Required.ErrorMessage,Größe ist erforderlich
+de,QuickAction.Widget__c.Log_Widget,Widget protokollieren
+de,PicklistValue.Colors__gvs.Yellow,Gelb
+de,PicklistValue.Colors__gvs.Green,Grün
+de,PicklistValue.Standard.LeadSource.Web,Web
+de,CustomLabel.Farewell,Auf Wiedersehen
+de,CustomLabel.Greeting,Hallo
+de,WebTab.Widget__c,Widgets
+de,CustomReportType.Widgets_with_Parts.Name,Widgets mit Teilen
+de,ReportTypeSection.Widgets_with_Parts.Widgets,Widgets
+de,CustomField.Task.Note.FieldLabel,Notiz
+de,CustomField.Task.Priority_Code.FieldLabel,Prioritätscode
+fr,CustomField.Widget__c.Color.FieldLabel,Couleur
+fr,CustomField.Widget__c.Size.FieldLabel,Taille 
+fr,PicklistValue.Widget__c.Color.Blue,Bleu
+fr,CustomLabel.Farewell,Au revoir
+fr,LayoutSection.Widget__c.Widget Layout.Details,Détails
+en_US,CustomField.Widget__c.Color.FieldLabel,Colour

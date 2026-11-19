@@ -1,0 +1,328 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-0",
+    "Name": "All Regions",
+    "DeveloperName": "All_Regions",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": null,
+    "Territory2TypeId": "TYPE-Global",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Global"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Read",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-1",
+    "Name": "North",
+    "DeveloperName": "North",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-0",
+    "Territory2TypeId": "TYPE-Region",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Region"
+    },
+    "AccountAccessLevel": "Edit",
+    "OpportunityAccessLevel": "Edit",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-11",
+    "Name": "Northeast",
+    "DeveloperName": "Northeast",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-1",
+    "Territory2TypeId": "TYPE-District",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "District"
+    },
+    "AccountAccessLevel": "Edit",
+    "OpportunityAccessLevel": "Edit",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-111",
+    "Name": "Northeast Retail",
+    "DeveloperName": "Northeast_Retail",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-11",
+    "Territory2TypeId": "TYPE-Sales",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Sales"
+    },
+    "AccountAccessLevel": "Edit",
+    "OpportunityAccessLevel": "Edit",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-12",
+    "Name": "Northwest",
+    "DeveloperName": "Northwest",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-1",
+    "Territory2TypeId": "TYPE-District",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "District"
+    },
+    "AccountAccessLevel": "Edit",
+    "OpportunityAccessLevel": "Edit",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-13",
+    "Name": "Strategic Accounts North",
+    "DeveloperName": "Strategic_Accounts_North",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-1",
+    "Territory2TypeId": "TYPE-Strategic",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Strategic"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Read",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-2",
+    "Name": "South",
+    "DeveloperName": "South",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-0",
+    "Territory2TypeId": "TYPE-Region",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Region"
+    },
+    "AccountAccessLevel": "Edit",
+    "OpportunityAccessLevel": "Edit",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-21",
+    "Name": "Southwest",
+    "DeveloperName": "Southwest",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-2",
+    "Territory2TypeId": "TYPE-District",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "District"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-211",
+    "Name": "Southwest",
+    "DeveloperName": "Southwest_Child_1",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-21",
+    "Territory2TypeId": "TYPE-Sales",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Sales"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-22",
+    "Name": "Southeast",
+    "DeveloperName": "Southeast",
+    "Territory2ModelId": "MODEL-1",
+    "ParentTerritory2Id": "T-2",
+    "Territory2TypeId": "TYPE-District",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "District"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Edit",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "Territory2"
+    },
+    "Id": "T-9",
+    "Name": "Planning Top",
+    "DeveloperName": "Planning_Top",
+    "Territory2ModelId": "MODEL-2",
+    "ParentTerritory2Id": null,
+    "Territory2TypeId": "TYPE-Global",
+    "Territory2Type": {
+     "attributes": {
+      "type": "Territory2Type"
+     },
+     "MasterLabel": "Global"
+    },
+    "AccountAccessLevel": "Read",
+    "OpportunityAccessLevel": "Read",
+    "CaseAccessLevel": "Read",
+    "ContactAccessLevel": "Edit",
+    "Description": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   }
+  ],
+  "totalSize": 11,
+  "done": true
+ }
+}

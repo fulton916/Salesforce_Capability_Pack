@@ -1,0 +1,6 @@
+# Keep fixture bytes exact. A carriage return inside a value is data, and CRLF
+# line endings added on checkout would make the CR-safe reader refuse the file.
+*.xml -text
+*.stf -text
+*.csv -text
+*.json -text

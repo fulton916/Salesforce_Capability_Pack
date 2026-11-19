@@ -1,0 +1,49 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "AggregateResult"
+    },
+    "Territory2Id": "T-0",
+    "SobjectType": "Account",
+    "n": 100
+   },
+   {
+    "attributes": {
+     "type": "AggregateResult"
+    },
+    "Territory2Id": "T-11",
+    "SobjectType": "Account",
+    "n": 20
+   },
+   {
+    "attributes": {
+     "type": "AggregateResult"
+    },
+    "Territory2Id": "T-11",
+    "SobjectType": "Opportunity",
+    "n": 5
+   },
+   {
+    "attributes": {
+     "type": "AggregateResult"
+    },
+    "Territory2Id": "T-12",
+    "SobjectType": "Account",
+    "n": 7
+   },
+   {
+    "attributes": {
+     "type": "AggregateResult"
+    },
+    "Territory2Id": "T-9",
+    "SobjectType": "Account",
+    "n": 3
+   }
+  ],
+  "totalSize": 5,
+  "done": true
+ }
+}

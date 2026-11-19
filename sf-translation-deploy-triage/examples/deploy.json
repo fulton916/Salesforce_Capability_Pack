@@ -1,0 +1,54 @@
+{
+ "status": 1,
+ "result": {
+  "status": "SucceededPartial",
+  "numberComponentsTotal": 2,
+  "numberComponentsDeployed": 1,
+  "details": {
+   "componentFailures": [
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "Invalid picklist value: Red in field: Widget__c.Color__c (12:5)",
+     "problemType": "Error"
+    },
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "Invalid picklist value: Purple in field: Widget__c.Color__c (14:5)",
+     "problemType": "Error"
+    },
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "Invalid picklist value: Open in field: Widget__c.Stage__c (20:5)",
+     "problemType": "Error"
+    },
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "Invalid picklist value: Preâ€‘Assembled in field: Widget__c.Kind__c (30:5)",
+     "problemType": "Error"
+    },
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "In field: field - no CustomField named Widget__c.Old__c found",
+     "problemType": "Error"
+    },
+    {
+     "fullName": "Widget__c-de",
+     "componentType": "CustomObjectTranslation",
+     "problem": "Gender is required for language GERMAN",
+     "problemType": "Error"
+    }
+   ],
+   "componentSuccesses": [
+    {
+     "fullName": "Gadget__c-de",
+     "componentType": "CustomObjectTranslation"
+    }
+   ]
+  }
+ }
+}

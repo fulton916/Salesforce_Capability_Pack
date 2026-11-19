@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.sf/
+.sfdx/
+# run output
+work/
+out/
+out_*/
+exports/
+snapshots/
+*.xlsx
+*.stf
+dryrun*.json
+deploy*.json
+layout_section_verdicts.json

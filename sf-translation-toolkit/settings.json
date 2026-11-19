@@ -1,0 +1,18 @@
+{
+  "_help": "Project settings for the translation toolkit. Every key is optional; delete one to use its default. See README.md.",
+
+  "api_version": "62.0",
+  "_api_version": "Salesforce API version the scripts call. 62.0 is the version the toolkit was tested with.",
+
+  "probe_language": "ja",
+  "_probe_language": "A language your org has NEVER translated into. Used to tell Salesforce-owned layout headings from yours. Change it if you translate Japanese.",
+
+  "banner_to_populate": "To Populate",
+  "_banner_to_populate": "Text of the banner over the columns reviewers fill in.",
+
+  "standard_object_labels": {},
+  "_standard_object_labels": "English labels for standard objects the toolkit does not know, e.g. {\"WorkOrder\": [\"Work Order\", \"Work Orders\"]}. Only used for display in the workbook.",
+
+  "standard_value_sets": {},
+  "_standard_value_sets": "Standard picklist fields the toolkit does not know, as Object.Field -> standard value set name, e.g. {\"Case.Origin\": \"CaseOrigin\"}."
+}

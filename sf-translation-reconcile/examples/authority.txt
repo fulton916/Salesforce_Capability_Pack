@@ -1,0 +1,3 @@
+# Entry ids someone with authority named explicitly for overwrite, one per line.
+# provenance.py holds every other overwrite of a value we did not write.
+decisions_long.csv!2:de

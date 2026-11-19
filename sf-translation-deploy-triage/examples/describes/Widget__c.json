@@ -1,0 +1,47 @@
+{
+ "status": 0,
+ "result": {
+  "name": "Widget__c",
+  "fields": [
+   {
+    "name": "Color__c",
+    "label": "Color",
+    "picklistValues": [
+     {
+      "value": "RED",
+      "label": "Red"
+     },
+     {
+      "value": "BLUE",
+      "label": "Blue"
+     }
+    ]
+   },
+   {
+    "name": "Stage__c",
+    "label": "Stage",
+    "picklistValues": [
+     {
+      "value": "OPEN",
+      "label": "Open "
+     }
+    ]
+   },
+   {
+    "name": "Kind__c",
+    "label": "Kind",
+    "picklistValues": [
+     {
+      "value": "PRE",
+      "label": "Pre‑Assembled"
+     }
+    ]
+   },
+   {
+    "name": "Name",
+    "label": "Widget Name",
+    "picklistValues": []
+   }
+  ]
+ }
+}

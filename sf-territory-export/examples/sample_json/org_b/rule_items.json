@@ -1,0 +1,153 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-1",
+    "RuleId": "R-1",
+    "SortOrder": 1,
+    "Field": "Account.Region__c",
+    "Operation": "equals",
+    "Value": "NE",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-2",
+    "RuleId": "R-1",
+    "SortOrder": 2,
+    "Field": "Account.Sales_Code__c",
+    "Operation": "equals",
+    "Value": "R12",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-3",
+    "RuleId": "R-1",
+    "SortOrder": 3,
+    "Field": "Account.Alt_Code__c",
+    "Operation": "equals",
+    "Value": "R12,R13",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-4",
+    "RuleId": "R-2",
+    "SortOrder": 1,
+    "Field": "Account.Sales_Code__c",
+    "Operation": "equals",
+    "Value": "C1,C3",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-5",
+    "RuleId": "R-2",
+    "SortOrder": 2,
+    "Field": "Account.Alt_Code__c",
+    "Operation": "equals",
+    "Value": "C1",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-6",
+    "RuleId": "R-3",
+    "SortOrder": 1,
+    "Field": "Account.Region__c",
+    "Operation": "equals",
+    "Value": "SW,SE",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-7",
+    "RuleId": "R-4",
+    "SortOrder": 1,
+    "Field": "Account.Sales_Code__c",
+    "Operation": "startsWith",
+    "Value": "X",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRuleItem"
+    },
+    "Id": "I-9",
+    "RuleId": "R-9",
+    "SortOrder": 1,
+    "Field": "Account.Sales_Code__c",
+    "Operation": "equals",
+    "Value": "P1",
+    "LastModifiedDate": "2026-01-16T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   }
+  ],
+  "totalSize": 8,
+  "done": true
+ }
+}

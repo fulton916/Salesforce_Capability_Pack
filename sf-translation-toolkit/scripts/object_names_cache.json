@@ -1,0 +1,5 @@
+{
+  "_instructions": "Optional. Object name case forms for standard objects, used only to pre-fill the Object Names tab of the workbook. Salesforce's built-in object names are not readable through any API, so an admin copies them from Setup > User Interface > Rename Tabs and Labels. combine_translations.py reads this file if present; keys starting with '_' are comments. Leave it empty if you do not need the pre-fill.",
+  "_priority": "XML caseValues in the local retrieve > this cache > REST API object label (Nominative only)",
+  "_format": "{\"<lang>\": {\"<Object>\": {\"<Case>\": {\"singular\": \"...\", \"plural\": \"...\"}}}}. Languages with articles but no cases (da, sv) use '' as the case key and hold only the base (None-article) form. See examples/object_names_cache.example.json."
+}

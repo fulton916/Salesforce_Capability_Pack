@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Layout xmlns="http://soap.sforce.com/2006/04/metadata">
+    <layoutSections>
+        <editHeading>true</editHeading>
+        <label>Widget Details</label>
+        <style>TwoColumnsTopToBottom</style>
+    </layoutSections>
+    <layoutSections>
+        <editHeading>false</editHeading>
+        <style>CustomLinks</style>
+    </layoutSections>
+</Layout>

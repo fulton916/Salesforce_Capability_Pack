@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Salesforce PSG Compare",
+  "version": "0.1.0",
+  "description": "Compare two Salesforce permission set groups: what they contain and what they allow. Read-only; uses your existing Salesforce login.",
+  "permissions": ["cookies", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://*.salesforce.com/*",
+    "https://*.force.com/*",
+    "https://*.salesforce-setup.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.visualforce.com/*",
+    "https://*.salesforce.mil/*",
+    "https://*.cloudforce.mil/*",
+    "https://*.sfcrmproducts.cn/*"
+  ],
+  "action": {
+    "default_title": "Salesforce PSG Compare",
+    "default_popup": "popup.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

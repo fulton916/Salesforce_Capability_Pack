@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic test fixture: three countries, a few states. Not taken from any org. -->
+<AddressSettings xmlns="http://soap.sforce.com/2006/04/metadata">
+    <countriesAndStates>
+        <countries>
+            <active>true</active>
+            <integrationValue>United States</integrationValue>
+            <isoCode>US</isoCode>
+            <label>United States</label>
+            <orgDefault>true</orgDefault>
+            <standard>true</standard>
+            <states>
+                <active>true</active>
+                <integrationValue>Texas</integrationValue>
+                <isoCode>TX</isoCode>
+                <label>Texas</label>
+                <standard>true</standard>
+                <visible>true</visible>
+            </states>
+            <states>
+                <active>true</active>
+                <integrationValue>Alaska</integrationValue>
+                <isoCode>AK</isoCode>
+                <label>Alaska</label>
+                <standard>true</standard>
+                <visible>false</visible>
+            </states>
+            <visible>true</visible>
+        </countries>
+        <countries>
+            <active>false</active>
+            <integrationValue>Iceland</integrationValue>
+            <isoCode>IS</isoCode>
+            <label>Iceland</label>
+            <orgDefault>false</orgDefault>
+            <standard>true</standard>
+            <visible>false</visible>
+        </countries>
+        <countries>
+            <active>true</active>
+            <integrationValue>CA-INT</integrationValue>
+            <isoCode>CA</isoCode>
+            <label>Canada</label>
+            <orgDefault>false</orgDefault>
+            <standard>true</standard>
+            <states>
+                <active>true</active>
+                <integrationValue>Ontario</integrationValue>
+                <isoCode>ON</isoCode>
+                <label>Ontario</label>
+                <standard>true</standard>
+                <visible>true</visible>
+            </states>
+            <states>
+                <active>false</active>
+                <integrationValue>Custom Region</integrationValue>
+                <isoCode>ZZ</isoCode>
+                <label>Custom Region</label>
+                <standard>false</standard>
+                <visible>false</visible>
+            </states>
+            <visible>true</visible>
+        </countries>
+    </countriesAndStates>
+</AddressSettings>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomFieldTranslation xmlns="http://soap.sforce.com/2006/04/metadata">
+    <help>eins&#13;
+zwei</help>
+    <label>Farbe</label>
+    <name>Color__c</name>
+    <picklistValues>
+        <masterLabel>Red</masterLabel>
+        <translation>Rot</translation>
+    </picklistValues>
+    <picklistValues>
+        <masterLabel>Gone</masterLabel>
+        <translation>Weg</translation>
+    </picklistValues>
+</CustomFieldTranslation>

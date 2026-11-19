@@ -1,0 +1,54 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "RuleTerritory2Association"
+    },
+    "Id": "A-1",
+    "RuleId": "R-1",
+    "Territory2Id": "T-11",
+    "IsInherited": false
+   },
+   {
+    "attributes": {
+     "type": "RuleTerritory2Association"
+    },
+    "Id": "A-2",
+    "RuleId": "R-2",
+    "Territory2Id": "T-12",
+    "IsInherited": false
+   },
+   {
+    "attributes": {
+     "type": "RuleTerritory2Association"
+    },
+    "Id": "A-3",
+    "RuleId": "R-3",
+    "Territory2Id": "T-2",
+    "IsInherited": false
+   },
+   {
+    "attributes": {
+     "type": "RuleTerritory2Association"
+    },
+    "Id": "A-4",
+    "RuleId": "R-3",
+    "Territory2Id": "T-21",
+    "IsInherited": true
+   },
+   {
+    "attributes": {
+     "type": "RuleTerritory2Association"
+    },
+    "Id": "A-9",
+    "RuleId": "R-9",
+    "Territory2Id": "T-9",
+    "IsInherited": false
+   }
+  ],
+  "totalSize": 5,
+  "done": true
+ }
+}

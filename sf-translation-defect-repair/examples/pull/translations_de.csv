@@ -1,0 +1,6 @@
+file,type,component,field,masterLabel,source,translation,gender
+globalValueSetTranslations/Flavor-de.globalValueSetTranslation-meta.xml,global-value,Flavor,,Crème,Crème,CrÃ¨me,
+globalValueSetTranslations/Sizes-de.globalValueSetTranslation-meta.xml,global-value,Sizes,,Extra Large ,Extra Large ,,
+objectTranslations/Widget__c-de/Stage__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Stage__c,Open – pending review,Open – pending review,,
+objectTranslations/Widget__c-de/Kind__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Kind__c,Pre‑Assembled,Pre‑Assembled,Vorâ€'montiert,
+objectTranslations/Widget__c-de/Kind__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Kind__c,Basic,Basic,Einfach,

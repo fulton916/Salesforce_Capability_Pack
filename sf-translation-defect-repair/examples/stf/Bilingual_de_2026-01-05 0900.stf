@@ -1,0 +1,21 @@
+# Bilingual export (synthetic)
+# Lines that begin with the # symbol are ignored.
+
+Language code: de
+Type: Bilingual
+Translation type: Metadata
+
+------------------TRANSLATED-------------------
+
+# KEY	LABEL	TRANSLATION	OUT OF DATE
+
+PicklistValue.Widget__c.Kind.Basic	Basic	Einfach	-
+CustomField.Widget__c.Notes.HelpText	Line one
+Line two	Zeile eins
+Zeile zwei	-
+
+------------------OUTDATED AND UNTRANSLATED-----------------
+
+# KEY	LABEL
+
+PicklistValue.Widget__c.Kind.Deluxe	Deluxe

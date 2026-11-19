@@ -1,0 +1,29 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "Territory2Model"
+    },
+    "Id": "MODEL-1",
+    "Name": "Sales Model",
+    "DeveloperName": "Sales_Model",
+    "State": "Active",
+    "LastModifiedDate": "2026-01-01T00:00:00.000+0000"
+   },
+   {
+    "attributes": {
+     "type": "Territory2Model"
+    },
+    "Id": "MODEL-2",
+    "Name": "Planning Model",
+    "DeveloperName": "Planning_Model",
+    "State": "Planning",
+    "LastModifiedDate": "2026-01-01T00:00:00.000+0000"
+   }
+  ],
+  "totalSize": 2,
+  "done": true
+ }
+}

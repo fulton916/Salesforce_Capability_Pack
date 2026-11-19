@@ -1,0 +1,20 @@
+__pycache__/
+*.pyc
+.sf/
+.sfdx/
+*.xlsx
+# run folders and outputs, if a run is made inside the package folder (better: keep runs outside it)
+/runs/
+/demo/
+/before/
+/pre/
+/after/
+/_merged_*/
+/payload*/
+/manifests/
+/*_negctl*
+/plan*.json
+/push_report*.json
+/check_vs_stf*.json
+/pre_deploy_check.json
+/verify_push.json

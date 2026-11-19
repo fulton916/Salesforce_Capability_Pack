@@ -1,0 +1,7 @@
+file,type,component,field,masterLabel,source,translation,gender,startsWith
+objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Color__c,Red,Red,Rot,,
+objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Color__c,Purple,Purple,Lila,,
+objectTranslations/Widget__c-de/Stage__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Stage__c,Open,Open,Offen,,
+objectTranslations/Widget__c-de/Kind__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Kind__c,Preâ€‘Assembled,Preâ€‘Assembled,Vorâ€‘montiert,,
+objectTranslations/Widget__c-de/Old__c.fieldTranslation-meta.xml,field-label,Widget__c,Old__c,,Old,Alt,,
+objectTranslations/Widget__c-de/Name.fieldTranslation-meta.xml,standard-field,Widget__c,Name,,Widget Name,Widget-Name,,

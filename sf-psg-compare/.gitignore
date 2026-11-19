@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+# snapshots and exports taken from real orgs
+snapshots/
+psg_*.json
+psg_compare_*.csv
+*.zip
+!extension/samples/*.json

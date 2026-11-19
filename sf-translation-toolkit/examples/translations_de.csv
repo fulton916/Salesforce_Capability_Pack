@@ -1,0 +1,12 @@
+file,type,component,field,masterLabel,source,translation,plural_translation,gender,startsWith,caseType,article,plural
+objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml,field-label,Widget__c,Color__c,,Color,,,,,,,
+objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Color__c,Red,Red,,,,,,,
+objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml,field-picklist,Widget__c,Color__c,Blue,Blue,,,,,,,
+objectTranslations/Widget__c-de/Notes__c.fieldTranslation-meta.xml,field-label,Widget__c,Notes__c,,Notes,,,,,,,
+objectTranslations/Widget__c-de/Size__c.fieldTranslation-meta.xml,field-label,Widget__c,Size__c,,Size,,,,,,,
+objectTranslations/Widget__c-de/Widget__c-de.objectTranslation-meta.xml,record-type,Widget__c,Premium,,Premium Widget,,,,,,,
+objectTranslations/Widget__c-de/Widget__c-de.objectTranslation-meta.xml,validation-rule,Widget__c,Require_Color,,Color is required.,,,,,,,
+objectTranslations/Widget__c-de/Widget__c-de.objectTranslation-meta.xml,layout-section,Widget__c,Widget Layout,Widget Details,Widget Details,,,,,,,
+translations/de.translation-meta.xml,custom-label,(global),Greeting,,Hello,,,,,,,
+globalValueSetTranslations/SizeSet-de.globalValueSetTranslation-meta.xml,global-value,SizeSet,,Large,Large,,,,,,,
+globalValueSetTranslations/SizeSet-de.globalValueSetTranslation-meta.xml,global-value,SizeSet,,Small,Small,,,,,,,

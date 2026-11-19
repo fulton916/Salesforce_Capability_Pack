@@ -1,0 +1,7 @@
+lang,type,object,field,item,value,gender,decision
+de,field-label,Widget__c,Size__c,,Größe,,ok
+de,field-picklist,Widget__c,Color__c,Blue,Blau,,ok
+de,record-type,Widget__c,Premium,,Premium Plus,,hold
+fr,global-value,Colors,,Green,Vert,,ok
+fr,standard-field,Account,AccountNumber,,Numéro de compte,Masculine,ok
+de,custom-label,,Greeting,,Guten Tag,,ok

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Translations xmlns="http://soap.sforce.com/2006/04/metadata">
+    <customLabels>
+        <label>Hallo</label>
+        <name>Greeting</name>
+    </customLabels>
+    <customLabels>
+        <label><!-- Goodbye --></label>
+        <name>Farewell</name>
+    </customLabels>
+    <customTabs>
+        <label><!-- Widgets --></label>
+        <name>Widget__c</name>
+    </customTabs>
+    <reportTypes>
+        <description><!-- Widgets and their parts --></description>
+        <label><!-- Widgets with Parts --></label>
+        <name>Widgets_with_Parts</name>
+        <sections>
+            <label><!-- Widgets --></label>
+            <name>Widgets</name>
+        </sections>
+    </reportTypes>
+</Translations>

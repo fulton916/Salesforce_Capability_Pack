@@ -1,0 +1,3 @@
+openpyxl>=3.1
+# only for `snapshot.py mark-start --org-tz` on Windows (no system time zone database there)
+tzdata>=2024.1; platform_system == "Windows"

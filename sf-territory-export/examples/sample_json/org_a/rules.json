@@ -1,0 +1,104 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRule"
+    },
+    "Id": "R-1",
+    "DeveloperName": "Northeast_Rule",
+    "MasterLabel": "Northeast Rule",
+    "Territory2ModelId": "MODEL-1",
+    "ObjectType": "Account",
+    "IsActive": true,
+    "BooleanFilter": "1 AND (2 OR 3)",
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRule"
+    },
+    "Id": "R-2",
+    "DeveloperName": "Northwest_Rule",
+    "MasterLabel": "Northwest Rule",
+    "Territory2ModelId": "MODEL-1",
+    "ObjectType": "Account",
+    "IsActive": true,
+    "BooleanFilter": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRule"
+    },
+    "Id": "R-3",
+    "DeveloperName": "South_Rule",
+    "MasterLabel": "South Rule",
+    "Territory2ModelId": "MODEL-1",
+    "ObjectType": "Account",
+    "IsActive": true,
+    "BooleanFilter": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRule"
+    },
+    "Id": "R-4",
+    "DeveloperName": "Unused_Rule",
+    "MasterLabel": "Unused Rule",
+    "Territory2ModelId": "MODEL-1",
+    "ObjectType": "Account",
+    "IsActive": true,
+    "BooleanFilter": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   },
+   {
+    "attributes": {
+     "type": "ObjectTerritory2AssignmentRule"
+    },
+    "Id": "R-9",
+    "DeveloperName": "Planning_Rule",
+    "MasterLabel": "Planning Rule",
+    "Territory2ModelId": "MODEL-2",
+    "ObjectType": "Account",
+    "IsActive": true,
+    "BooleanFilter": null,
+    "LastModifiedDate": "2026-01-15T10:00:00.000+0000",
+    "LastModifiedBy": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Admin User"
+    }
+   }
+  ],
+  "totalSize": 5,
+  "done": true
+ }
+}

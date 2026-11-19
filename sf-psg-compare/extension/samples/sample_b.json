@@ -1,0 +1,249 @@
+{
+  "schema": "sf-psg-snapshot/1",
+  "takenAt": "2026-11-18T15:00:00.000Z",
+  "org": {
+    "id": "00D000000000001EAA",
+    "name": "Example Corp (sample)",
+    "isSandbox": true,
+    "instance": "CS0",
+    "edition": "Enterprise Edition",
+    "host": "example--dev.sandbox.my.salesforce.com"
+  },
+  "psg": {
+    "id": "0PG00000000000SALE",
+    "developerName": "Sales_Manager",
+    "label": "Sales Manager",
+    "description": "Sales reps plus team oversight and forecasting.",
+    "status": "Updated",
+    "aggregatePermissionSetId": "0PS00000000000SALE"
+  },
+  "components": [
+    {
+      "id": "0PSSales_Core00",
+      "name": "Sales_Core",
+      "label": "Sales Core",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSReport_Runne",
+      "name": "Report_Runner",
+      "label": "Report Runner",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSWidget_User0",
+      "name": "Widget_User",
+      "label": "Widget User",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSTeam_Oversig",
+      "name": "Team_Oversight",
+      "label": "Team Oversight",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSForecast_Man",
+      "name": "Forecast_Manager",
+      "label": "Forecast Manager",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSData_Steward",
+      "name": "Data_Steward",
+      "label": "Data Steward",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    }
+  ],
+  "muting": null,
+  "assignments": {
+    "total": 37,
+    "active": 35
+  },
+  "userPermissions": {
+    "PermissionsApiEnabled": "API Enabled",
+    "PermissionsRunReports": "Run Reports",
+    "PermissionsEditTask": "Edit Tasks",
+    "PermissionsEditEvent": "Edit Events",
+    "PermissionsChatterInternalUser": "Chatter Internal User",
+    "PermissionsLightningExperienceUser": "Lightning Experience User",
+    "PermissionsExportReport": "Export Reports",
+    "PermissionsViewAllData": "View All Data",
+    "PermissionsManageDashboards": "Manage Dashboards in Public Folders",
+    "PermissionsTransferAnyEntity": "Transfer Record",
+    "PermissionsViewSetup": "View Setup and Configuration"
+  },
+  "objectPermissions": {
+    "Account": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": true,
+      "ViewAllFields": false,
+      "ViewAllRecords": true,
+      "ModifyAllRecords": false
+    },
+    "Contact": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": true,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Opportunity": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": true,
+      "ViewAllFields": false,
+      "ViewAllRecords": true,
+      "ModifyAllRecords": true
+    },
+    "Widget__c": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "ForecastingItem": {
+      "Read": true,
+      "Create": false,
+      "Edit": false,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Quota__c": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": true,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    }
+  },
+  "fieldPermissions": {
+    "Account.Industry": {
+      "Read": true,
+      "Edit": true
+    },
+    "Account.AnnualRevenue": {
+      "Read": true,
+      "Edit": true
+    },
+    "Account.Rating": {
+      "Read": true,
+      "Edit": true
+    },
+    "Contact.Email": {
+      "Read": true,
+      "Edit": true
+    },
+    "Contact.Phone": {
+      "Read": true,
+      "Edit": true
+    },
+    "Opportunity.Amount": {
+      "Read": true,
+      "Edit": true
+    },
+    "Opportunity.Probability": {
+      "Read": true,
+      "Edit": true
+    },
+    "Widget__c.Color__c": {
+      "Read": true,
+      "Edit": true
+    },
+    "Widget__c.Size__c": {
+      "Read": true,
+      "Edit": true
+    },
+    "Quota__c.Target__c": {
+      "Read": true,
+      "Edit": true
+    },
+    "Quota__c.Period__c": {
+      "Read": true,
+      "Edit": true
+    }
+  },
+  "setupAccess": {
+    "ApexClass|QuoteController": {
+      "type": "ApexClass",
+      "typeLabel": "Apex class",
+      "name": "QuoteController",
+      "label": null
+    },
+    "ApexClass|TeamReassignService": {
+      "type": "ApexClass",
+      "typeLabel": "Apex class",
+      "name": "TeamReassignService",
+      "label": null
+    },
+    "ApexPage|QuotePdf": {
+      "type": "ApexPage",
+      "typeLabel": "Visualforce page",
+      "name": "QuotePdf",
+      "label": null
+    },
+    "TabSet|standard__Sales": {
+      "type": "TabSet",
+      "typeLabel": "App",
+      "name": "standard__Sales",
+      "label": "Sales"
+    },
+    "TabSet|Forecasting_Console": {
+      "type": "TabSet",
+      "typeLabel": "App",
+      "name": "Forecasting_Console",
+      "label": "Forecasting Console"
+    },
+    "CustomPermission|Can_Submit_Quote": {
+      "type": "CustomPermission",
+      "typeLabel": "Custom permission",
+      "name": "Can_Submit_Quote",
+      "label": "Can Submit Quote"
+    },
+    "CustomPermission|Approve_Discounts": {
+      "type": "CustomPermission",
+      "typeLabel": "Custom permission",
+      "name": "Approve_Discounts",
+      "label": "Approve Discounts"
+    }
+  },
+  "tabSettings": {
+    "standard-Account": "DefaultOn",
+    "standard-Contact": "DefaultOn",
+    "standard-Opportunity": "DefaultOn",
+    "Widget__c": "DefaultOn",
+    "standard-Forecasting3": "DefaultOn",
+    "Quota__c": "DefaultOn"
+  },
+  "warnings": []
+}

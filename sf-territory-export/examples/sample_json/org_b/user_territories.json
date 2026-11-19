@@ -1,0 +1,134 @@
+{
+ "status": 0,
+ "result": {
+  "records": [
+   {
+    "attributes": {
+     "type": "UserTerritory2Association"
+    },
+    "Id": "U-1",
+    "UserId": "USER-1",
+    "Territory2Id": "T-11",
+    "RoleInTerritory2": null,
+    "IsActive": true,
+    "LastModifiedDate": "2026-01-17T10:00:00.000+0000",
+    "User": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Alex Example",
+     "Username": "alex.example@example.com",
+     "IsActive": true,
+     "Profile": {
+      "attributes": {
+       "type": "Profile"
+      },
+      "Name": "Standard User"
+     }
+    }
+   },
+   {
+    "attributes": {
+     "type": "UserTerritory2Association"
+    },
+    "Id": "U-2",
+    "UserId": "USER-2",
+    "Territory2Id": "T-11",
+    "RoleInTerritory2": "Owner",
+    "IsActive": true,
+    "LastModifiedDate": "2026-01-17T10:00:00.000+0000",
+    "User": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Blair Example",
+     "Username": "blair.example@example.com",
+     "IsActive": true,
+     "Profile": {
+      "attributes": {
+       "type": "Profile"
+      },
+      "Name": "Standard User"
+     }
+    }
+   },
+   {
+    "attributes": {
+     "type": "UserTerritory2Association"
+    },
+    "Id": "U-3",
+    "UserId": "USER-3",
+    "Territory2Id": "T-2",
+    "RoleInTerritory2": null,
+    "IsActive": true,
+    "LastModifiedDate": "2026-01-17T10:00:00.000+0000",
+    "User": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Casey Example",
+     "Username": "casey.example@example.com",
+     "IsActive": true,
+     "Profile": {
+      "attributes": {
+       "type": "Profile"
+      },
+      "Name": "Standard User"
+     }
+    }
+   },
+   {
+    "attributes": {
+     "type": "UserTerritory2Association"
+    },
+    "Id": "U-4",
+    "UserId": "USER-4",
+    "Territory2Id": "T-0",
+    "RoleInTerritory2": null,
+    "IsActive": true,
+    "LastModifiedDate": "2026-01-17T10:00:00.000+0000",
+    "User": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Drew Example",
+     "Username": "drew.example@example.com",
+     "IsActive": true,
+     "Profile": {
+      "attributes": {
+       "type": "Profile"
+      },
+      "Name": "Standard User"
+     }
+    }
+   },
+   {
+    "attributes": {
+     "type": "UserTerritory2Association"
+    },
+    "Id": "U-9",
+    "UserId": "USER-9",
+    "Territory2Id": "T-9",
+    "RoleInTerritory2": null,
+    "IsActive": true,
+    "LastModifiedDate": "2026-01-17T10:00:00.000+0000",
+    "User": {
+     "attributes": {
+      "type": "User"
+     },
+     "Name": "Eli Example",
+     "Username": "eli.example@example.com",
+     "IsActive": true,
+     "Profile": {
+      "attributes": {
+       "type": "Profile"
+      },
+      "Name": "Standard User"
+     }
+    }
+   }
+  ],
+  "totalSize": 5,
+  "done": true
+ }
+}

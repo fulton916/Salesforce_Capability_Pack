@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PSG Compare</title>
+<link rel="stylesheet" href="psg-compare.css">
+</head>
+<body>
+<header class="top">
+  <h1>PSG Compare</h1>
+  <div class="org" id="org">Not connected</div>
+</header>
+
+<main>
+  <section class="panel">
+    <div class="pickers">
+      <div class="picker" data-side="a">
+        <h2><span class="side a">A</span> First permission set group</h2>
+        <div class="row org-only">
+          <input type="text" class="filter" placeholder="Filter groups by name…" aria-label="Filter group A">
+        </div>
+        <div class="row org-only">
+          <select class="psg" aria-label="Group A"><option value="">Choose a group…</option></select>
+        </div>
+        <div class="file">or load a saved snapshot: <input type="file" class="snap" accept=".json,application/json" aria-label="Snapshot file for A"></div>
+        <div class="chosen"></div>
+      </div>
+      <div class="picker" data-side="b">
+        <h2><span class="side b">B</span> Second permission set group</h2>
+        <div class="row org-only">
+          <input type="text" class="filter" placeholder="Filter groups by name…" aria-label="Filter group B">
+        </div>
+        <div class="row org-only">
+          <select class="psg" aria-label="Group B"><option value="">Choose a group…</option></select>
+        </div>
+        <div class="file">or load a saved snapshot: <input type="file" class="snap" accept=".json,application/json" aria-label="Snapshot file for B"></div>
+        <div class="chosen"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="compare" class="primary" disabled>Compare</button>
+      <span id="progress" role="status"></span>
+    </div>
+    <div id="error" class="error" hidden></div>
+    <p class="hint">Read-only. The tool only runs queries; nothing is changed in the org. A snapshot saved here can be compared later against a group in another org (sandbox vs production).</p>
+  </section>
+
+  <section class="panel" id="results" hidden>
+    <ul class="highlights" id="highlights"></ul>
+  </section>
+
+  <section class="panel" id="detail" hidden>
+    <nav class="tabs" id="tabs" role="tablist"></nav>
+    <div class="toolbar">
+      <input type="search" id="search" placeholder="Search this tab…" aria-label="Search">
+      <div class="seg" role="group" aria-label="Rows to show">
+        <button id="showDiff" aria-pressed="true">Differences</button>
+        <button id="showAll" aria-pressed="false">Everything</button>
+      </div>
+      <button id="csvTab">Export tab (CSV)</button>
+      <button id="csvAll">Export all (CSV)</button>
+      <button id="saveA">Save snapshot A</button>
+      <button id="saveB">Save snapshot B</button>
+    </div>
+    <div class="legend"><span class="la">Only A</span><span class="lb">Only B</span><span class="ld">Both, different</span></div>
+    <div class="tablewrap" id="table"></div>
+  </section>
+</main>
+<script type="module" src="psg-compare.js"></script>
+</body>
+</html>

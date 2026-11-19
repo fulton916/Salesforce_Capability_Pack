@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Color__c</fullName>
+    <label>Color</label>
+    <type>Picklist</type>
+    <valueSet>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>RED</fullName><label>Red</label></value>
+            <value><fullName>BLUE</fullName><label>Blue</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

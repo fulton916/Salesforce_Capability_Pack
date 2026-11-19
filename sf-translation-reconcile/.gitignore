@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.xlsx
+*.xlsm
+!examples/*.xlsx
+run/
+runs/
+out/
+output/
+results/
+.sf/
+.sfdx/

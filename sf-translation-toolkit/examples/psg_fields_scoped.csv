@@ -1,0 +1,4 @@
+Name,editable,readable,PSG
+Widget__c.Color__c,TRUE,TRUE,Sales_Users_PSG
+Widget__c.Size__c,FALSE,TRUE,Sales_Users_PSG
+Widget__c.Notes__c,TRUE,TRUE,Service_Users_PSG

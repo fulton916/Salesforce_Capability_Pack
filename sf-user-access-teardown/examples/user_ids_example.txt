@@ -1,0 +1,6 @@
+# One Salesforce User Id (005...) per line. 15 or 18 characters.
+# Blank lines and lines starting with # are ignored. A header line is allowed.
+# These Ids are fake: replace them with your own.
+005FAKE00000001
+005FAKE00000002
+005FAKE00000003

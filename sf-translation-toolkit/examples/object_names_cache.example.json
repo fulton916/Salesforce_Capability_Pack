@@ -1,0 +1,14 @@
+{
+  "_instructions": "Synthetic example of scripts/object_names_cache.json. Values are made up for the Widget__c test object.",
+  "fi": {
+    "Widget__c": {
+      "Nominative": {"singular": "Vimpain", "plural": "Vimpaimet"},
+      "Genitive": {"singular": "", "plural": ""}
+    }
+  },
+  "da": {
+    "Widget__c": {
+      "": {"singular": "Dims", "plural": "Dimser"}
+    }
+  }
+}

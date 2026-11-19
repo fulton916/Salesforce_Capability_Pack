@@ -1,0 +1,2 @@
+# fixtures carry a deliberate carriage return inside a value: keep their bytes exactly
+tests/fixtures/** -text

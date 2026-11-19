@@ -1,0 +1,219 @@
+{
+  "schema": "sf-psg-snapshot/1",
+  "takenAt": "2026-11-18T15:00:00.000Z",
+  "org": {
+    "id": "00D000000000001EAA",
+    "name": "Example Corp (sample)",
+    "isSandbox": true,
+    "instance": "CS0",
+    "edition": "Enterprise Edition",
+    "host": "example--dev.sandbox.my.salesforce.com"
+  },
+  "psg": {
+    "id": "0PG00000000000SALE",
+    "developerName": "Sales_Rep",
+    "label": "Sales Rep",
+    "description": "Day-to-day access for field sales reps.",
+    "status": "Updated",
+    "aggregatePermissionSetId": "0PS00000000000SALE"
+  },
+  "components": [
+    {
+      "id": "0PSSales_Core00",
+      "name": "Sales_Core",
+      "label": "Sales Core",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSReport_Runne",
+      "name": "Report_Runner",
+      "label": "Report Runner",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSWidget_User0",
+      "name": "Widget_User",
+      "label": "Widget User",
+      "type": "Regular",
+      "isMuting": false,
+      "licence": "Salesforce",
+      "description": null
+    },
+    {
+      "id": "0PSSales_Rep_Mu",
+      "name": "Sales_Rep_Muting",
+      "label": "Sales Rep Muting",
+      "type": "Muting",
+      "isMuting": true,
+      "licence": null,
+      "description": null
+    }
+  ],
+  "muting": {
+    "id": "0PS000000000MUTE",
+    "sobject": "PermissionSet",
+    "name": "Sales_Rep_Muting",
+    "label": "Sales Rep Muting",
+    "userPermissions": {
+      "PermissionsExportReport": "Export Reports"
+    },
+    "objectPermissions": {
+      "Opportunity": {
+        "Read": false,
+        "Create": false,
+        "Edit": false,
+        "Delete": true,
+        "ViewAllFields": false,
+        "ViewAllRecords": false,
+        "ModifyAllRecords": false
+      }
+    },
+    "fieldPermissions": {
+      "Account.AnnualRevenue": {
+        "Read": false,
+        "Edit": true
+      }
+    }
+  },
+  "assignments": {
+    "total": 412,
+    "active": 398
+  },
+  "userPermissions": {
+    "PermissionsApiEnabled": "API Enabled",
+    "PermissionsRunReports": "Run Reports",
+    "PermissionsEditTask": "Edit Tasks",
+    "PermissionsEditEvent": "Edit Events",
+    "PermissionsChatterInternalUser": "Chatter Internal User",
+    "PermissionsLightningExperienceUser": "Lightning Experience User"
+  },
+  "objectPermissions": {
+    "Account": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Contact": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Opportunity": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Widget__c": {
+      "Read": true,
+      "Create": true,
+      "Edit": true,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    },
+    "Campaign": {
+      "Read": true,
+      "Create": false,
+      "Edit": false,
+      "Delete": false,
+      "ViewAllFields": false,
+      "ViewAllRecords": false,
+      "ModifyAllRecords": false
+    }
+  },
+  "fieldPermissions": {
+    "Account.Industry": {
+      "Read": true,
+      "Edit": true
+    },
+    "Account.AnnualRevenue": {
+      "Read": true,
+      "Edit": false
+    },
+    "Account.Rating": {
+      "Read": true,
+      "Edit": true
+    },
+    "Contact.Email": {
+      "Read": true,
+      "Edit": true
+    },
+    "Contact.Phone": {
+      "Read": true,
+      "Edit": true
+    },
+    "Opportunity.Amount": {
+      "Read": true,
+      "Edit": true
+    },
+    "Opportunity.Probability": {
+      "Read": true,
+      "Edit": false
+    },
+    "Widget__c.Color__c": {
+      "Read": true,
+      "Edit": true
+    },
+    "Widget__c.Size__c": {
+      "Read": true,
+      "Edit": false
+    },
+    "Campaign.BudgetedCost": {
+      "Read": true,
+      "Edit": false
+    }
+  },
+  "setupAccess": {
+    "ApexClass|QuoteController": {
+      "type": "ApexClass",
+      "typeLabel": "Apex class",
+      "name": "QuoteController",
+      "label": null
+    },
+    "ApexPage|QuotePdf": {
+      "type": "ApexPage",
+      "typeLabel": "Visualforce page",
+      "name": "QuotePdf",
+      "label": null
+    },
+    "TabSet|standard__Sales": {
+      "type": "TabSet",
+      "typeLabel": "App",
+      "name": "standard__Sales",
+      "label": "Sales"
+    },
+    "CustomPermission|Can_Submit_Quote": {
+      "type": "CustomPermission",
+      "typeLabel": "Custom permission",
+      "name": "Can_Submit_Quote",
+      "label": "Can Submit Quote"
+    }
+  },
+  "tabSettings": {
+    "standard-Account": "DefaultOn",
+    "standard-Contact": "DefaultOn",
+    "standard-Opportunity": "DefaultOn",
+    "Widget__c": "DefaultOff",
+    "standard-Campaign": "DefaultOff"
+  },
+  "warnings": []
+}
