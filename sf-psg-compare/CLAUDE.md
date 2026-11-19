@@ -14,6 +14,27 @@ browser session and never writes to the org.
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights}`. Pure.
 - `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
 
+## User access (second tool)
+
+A read-only page, `extension/user-access.html`, that shows one user's access (profile and licence,
+role, permission set groups, permission sets with "directly / through group", permission set
+licences, public groups, queues, territories) and compares two users. Same look as the compare page:
+it links `psg-compare.css` and adds a little in `user-access.css`.
+
+- `extension/lib/useraccess.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with
+  `soqlString` / `soqlLike`, LIMIT 50) and `readUserAccess(api, userId)` →
+  `{schema: "sf-user-access/1", user, sections, unavailable, warnings}`. Reads `User`,
+  `PermissionSetAssignment`, `PermissionSetGroup(Component)`, `PermissionSet`, `MutingPermissionSet`,
+  `PermissionSetLicenseAssign`, `GroupMember`, `UserTerritory2Association`. Only the user read may
+  throw; every other area fails softly into `unavailable` (plain words) and `warnings` (raw).
+- `extension/lib/usercompare.js` — pure: rows, `compareUsers(a, b)`, verdict, CSV.
+- `extension/user-access.js` — the page. `?host=`, `?dev=1`, `?demo=1` work as in `psg-compare.js`.
+  Demo: `http://127.0.0.1:8765/user-access.html?demo=1`.
+- Tests: `tests/user_access_tests.mjs`, run from `tests/run_tests.mjs`.
+- Rules that matter: matching by API name, never Id; no user snapshots or files (usernames);
+  no `innerHTML`, `localStorage` or `chrome.storage` (a test checks); group and queue membership is
+  direct only (say so in help text). Not covered: object/field access, nested group membership.
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",

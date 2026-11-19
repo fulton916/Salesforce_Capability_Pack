@@ -1,0 +1,109 @@
+{
+  "schema": "sf-user-access/1",
+  "takenAt": "2026-01-15T09:00:00.000Z",
+  "user": {
+    "id": "005DEMO000000AAA1",
+    "name": "Alex Example",
+    "username": "alex.example@example.com",
+    "isActive": true
+  },
+  "sections": {
+    "profile": [
+      {
+        "key": "Sales_Standard",
+        "label": "Sales Standard",
+        "licence": "Salesforce"
+      }
+    ],
+    "role": [
+      {
+        "key": "Regional_Sales_Rep",
+        "label": "Regional Sales Rep"
+      }
+    ],
+    "permissionSetGroups": [
+      {
+        "key": "Sales_Core",
+        "label": "Sales Core",
+        "status": "Updated",
+        "muting": [
+          "Mute Delete Access"
+        ]
+      }
+    ],
+    "permissionSets": [
+      {
+        "key": "Lead_Convert",
+        "label": "Lead Convert",
+        "licence": null,
+        "direct": false,
+        "groups": [
+          {
+            "key": "Sales_Core",
+            "label": "Sales Core"
+          }
+        ]
+      },
+      {
+        "key": "Opportunity_Edit",
+        "label": "Opportunity Edit",
+        "licence": null,
+        "direct": true,
+        "groups": [
+          {
+            "key": "Sales_Core",
+            "label": "Sales Core"
+          }
+        ]
+      },
+      {
+        "key": "Quote_Approver",
+        "label": "Quote Approver",
+        "licence": "Salesforce",
+        "direct": true,
+        "groups": []
+      },
+      {
+        "key": "Sales_Reports",
+        "label": "Sales Reports",
+        "licence": null,
+        "direct": true,
+        "groups": []
+      }
+    ],
+    "permissionSetLicenses": [
+      {
+        "key": "SalesCloudEinsteinPsl",
+        "label": "Sales Cloud Einstein"
+      }
+    ],
+    "publicGroups": [
+      {
+        "key": "All_Sales_Staff",
+        "label": "All Sales Staff"
+      },
+      {
+        "key": "EMEA_Managers",
+        "label": "EMEA Managers"
+      }
+    ],
+    "queues": [
+      {
+        "key": "Escalations",
+        "label": "Escalations"
+      },
+      {
+        "key": "Lead_Triage",
+        "label": "Lead Triage"
+      }
+    ],
+    "territories": [
+      {
+        "key": "Northeast_Region",
+        "label": "Northeast Region"
+      }
+    ]
+  },
+  "unavailable": {},
+  "warnings": []
+}

@@ -57,6 +57,58 @@ Id, so a group in a sandbox compares cleanly with the same group in production.
 A snapshot holds permission names, object and field API names and counts. It holds no record
 data and no user names. It does hold the org name and host; treat it like any other org export.
 
+## User access
+
+A second page, **User access**, shows what one user has, in plain words, and can set two users side
+by side. It is read-only, like the compare page, and looks and works the same way (same
+stylesheet, cards, tabs, "Only differences / Everything", "Show API names", search box, Download).
+
+Type part of a name or username (words in any order) and pick the user from the list that opens
+under the box. Inactive users are marked "Inactive". The search runs in the org, so it works in orgs
+with thousands of users. Add a second user under "Compare with another user (optional)" to compare;
+"Remove this user" goes back to one user.
+
+It shows, for each user:
+
+| Area | What it shows |
+|---|---|
+| Profile | the profile and its user licence |
+| Role | the role |
+| Permission set groups | groups assigned to the user; a muting permission set is shown as "Muting permission set: ..." |
+| Permission sets | every permission set the user gets, and how: "Assigned directly", "Through group: ...", or both. Profile-owned sets and the summary sets Salesforce keeps for groups are left out |
+| Permission set licences | the permission set licences assigned |
+| Public groups, Queues | direct membership only. Membership through roles or groups inside groups is not shown |
+| Territories | the territories the user is assigned to |
+
+With two users, each card says how many items only one has, or "✓ Same in both". A permission set
+one user has directly and the other gets through a group counts as "assigned differently". Items are
+matched by API name, never by Id. **Download** saves "This list" or "Everything" as a CSV for Excel.
+Nothing about users is saved: there are no user snapshots, because they hold usernames.
+
+If an area cannot be read, only that area says so in plain words (for example "Territories are not
+turned on in this org") and the raw error goes to "Technical notes". When the org's territory feature is off, the page does not even ask for it. A failed search or read shows a plain message, with the raw Salesforce message folded under "Technical details".
+
+Objects it reads (all with `SELECT`, nothing else): `User`, `PermissionSetAssignment`,
+`PermissionSetGroup`, `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`,
+`UserLicense`, `PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
+`UserTerritory2Association`. Your user needs API Enabled and View Setup and Configuration, and
+access to see users.
+
+Try it: `python tools/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/user-access.html?demo=1> (two made-up users). Against an org through the dev
+server: `?dev=1`. The popup opens it as `user-access.html?host=<org host>`.
+
+Does not cover: field-level or object-level access, what a permission set contains, sharing and
+record access, group or queue membership through roles or nested groups, login history, or any
+change to a user. For removing access use `sf-user-access-teardown`.
+
+Run against live orgs so far (read-only): a Developer Edition org (search, permission sets,
+licences and compare worked; territories are off there and are handled) and a large sandbox with
+about 6,000 users. On the sandbox, a user with 3 permission set groups, 18 permission sets (9 only
+through groups), 11 licences, 3 public groups, 24 queues and 1 territory matched the org line by
+line, including a muting permission set, and a compare of two users worked. Not yet checked inside
+Chrome from the toolbar button (only through the dev server).
+
 ## Install (unpacked, for your own browser)
 
 1. Copy this folder anywhere.
@@ -72,8 +124,9 @@ push it by policy.
 ## Use
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
-2. Click the extension → **Compare permission set groups**. A new tab opens, connected to that org.
-   The header shows the org name and whether it is a sandbox or production.
+2. Click the extension. It is a menu of tools: choose **Compare permission set groups** or
+   **User access**. A new tab opens, connected to that org. The compare page's header shows the org
+   name and whether it is a sandbox or production.
 3. Pick group A and group B (type in the filter box to narrow the list), or load a snapshot file
    on either side.
 4. **Compare**. Each press reads the org again, so the result is current.
@@ -165,13 +218,16 @@ node tests/run_tests.mjs
 | Path | What |
 |---|---|
 | `extension/manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs; Salesforce hosts only) |
-| `extension/popup.*` | Toolbar popup: detects the org in the current tab, opens the compare page |
+| `extension/popup.*` | Toolbar popup: a menu of tools. Detects the org in the current tab and opens the chosen page |
 | `extension/psg-compare.*` | The compare page |
+| `extension/user-access.*` | The User access page (html, js, and a little extra css on top of `psg-compare.css`) |
+| `extension/lib/useraccess.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
+| `extension/lib/usercompare.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
 | `extension/lib/sfconn.js` | Session lookup and REST client (query with paging, describe) |
 | `extension/lib/snapshot.js` | Reads one group into a snapshot |
 | `extension/lib/compare.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
 | `extension/lib/pick.js` | Matching for the group search box |
 | `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `extension/samples/` | Two synthetic snapshots for the demo and the tests |
+| `extension/samples/` | Two synthetic snapshots and two synthetic users for the demos and the tests |
 | `tests/` | Offline tests and the sample generator |

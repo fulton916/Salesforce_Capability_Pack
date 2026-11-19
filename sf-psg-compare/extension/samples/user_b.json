@@ -1,0 +1,115 @@
+{
+  "schema": "sf-user-access/1",
+  "takenAt": "2026-01-15T09:00:00.000Z",
+  "user": {
+    "id": "005DEMO000000BBB2",
+    "name": "Blake Sample",
+    "username": "blake.sample@example.com",
+    "isActive": true
+  },
+  "sections": {
+    "profile": [
+      {
+        "key": "Marketing_User",
+        "label": "Marketing User",
+        "licence": "Salesforce"
+      }
+    ],
+    "role": [
+      {
+        "key": "Marketing_Manager",
+        "label": "Marketing Manager"
+      }
+    ],
+    "permissionSetGroups": [
+      {
+        "key": "Marketing_Basics",
+        "label": "Marketing Basics",
+        "status": "Updated",
+        "muting": []
+      },
+      {
+        "key": "Sales_Core",
+        "label": "Sales Core",
+        "status": "Updated",
+        "muting": [
+          "Mute Delete Access"
+        ]
+      }
+    ],
+    "permissionSets": [
+      {
+        "key": "Campaign_Manager",
+        "label": "Campaign Manager",
+        "licence": "Marketing User",
+        "direct": false,
+        "groups": [
+          {
+            "key": "Marketing_Basics",
+            "label": "Marketing Basics"
+          }
+        ]
+      },
+      {
+        "key": "Lead_Convert",
+        "label": "Lead Convert",
+        "licence": null,
+        "direct": false,
+        "groups": [
+          {
+            "key": "Sales_Core",
+            "label": "Sales Core"
+          }
+        ]
+      },
+      {
+        "key": "Opportunity_Edit",
+        "label": "Opportunity Edit",
+        "licence": null,
+        "direct": false,
+        "groups": [
+          {
+            "key": "Sales_Core",
+            "label": "Sales Core"
+          }
+        ]
+      },
+      {
+        "key": "Sales_Reports",
+        "label": "Sales Reports",
+        "licence": null,
+        "direct": true,
+        "groups": []
+      }
+    ],
+    "permissionSetLicenses": [
+      {
+        "key": "CRMAnalyticsPlusPsl",
+        "label": "CRM Analytics Plus"
+      },
+      {
+        "key": "SalesCloudEinsteinPsl",
+        "label": "Sales Cloud Einstein"
+      }
+    ],
+    "publicGroups": [
+      {
+        "key": "All_Sales_Staff",
+        "label": "All Sales Staff"
+      },
+      {
+        "key": "Marketing_Team",
+        "label": "Marketing Team"
+      }
+    ],
+    "queues": [
+      {
+        "key": "Lead_Triage",
+        "label": "Lead Triage"
+      }
+    ],
+    "territories": []
+  },
+  "unavailable": {},
+  "warnings": []
+}

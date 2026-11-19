@@ -2,19 +2,22 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>PSG Compare</title>
+<title>Salesforce Capability Pack</title>
 <link rel="stylesheet" href="psg-compare.css">
 <style>
-  body { width: 300px; padding: 14px; }
+  body { width: 320px; padding: 14px; }
   .host { font: 12px/1.4 var(--mono); color: var(--muted); word-break: break-all; margin: 6px 0 12px; }
-  button { width: 100%; }
+  #menu { display: flex; flex-direction: column; gap: 8px; }
+  #menu button { width: 100%; text-align: left; padding: 8px 10px; }
+  #menu .tool-title { display: block; font-weight: 600; }
+  #menu .tool-desc { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 </style>
 </head>
 <body>
-  <h1 class="popup-title">PSG Compare</h1>
+  <h1 class="popup-title">Salesforce Capability Pack</h1>
   <div id="state">Looking for a Salesforce tab…</div>
   <div class="host" id="host"></div>
-  <button id="open" class="primary" hidden>Compare permission set groups</button>
+  <div id="menu"></div>
   <script type="module" src="popup.js"></script>
 </body>
 </html>
