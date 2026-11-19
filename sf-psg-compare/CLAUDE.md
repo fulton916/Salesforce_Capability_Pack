@@ -31,8 +31,12 @@ browser session and never writes to the org.
 5. If you change the snapshot shape, bump `SNAPSHOT_SCHEMA`, keep `validateSnapshot` in step, and
    regenerate the samples: `python tests/make_samples.py`.
 6. Run `node tests/run_tests.mjs`; it must end "All N checks passed."
-7. To see the page: `python -m http.server 8765 --directory extension`, open
-   `http://localhost:8765/psg-compare.html?demo=1`.
+7. To see the page: `python tools/dev_server.py --no-org`, open
+   `http://127.0.0.1:8765/psg-compare.html?demo=1`. Against a live org (read-only, only the org
+   the user names): `python tools/dev_server.py --target-org <alias>`, open `?dev=1`. Pages
+   reload by themselves on file changes, so there is no need to ask the user to reload Chrome.
+8. Write UI text for admins, not developers: labels before API names, plain words, no raw
+   error dumps in the main view (they go to Technical notes).
 
 ## Guardrails
 

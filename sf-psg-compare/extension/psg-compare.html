@@ -3,69 +3,98 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PSG Compare</title>
+<title>Permission Set Group Compare</title>
 <link rel="stylesheet" href="psg-compare.css">
 </head>
 <body>
 <header class="top">
-  <h1>PSG Compare</h1>
+  <h1>Permission Set Group Compare</h1>
   <div class="org" id="org">Not connected</div>
 </header>
 
 <main>
   <section class="panel">
+    <h2 class="step">Choose two permission set groups to compare</h2>
     <div class="pickers">
       <div class="picker" data-side="a">
-        <h2><span class="side a">A</span> First permission set group</h2>
-        <div class="row org-only">
-          <input type="text" class="filter" placeholder="Filter groups by name…" aria-label="Filter group A">
+        <label class="pick-label" for="input-a"><span class="side a">A</span> First group</label>
+        <div class="combo org-only">
+          <input type="text" id="input-a" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-a" autocomplete="off" placeholder="Start typing a name, e.g. Sales">
+          <ul class="psg-list" id="list-a" role="listbox" hidden></ul>
         </div>
-        <div class="row org-only">
-          <select class="psg" aria-label="Group A"><option value="">Choose a group…</option></select>
-        </div>
-        <div class="file">or load a saved snapshot: <input type="file" class="snap" accept=".json,application/json" aria-label="Snapshot file for A"></div>
         <div class="chosen"></div>
       </div>
       <div class="picker" data-side="b">
-        <h2><span class="side b">B</span> Second permission set group</h2>
-        <div class="row org-only">
-          <input type="text" class="filter" placeholder="Filter groups by name…" aria-label="Filter group B">
+        <label class="pick-label" for="input-b"><span class="side b">B</span> Second group</label>
+        <div class="combo org-only">
+          <input type="text" id="input-b" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-b" autocomplete="off" placeholder="Start typing a name, e.g. Service">
+          <ul class="psg-list" id="list-b" role="listbox" hidden></ul>
         </div>
-        <div class="row org-only">
-          <select class="psg" aria-label="Group B"><option value="">Choose a group…</option></select>
-        </div>
-        <div class="file">or load a saved snapshot: <input type="file" class="snap" accept=".json,application/json" aria-label="Snapshot file for B"></div>
         <div class="chosen"></div>
       </div>
     </div>
     <div class="actions">
-      <button id="compare" class="primary" disabled>Compare</button>
+      <button id="compare" class="primary big" disabled>Compare</button>
       <span id="progress" role="status"></span>
     </div>
     <div id="error" class="error" hidden></div>
-    <p class="hint">Read-only. The tool only runs queries; nothing is changed in the org. A snapshot saved here can be compared later against a group in another org (sandbox vs production).</p>
+    <details class="files">
+      <summary>Compare with a saved file instead (for example, a group from another org)</summary>
+      <p class="hint">After a comparison, use <b>Download → Save group to a file</b>. You can load that file here later, in this org or another one.</p>
+      <div class="file-row"><span class="side a">A</span> <input type="file" class="snap" data-side="a" accept=".json,application/json" aria-label="Saved file for group A"></div>
+      <div class="file-row"><span class="side b">B</span> <input type="file" class="snap" data-side="b" accept=".json,application/json" aria-label="Saved file for group B"></div>
+    </details>
   </section>
 
-  <section class="panel" id="results" hidden>
-    <ul class="highlights" id="highlights"></ul>
-  </section>
-
-  <section class="panel" id="detail" hidden>
-    <nav class="tabs" id="tabs" role="tablist"></nav>
-    <div class="toolbar">
-      <input type="search" id="search" placeholder="Search this tab…" aria-label="Search">
-      <div class="seg" role="group" aria-label="Rows to show">
-        <button id="showDiff" aria-pressed="true">Differences</button>
-        <button id="showAll" aria-pressed="false">Everything</button>
+  <section id="results" hidden>
+    <div class="panel hero">
+      <div class="vs">
+        <div class="who a" id="whoA"></div>
+        <div class="vs-mid">vs</div>
+        <div class="who b" id="whoB"></div>
       </div>
-      <button id="csvTab">Export tab (CSV)</button>
-      <button id="csvAll">Export all (CSV)</button>
-      <button id="saveA">Save snapshot A</button>
-      <button id="saveB">Save snapshot B</button>
+      <p class="verdict" id="verdict"></p>
     </div>
-    <div class="legend"><span class="la">Only A</span><span class="lb">Only B</span><span class="ld">Both, different</span></div>
-    <div class="tablewrap" id="table"></div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="panel" id="riskPanel" hidden>
+      <h2>Worth a closer look</h2>
+      <p class="hint">Powerful access that only one of the groups gives.</p>
+      <ul class="risks" id="risks"></ul>
+      <button class="link" id="moreRisks" hidden></button>
+    </div>
+
+    <div class="panel" id="detail">
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+      <p class="help" id="help"></p>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search…" aria-label="Search this list">
+        <div class="seg" role="group" aria-label="Rows to show">
+          <button id="showDiff" aria-pressed="true">Only differences</button>
+          <button id="showAll" aria-pressed="false">Everything</button>
+        </div>
+        <label class="check"><input type="checkbox" id="showApi"> Show API names</label>
+        <details class="menu">
+          <summary class="button">Download ▾</summary>
+          <div class="menu-items">
+            <button id="csvTab">This list (Excel CSV)</button>
+            <button id="csvAll">Full comparison (Excel CSV)</button>
+            <button id="saveA">Save group A to a file</button>
+            <button id="saveB">Save group B to a file</button>
+          </div>
+        </details>
+      </div>
+      <div class="tablewrap" id="table"></div>
+    </div>
+
+    <details class="panel notes" id="notesPanel" hidden>
+      <summary id="notesTitle">Technical notes</summary>
+      <ul id="notes"></ul>
+    </details>
   </section>
+
+  <p class="footer">Read-only: this page only looks at your org, it never changes anything.</p>
 </main>
 <script type="module" src="psg-compare.js"></script>
 </body>

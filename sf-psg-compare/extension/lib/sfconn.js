@@ -55,8 +55,9 @@ export class SalesforceError extends Error {
 
 /** Minimal REST client. `fetchImpl` is injectable for tests. */
 export class SfApi {
-  constructor({ apiHost, sessionId, apiVersion = API_VERSION, fetchImpl }) {
-    this.base = `https://${apiHost}`;
+  constructor({ apiHost, sessionId, apiVersion = API_VERSION, fetchImpl, base }) {
+    // `base` lets the local dev server stand in for the org (it adds the real login itself).
+    this.base = base || `https://${apiHost}`;
     this.sessionId = sessionId;
     this.apiVersion = apiVersion;
     this.fetch = fetchImpl || ((...a) => fetch(...a));
@@ -100,8 +101,24 @@ export class SfApi {
     return page.totalSize;
   }
 
-  async describe(sobject) {
-    return this.get(`/services/data/v${this.apiVersion}/sobjects/${sobject}/describe/`);
+  /** Every object's API name and label (one call, cached). */
+  describeGlobal() {
+    return this.cached("global", () => this.get(`/services/data/v${this.apiVersion}/sobjects/`));
+  }
+
+  /** Describe of one object (cached: both sides of a compare share it). */
+  describe(sobject) {
+    return this.cached(`d:${sobject}`, () => this.get(`/services/data/v${this.apiVersion}/sobjects/${sobject}/describe/`));
+  }
+
+  cached(key, load) {
+    this.cache ||= new Map();
+    if (!this.cache.has(key)) {
+      const p = load();
+      p.catch(() => this.cache.delete(key)); // do not keep failures
+      this.cache.set(key, p);
+    }
+    return this.cache.get(key);
   }
 }
 

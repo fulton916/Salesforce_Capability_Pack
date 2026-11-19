@@ -20,6 +20,11 @@ export const SETUP_TYPES = {
   ConnectedApplication: { label: "Connected app", sobject: "ConnectedApplication", name: "Name" },
   NamedCredential: { label: "Named credential", sobject: "NamedCredential", name: "DeveloperName", ns: "NamespacePrefix" },
   ExternalCredential: { label: "External credential", sobject: "ExternalCredential", name: "DeveloperName", ns: "NamespacePrefix" },
+  ExternalCredentialParameter: {
+    label: "External credential principal", sobject: "ExternalCredentialParameter",
+    cols: ["ParameterName", "ExternalCredential.DeveloperName"],
+    nameOf: (r) => `${r.ExternalCredential?.DeveloperName ?? "?"}.${r.ParameterName}`,
+  },
   ExternalDataSource: { label: "External data source", sobject: "ExternalDataSource", name: "DeveloperName", ns: "NamespacePrefix" },
   CustomEntityDefinition: { label: "Custom setting / metadata type", sobject: "CustomObject", tooling: true, name: "DeveloperName", ns: "NamespacePrefix" },
   FlowDefinition: { label: "Flow", sobject: "FlowDefinition", tooling: true, name: "DeveloperName", ns: "NamespacePrefix" },
@@ -93,14 +98,14 @@ async function setupAccess(api, parentId, warnings) {
     const names = {};
     if (spec) {
       const idField = spec.id || "Id";
-      const cols = [...new Set([idField, spec.name, spec.ns, spec.display].filter(Boolean))];
+      const cols = [...new Set([idField, spec.name, spec.ns, spec.display, ...(spec.cols || [])].filter(Boolean))];
       try {
         for (const part of chunk(ids, ID_CHUNK)) {
           const soql = `SELECT ${cols.join(", ")} FROM ${spec.sobject} WHERE ${idField} IN (${part.map(soqlString).join(", ")})`;
           const { records: recs } = await api.query(soql, { tooling: !!spec.tooling });
           for (const rec of recs) {
             names[rec[idField].slice(0, 15)] = {
-              name: qualified(spec.ns && rec[spec.ns], rec[spec.name]),
+              name: spec.nameOf ? spec.nameOf(rec) : qualified(spec.ns && rec[spec.ns], rec[spec.name]),
               label: spec.display ? rec[spec.display] : null,
             };
           }
@@ -203,10 +208,11 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
     if (rest.length) {
       try {
         const { records: mps } = await api.query(
-          `SELECT Id, DeveloperName, MasterLabel, NamespacePrefix FROM MutingPermissionSet WHERE Id IN (${rest.map(soqlString).join(", ")})`
+          // MutingPermissionSet has no NamespacePrefix field.
+          `SELECT Id, DeveloperName, MasterLabel FROM MutingPermissionSet WHERE Id IN (${rest.map(soqlString).join(", ")})`
         );
         for (const m of mps) {
-          const name = qualified(m.NamespacePrefix, m.DeveloperName);
+          const name = m.DeveloperName;
           components.push({ id: m.Id, name, label: m.MasterLabel, type: "Muting", isMuting: true, licence: null, description: null });
           muting = { id: m.Id, sobject: "MutingPermissionSet", name, label: m.MasterLabel };
         }
@@ -217,40 +223,49 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
   }
   components.sort((x, y) => x.name.localeCompare(y.name));
 
-  progress("Reading system permissions");
-  const psFields = await permissionFields(api, "PermissionSet");
-  const userPermissions = await truePermissions(api, "PermissionSet", agg.Id, psFields);
+  // The reads below do not depend on each other, so they run at the same time.
+  progress("Reading permissions");
+  const [psFields, opDesc] = await Promise.all([permissionFields(api, "PermissionSet"), permissionFields(api, "ObjectPermissions")]);
+  const opFields = opDesc.map((f) => f.name);
 
-  progress("Reading object permissions");
-  const opFields = (await permissionFields(api, "ObjectPermissions")).map((f) => f.name);
-  const objPerms = await objectPermissions(api, agg.Id, opFields);
-
-  progress("Reading field permissions");
-  const fldPerms = await fieldPermissions(api, agg.Id);
-
-  progress("Reading Apex, Visualforce, apps and custom permissions");
-  const setup = await setupAccess(api, agg.Id, warnings);
-
-  progress("Reading tab settings");
-  const tabs = await tabSettings(api, agg.Id);
-
-  if (muting) {
-    progress("Reading what the muting permission set removes");
+  const readMuting = async () => {
+    if (!muting) return;
     try {
       const mFields = muting.sobject === "PermissionSet" ? psFields : await permissionFields(api, muting.sobject);
-      muting.userPermissions = await truePermissions(api, muting.sobject, muting.id, mFields);
-      muting.objectPermissions = await objectPermissions(api, muting.id, opFields);
-      muting.fieldPermissions = await fieldPermissions(api, muting.id);
+      [muting.userPermissions, muting.objectPermissions, muting.fieldPermissions] = await Promise.all([
+        truePermissions(api, muting.sobject, muting.id, mFields),
+        objectPermissions(api, muting.id, opFields),
+        fieldPermissions(api, muting.id),
+      ]);
     } catch (e) {
       warnings.push(`Could not read what the muting permission set removes (${e.message}).`);
     }
-  }
+  };
+  const readGlobal = api.describeGlobal().catch((e) => {
+    warnings.push(`Could not read object names; API names are shown instead (${e.message}).`);
+    return { sobjects: [] };
+  });
 
-  progress("Counting assigned users");
-  const assigned = await api.count(`SELECT COUNT() FROM PermissionSetAssignment WHERE PermissionSetGroupId = ${idLit}`);
-  const assignedActive = await api.count(
-    `SELECT COUNT() FROM PermissionSetAssignment WHERE PermissionSetGroupId = ${idLit} AND Assignee.IsActive = true`
-  );
+  const [userPermissions, objPerms, fldPerms, setup, tabs, assigned, assignedActive, global] = await Promise.all([
+    truePermissions(api, "PermissionSet", agg.Id, psFields),
+    objectPermissions(api, agg.Id, opFields),
+    fieldPermissions(api, agg.Id),
+    setupAccess(api, agg.Id, warnings),
+    tabSettings(api, agg.Id),
+    api.count(`SELECT COUNT() FROM PermissionSetAssignment WHERE PermissionSetGroupId = ${idLit}`),
+    api.count(`SELECT COUNT() FROM PermissionSetAssignment WHERE PermissionSetGroupId = ${idLit} AND Assignee.IsActive = true`),
+    readGlobal,
+    readMuting(),
+  ]);
+
+  progress("Putting it together");
+  const wanted = new Set([
+    ...Object.keys(objPerms),
+    ...Object.keys(fldPerms).map((f) => f.split(".")[0]),
+    ...Object.keys(tabs).map((t) => t.replace(/^standard-/, "")),
+  ]);
+  const objectLabels = {};
+  for (const o of global.sobjects || []) if (wanted.has(o.name)) objectLabels[o.name] = o.label;
 
   if (!Object.keys(userPermissions).length && !Object.keys(objPerms).length && components.length) {
     warnings.push("The aggregate permission set returned no permissions although the group has components. Check the group's Status in Setup.");
@@ -276,6 +291,7 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
     fieldPermissions: fldPerms,
     setupAccess: setup,
     tabSettings: tabs,
+    objectLabels,
     warnings,
   };
 }

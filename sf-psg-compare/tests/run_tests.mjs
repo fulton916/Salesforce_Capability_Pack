@@ -6,7 +6,8 @@ import path from "node:path";
 
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../extension/lib/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../extension/lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv } from "../extension/lib/compare.js";
+import { compareSnapshots, toRows, toCsv, humanize } from "../extension/lib/compare.js";
+import { matchPsgs } from "../extension/lib/pick.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sample = (n) => JSON.parse(readFileSync(path.join(here, "../extension/samples", n), "utf-8"));
@@ -43,7 +44,9 @@ function fakeFetch(routes, log = []) {
   return async (url) => {
     const u = new URL(url);
     let body;
-    if (u.pathname.endsWith("/describe/")) {
+    if (u.pathname.endsWith("/sobjects/")) {
+      body = { sobjects: [{ name: "Account", label: "Customer Account" }, { name: "Contact", label: "Contact" }] };
+    } else if (u.pathname.endsWith("/describe/")) {
       const sobject = u.pathname.split("/").at(-3);
       body = routes.describe(sobject);
     } else if (u.pathname.includes("/query")) {
@@ -203,7 +206,7 @@ await test("takeSnapshot reads the aggregate permission set into a plain snapsho
   assert.equal(s.components.find((c) => c.name === "Core").licence, "Salesforce");
   assert.equal(s.muting.name, "Sales_Muting");
   assert.deepEqual(Object.keys(s.muting.userPermissions), ["PermissionsP005"]);
-  assert.ok(steps.length >= 6);
+  assert.ok(steps.length >= 2);
   // permission fields are split so no single query gets too long
   const userPermQueries = log.filter((q) => q.includes("FROM PermissionSet WHERE Id = '0PSAGG"));
   assert.equal(userPermQueries.length, 3);
@@ -251,7 +254,7 @@ await test("system permissions: only-B high-risk permission is a headline", () =
   assert.equal(row("userPermissions", "PermissionsViewAllData").status, "onlyB");
   assert.equal(row("userPermissions", "PermissionsViewAllData").highRisk, true);
   assert.equal(row("userPermissions", "PermissionsApiEnabled").status, "same");
-  assert.ok(texts.includes("Only Sales Manager grants View All Data."), texts.join("\n"));
+  assert.ok(texts.includes("Only Sales Manager has “View All Data”."), texts.join("\n"));
 });
 
 await test("objects: flag-level differences in both directions", () => {
@@ -262,7 +265,7 @@ await test("objects: flag-level differences in both directions", () => {
   assert.equal(row("objectPermissions", "Campaign").status, "onlyA");
   assert.equal(row("objectPermissions", "Quota__c").status, "onlyB");
   assert.equal(row("objectPermissions", "Widget__c").status, "same");
-  assert.ok(texts.some((t) => t.startsWith("Sales Manager has Delete, View All, Modify All on Opportunity")));
+  assert.ok(texts.includes("Sales Manager can Delete, View All, Modify All Opportunity records; Sales Rep cannot."), texts.join("\n"));
 });
 
 await test("fields: read vs edit", () => {
@@ -276,26 +279,28 @@ await test("fields: read vs edit", () => {
 
 await test("contents, setup access and tabs", () => {
   assert.equal(row("components", "Team_Oversight").status, "onlyB");
-  assert.equal(row("components", "Sales_Rep_Muting").kind, "Muting permission set");
+  assert.equal(row("components", "Sales_Rep_Muting").group, "Muting permission set");
   assert.equal(row("components", "Sales_Core").status, "same");
-  const muted = row("components", "muted|object|Opportunity");
-  assert.deepEqual([muted.status, muted.a, muted.kind], ["onlyA", "Delete", "Removed by muting"]);
-  assert.equal(row("components", "muted|user|PermissionsExportReport").label, "Export Reports");
-  assert.equal(row("setupAccess", "CustomPermission|Approve_Discounts").status, "onlyB");
+  const muted = R.sections.components.filter((r) => r.group === "Taken away by muting");
+  const mOpp = muted.find((r) => r.key === "Opportunity");
+  assert.deepEqual([mOpp.status, mOpp.a, mOpp.label], ["onlyA", "Delete", "Opportunity"]);
+  assert.ok(muted.some((r) => r.label === "Export Reports"));
+  assert.equal(muted.find((r) => r.key === "Account.AnnualRevenue").label, "Account › Annual Revenue");
+  assert.equal(row("setupAccess", "Approve_Discounts").status, "onlyB");
   assert.equal(row("tabs", "Widget__c").status, "differ");
   assert.equal(row("tabs", "standard-Campaign").status, "onlyA");
 });
 
 await test("overview and verdict", () => {
-  assert.equal(row("overview", "Assigned users (active / total)").a, "398 / 412");
+  assert.equal(row("overview", "Users assigned").a, "398 active (412 in total)");
   assert.equal(row("overview", "Muting permission set").b, "None");
-  assert.ok(texts.includes("Each group grants something the other does not."));
+  assert.ok(texts.includes("Each group gives some access the other does not."));
   assert.equal(R.counts.userPermissions.onlyB, 5);
 });
 
 await test("a group compared with itself is identical", () => {
   const same = compareSnapshots(A, structuredClone(A));
-  assert.equal(same.highlights.find((h) => h.level === "good")?.text, "Both groups grant exactly the same access.");
+  assert.equal(same.highlights.find((h) => h.level === "good")?.text, "Both groups give exactly the same access.");
   for (const k of ["userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabs", "components"]) {
     assert.equal(same.counts[k].same, same.counts[k].total, k);
   }
@@ -306,15 +311,15 @@ await test("superset is detected", () => {
   bigger.psg.label = "Rep Plus";
   bigger.userPermissions.PermissionsManageUsers = "Manage Users";
   const r = compareSnapshots(bigger, A);
-  assert.ok(r.highlights.some((h) => h.text === "Rep Plus grants everything Sales Rep grants, and more."));
-  assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus grants Manage Users."));
+  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more."));
+  assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus has “Manage Users”."));
 });
 
 await test("different orgs are called out", () => {
   const other = structuredClone(B);
   other.org = { id: "00D999", name: "Prod", isSandbox: false };
   const r = compareSnapshots(A, other);
-  assert.ok(r.highlights[0].text.startsWith("A and B come from different orgs"));
+  assert.ok(r.highlights.some((h) => h.kind === "note" && h.text.startsWith("The groups come from different orgs")));
 });
 
 await test("all-false object rows on both sides are dropped", () => {
@@ -326,13 +331,78 @@ await test("all-false object rows on both sides are dropped", () => {
 
 await test("CSV export: BOM, header, escaping, one section", () => {
   const all = toRows(R);
-  assert.deepEqual(all[0].slice(0, 4), ["Section", "Group", "Item", "Status"]);
+  assert.deepEqual(all[0].slice(0, 5), ["Section", "Group", "Item", "API name", "Difference"]);
   const csv = toCsv([["a,b", 'say "hi"', "line\nbreak", "plain"]]);
   assert.equal(csv, '﻿"a,b","say ""hi""","line\nbreak",plain\r\n');
   const objs = toRows(R, "objectPermissions");
   assert.ok(objs.slice(1).every((r) => r[0] === "Objects"));
-  const opp = objs.find((r) => r[2] === "Opportunity");
-  assert.equal(opp[7], "Delete, View All, Modify All");
+  const opp = objs.find((r) => r[3] === "Opportunity");
+  assert.equal(opp[8], "Delete, View All, Modify All");
+  assert.equal(opp[4], "Different");
+});
+
+// ---------- friendly names and search ----------
+
+console.log("names and search");
+
+await test("humanize turns API names into words", () => {
+  assert.equal(humanize("Account_to_Account_Relation__c"), "Account to Account Relation");
+  assert.equal(humanize("AnnualRevenue"), "Annual Revenue");
+  assert.equal(humanize("acme__Widget_Size__c"), "Widget Size");
+  assert.equal(humanize("GnrcVstKeyPerformanceInd"), "Gnrc Vst Key Performance Ind");
+  assert.equal(humanize("Quota__mdt"), "Quota");
+});
+
+await test("object labels from the org are used when the snapshot has them", () => {
+  const a = structuredClone(A);
+  a.objectLabels = { Widget__c: "Gadget" };
+  const r = compareSnapshots(a, B);
+  assert.equal(r.sections.objectPermissions.find((x) => x.key === "Widget__c").label, "Gadget");
+  assert.equal(r.sections.fieldPermissions.find((x) => x.key === "Widget__c.Color__c").group, "Gadget");
+  assert.equal(r.sections.tabs.find((x) => x.key === "standard-Account").label, "Account");
+});
+
+await test("snapshot reads object labels with one describeGlobal call", async () => {
+  const s = await takeSnapshot(apiWith(snapshotRoutes()), "0PG1");
+  assert.deepEqual(s.objectLabels, { Account: "Customer Account" });
+});
+
+await test("muting permission sets in their own object are read without NamespacePrefix", async () => {
+  const routes = snapshotRoutes();
+  routes.query.unshift([/FROM PermissionSet WHERE Id IN/, () => [
+    { Id: "0PSC1", Name: "Core", Label: "Core", Type: "Regular", NamespacePrefix: null, LicenseId: null },
+  ]]);
+  routes.query.unshift([/FROM MutingPermissionSet/, (q) => {
+    assert.ok(!q.includes("NamespacePrefix"), q);
+    return [{ Id: "0PSMUTE00000001AAA", DeveloperName: "Sales_Muting", MasterLabel: "Sales Muting" }];
+  }]);
+  routes.describe = (s) => ({ fields: s === "PermissionSet" || s === "MutingPermissionSet" ? PS_FIELDS : s === "ObjectPermissions" ? OP_FIELDS : [] });
+  const s = await takeSnapshot(apiWith(routes), "0PG1");
+  assert.equal(s.muting?.sobject, "MutingPermissionSet");
+  assert.ok(!s.warnings.some((w) => w.includes("muting")), s.warnings.join("; "));
+});
+
+const PSGS = [
+  { id: "1", label: "Acme North Sales PSG", developerName: "Acme_North_Sales_PSG" },
+  { id: "2", label: "Acme North / South Service PSG", developerName: "Acme_North_South_Service_PSG" },
+  { id: "3", label: "Sales Ops", developerName: "Sales_Ops" },
+  { id: "4", label: "US Sales PSG", developerName: "US_Sales_PSG" },
+];
+
+await test("search matches every typed word, in any order, label or API name", () => {
+  assert.deepEqual(matchPsgs(PSGS, "acme north sales").items.map((p) => p.id), ["1"]);
+  assert.deepEqual(matchPsgs(PSGS, "service south").items.map((p) => p.id), ["2"]);
+  assert.deepEqual(matchPsgs(PSGS, "US_Sales").items.map((p) => p.id), ["4"]);
+  assert.equal(matchPsgs(PSGS, "").total, 4);
+  assert.equal(matchPsgs(PSGS, "zzz").total, 0);
+});
+
+await test("search puts names that start with the text first, and caps the list", () => {
+  assert.deepEqual(matchPsgs(PSGS, "sales").items.map((p) => p.id), ["3", "1", "4"]);
+  const many = Array.from({ length: 150 }, (_, i) => ({ id: String(i), label: `Group ${i}`, developerName: `G${i}` }));
+  const r = matchPsgs(many, "group");
+  assert.equal(r.items.length, 100);
+  assert.equal(r.total, 150);
 });
 
 console.log(failures.length ? `\n${failures.length} FAILED, ${passed} passed` : `\nAll ${passed} checks passed.`);

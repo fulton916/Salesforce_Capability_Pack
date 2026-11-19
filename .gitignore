@@ -1,8 +1,9 @@
 # One-off tools kept locally, not part of the pack
 sf-user-password-reset/
 
-# Local editor / assistant config
-.claude/
+# Local editor / assistant config (the team agents in .claude/agents and settings.json are shared)
+.claude/launch.json
+.claude/settings.local.json
 .vscode/
 .idea/
 

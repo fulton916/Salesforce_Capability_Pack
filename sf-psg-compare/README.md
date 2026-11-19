@@ -10,24 +10,34 @@ Read-only. It runs SOQL queries and describes. It never writes to the org.
 
 ## What it compares
 
-| Tab | A vs B |
+The page is written for admins, not developers. It shows labels ("Account › Annual Revenue"),
+not API names; "Show API names" adds them.
+
+At the top it says the result in plain words, for example "Sales Manager gives everything Sales
+Rep gives, and more." Under that:
+
+- **A card per area** with how many items only one group has, or "✓ Same in both". Click a card
+  to open its list.
+- **Worth a closer look:** powerful access only one group gives, such as "Only Sales Manager has
+  “View All Data”" or "Sales Manager can Delete, View All, Modify All Opportunity records; Sales
+  Rep cannot."
+- **Technical notes** (folded away): anything the tool could not read.
+
+| List | Shows |
 |---|---|
-| Overview | org, API name, label, description, status, number of component permission sets, muting permission set, assigned users (active / total), and how many items each group grants |
-| Contents | which permission sets each group is built from (with licence), and what each muting permission set removes |
-| System permissions | every user permission the group grants (API Enabled, View All Data, Export Reports…). High-risk permissions are tagged |
-| Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object, and exactly which flags only one side has |
-| Fields | None / Read / Edit per field |
-| Apex, pages, apps & custom perms | Apex classes, Visualforce pages, apps, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
-| Tabs | tab visibility (default on, default off, hidden) |
+| Summary | org, name, description, status, users assigned, permission sets inside, muting permission set, and how much each group gives |
+| General permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
+| Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object, and which ones only one group has |
+| Fields | No access / Read / Edit per field, grouped by object |
+| Apps, pages & code | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
+| Tabs | shown, available (hidden by default) or hidden |
+| What's inside | the permission sets each group is built from (with licence), and what each muting permission set takes away |
 
-At the top it writes the result in plain words, for example:
+Each list shows only the differences until you choose "Everything". **Download** saves the list
+or the full comparison as a CSV that opens in Excel, or saves a group to a file for later.
 
-- "Sales Manager grants everything Sales Rep grants, and more."
-- "Only Sales Manager grants View All Data."
-- "Sales Manager has Delete, View All, Modify All on Opportunity; Sales Rep does not."
-
-Each tab shows the differences by default. "Everything" shows the matching rows too. Every tab
-exports to CSV (opens in Excel), and "Export all" puts every tab in one CSV.
+Picking a group: type any part of its name or API name (words in any order) and press Enter or
+click it.
 
 ### Net access, not the sum of the parts
 
@@ -70,15 +80,32 @@ push it by policy.
 
 ### Try it without an org
 
-Serve the `extension/` folder and open the demo, which loads two made-up groups from
-`extension/samples/`:
-
 ```
-python -m http.server 8765 --directory extension
+python tools/dev_server.py --no-org
 ```
 
-Then open <http://localhost:8765/psg-compare.html?demo=1>. Opened as a plain web page (not
-through the extension) the tool can still compare two snapshot files.
+Then open <http://127.0.0.1:8765/psg-compare.html?demo=1>. It loads two made-up groups from
+`extension/samples/`.
+
+## Developing without reloading Chrome
+
+`tools/dev_server.py` serves the page and forwards its API calls to an org using the login the
+Salesforce CLI already has, so the page can be tested against a real org in any browser tab:
+
+```
+sf org login web --alias my-sandbox        # once, if the CLI is not logged in to the org
+python tools/dev_server.py --target-org my-sandbox
+```
+
+Open <http://127.0.0.1:8765/psg-compare.html?dev=1>.
+
+- **Read-only.** Only GET requests to `/services/data/` are forwarded; anything else gets 405.
+- **The token stays in the server.** The page never sees it. The server listens on 127.0.0.1 only
+  and refuses requests addressed to any other host name.
+- **Live reload.** Pages reload by themselves within about two seconds of a file change under
+  `extension/`. This also works for the unpacked extension loaded in Chrome: unpacked extensions
+  read their pages from disk, so page, JS and CSS edits need no "Reload" click while the dev
+  server runs. Changes to `manifest.json` still need one.
 
 ## What your user needs
 
@@ -108,13 +135,20 @@ finds it. It is held in memory for that tab only and never stored.
 ## Not tested
 
 The offline tests (below) cover the compare logic, the query and session handling, and the
-snapshot shape against faked API responses. **The tool has not yet been run against a live org.**
-Before relying on it, compare two groups you know well in a sandbox and check a few rows against
-Setup. In particular, check:
+snapshot shape against faked API responses.
 
-- that the aggregate permission set returns object and field permissions in your org;
-- the muting section, if your groups use muting permission sets;
-- the setup-access names (apps, flows, custom metadata types).
+Run against live orgs so far (read-only):
+
+- A Developer Edition org with 22 groups. For every group, the aggregate permission set's object
+  permissions matched its component permission sets. Spot-checked rows matched Setup. A compare
+  of two groups takes about 4 seconds.
+- A larger org (about 1,300 field permissions and 300 Apex/app items per group). It showed
+  that `MutingPermissionSet` has no `NamespacePrefix` field (fixed), and that
+  `ExternalCredentialParameter` items needed naming (added).
+
+Not yet checked against a live org: field permissions and Apex/app names line by line, and what a
+muting permission set takes away. Before relying on those, compare two groups you know well and
+check a few rows against Setup.
 
 ## Tests
 
@@ -135,6 +169,9 @@ node tests/run_tests.mjs
 | `extension/psg-compare.*` | The compare page |
 | `extension/lib/sfconn.js` | Session lookup and REST client (query with paging, describe) |
 | `extension/lib/snapshot.js` | Reads one group into a snapshot |
-| `extension/lib/compare.js` | Compares two snapshots; CSV export. Pure, no browser APIs |
+| `extension/lib/compare.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
+| `extension/lib/pick.js` | Matching for the group search box |
+| `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
+| `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
 | `extension/samples/` | Two synthetic snapshots for the demo and the tests |
 | `tests/` | Offline tests and the sample generator |
