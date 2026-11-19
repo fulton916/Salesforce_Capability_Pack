@@ -1,0 +1,63 @@
+name: Tests
+
+# Offline tests only: no secrets, no Salesforce org, no sf CLI.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHONUTF8: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  python:
+    name: ${{ matrix.package }} (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # sf-translation-field-notes is docs only (no tests), so it is left out.
+        package:
+          - sf-country-state-codes
+          - sf-safe-translation-push
+          - sf-territory-export
+          - sf-translation-defect-repair
+          - sf-translation-deploy-triage
+          - sf-translation-reconcile
+          - sf-translation-toolkit
+          - sf-user-access-teardown
+        python: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install dependencies
+        working-directory: ${{ matrix.package }}
+        run: python -m pip install -r requirements.txt openpyxl
+      - name: Run tests
+        working-directory: ${{ matrix.package }}
+        run: python tests/run_tests.py
+
+  node:
+    name: sf-psg-compare (Node 20)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run tests
+        working-directory: sf-psg-compare
+        run: node tests/run_tests.mjs
