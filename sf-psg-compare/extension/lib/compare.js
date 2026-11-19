@@ -440,6 +440,17 @@ export function cardCounts(result) {
 }
 
 /**
+ * The number on a tab: the sum of that card's difference lines (what only one group has, plus what
+ * is set up differently; for What's inside also what muting takes away). The Summary tab has none.
+ */
+export function tabDiffCount(result, key) {
+  const c = cardCounts(result)[key];
+  if (!c) return 0;
+  if (key === "components") return c.only + c.mutedOnly + c.mutedDiffer;
+  return c.only + (c.differ || 0);
+}
+
+/**
  * The lines of one card, in the words shown on the page. Each line is { n, side, before, after }:
  * the page prints "{n} {before} {group name for side} {after}". `side` is "a", "b" or null.
  * When the groups are the same for that card only the two totals are returned and `same` is true.
@@ -512,13 +523,55 @@ export function sortText(r, col, nameA = "A", nameB = "B") {
   }
 }
 
+const FIELD_RANK = { "No access": 0, Read: 1, Edit: 2 };
+const TAB_RANK = { [TAB_LABELS.Hidden]: 0, [TAB_LABELS.DefaultOff]: 1, [TAB_LABELS.DefaultOn]: 2 };
+
+/**
+ * How a group column (a or b) of these rows should sort: "tick" (yes/no), "object" (rights held),
+ * "field" (No access, Read, Edit), "tab" (Hidden, Available, Shown), or null for plain text
+ * (What's inside rows, and anything else).
+ */
+function accessKind(rows, col) {
+  if (col !== "a" && col !== "b") return null;
+  if (rows.some((r) => r.part)) return null;
+  const vals = rows.flatMap((r) => [r.a, r.b]).filter((v) => v !== null && v !== undefined);
+  if (!vals.length) return null;
+  if (vals.every((v) => typeof v === "boolean")) return "tick";
+  if (vals.every((v) => Array.isArray(v))) return "object";
+  if (vals.every((v) => v in FIELD_RANK)) return "field";
+  if (vals.every((v) => v in TAB_RANK)) return "tab";
+  return null;
+}
+
+/** Amount of access in one cell: higher means more. Used for tick, object, field and tab columns. */
+function accessRank(kind, v) {
+  if (kind === "tick") return v === true ? 1 : 0;
+  if (kind === "field") return FIELD_RANK[v] ?? 0;
+  if (kind === "tab") return TAB_RANK[v] ?? 0;
+  // Object rights: how many are held, then the strongest one. [count, strongest].
+  const list = Array.isArray(v) ? v : [];
+  const strongest = list.reduce((m, f) => Math.max(m, OBJECT_FLAGS.indexOf(f) + 1), 0);
+  return list.length * 100 + strongest;
+}
+
 /**
  * Sort rows by a column, `dir` "asc" (A to Z) or "desc". Case does not matter and numbers sort by
  * value (Item 2 before Item 10). Empty values always come last. Returns a new array; ties keep their order.
+ * Group columns showing access (yes/no, object rights, field access, tab setting) sort by amount of
+ * access instead: "asc" puts a tick first, otherwise the least access first, and "desc" the reverse;
+ * no access is a value there, not empty. Rows with the same amount are ordered by item name A to Z.
  */
 export function sortRows(rows, col, dir = "asc", nameA = "A", nameB = "B") {
   if (!col) return rows;
   const sign = dir === "desc" ? -1 : 1;
+  const kind = accessKind(rows, col);
+  if (kind) {
+    // A tick is the "most" access but A to Z shows it first, so the tick column runs the other way.
+    const flip = kind === "tick" ? -1 : 1;
+    const keyed = rows.map((r, i) => ({ r, i, n: accessRank(kind, r[col]), t: String(r.label ?? "") }));
+    keyed.sort((x, y) => sign * flip * (x.n - y.n) || COLLATOR.compare(x.t, y.t) || x.i - y.i);
+    return keyed.map((k) => k.r);
+  }
   const keyed = rows.map((r, i) => ({ r, i, t: sortText(r, col, nameA, nameB) }));
   keyed.sort((x, y) => {
     if (!x.t !== !y.t) return x.t ? -1 : 1;
@@ -571,7 +624,8 @@ function highlights(a, b, sections) {
 
   // System permissions first, one line each.
   for (const r of sections.userPermissions.filter((x) => x.highRisk && x.status !== "same")) {
-    out.push({ kind: "risk", area: "general", level: "risk", text: `Only ${r.status === "onlyA" ? A : B} has “${r.label}”.` });
+    const side = r.status === "onlyA" ? "a" : "b";
+    out.push({ kind: "risk", area: "general", level: "risk", side, text: `Only ${side === "a" ? A : B} has “${r.label}”.`, short: `“${r.label}”` });
   }
   // Objects: at most one line per side, only for View All / Modify All.
   for (const [side, who, other] of [["a", A, B], ["b", B, A]]) {
@@ -580,10 +634,10 @@ function highlights(a, b, sections) {
     // Standard objects make the clearest examples; then alphabetical.
     const ex = [...hits].sort((x, y) => /__/.test(x.key) - /__/.test(y.key) || x.label.localeCompare(y.label)).slice(0, 3).map((r) => r.label);
     const list = ex.length > 1 ? `${ex.slice(0, -1).join(", ")} and ${ex.at(-1)}` : ex[0];
-    const text = hits.length === 1
-      ? `${who} has View All or Modify All on the object ${list}, where ${other} has less. See Objects.`
-      : `${who} has View All or Modify All on ${num(hits.length)} objects where ${other} has less${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
-    out.push({ kind: "risk", area: "objects", level: "risk", text });
+    const body = hits.length === 1
+      ? `View All or Modify All on the object ${list}, where ${other} has less. See Objects.`
+      : `View All or Modify All on ${num(hits.length)} objects where ${other} has less${hits.length > ex.length ? ", including" : ":"} ${list}. See Objects.`;
+    out.push({ kind: "risk", area: "objects", level: "risk", side, text: `${who} has ${body}`, short: body });
   }
 
   const n = (k, st) => sections[k].filter((r) => r.status === st).length;

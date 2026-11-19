@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../extension/lib/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../extension/lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts, cardCounts, cardLines, sortRows, sortGrouped, sortSection } from "../extension/lib/compare.js";
+import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, sortRows, sortGrouped, sortSection } from "../extension/lib/compare.js";
 import { matchPsgs, searchWords } from "../extension/lib/pick.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -385,6 +385,24 @@ await test("highlights: general permissions first, objects condensed to one line
   assert.ok(a.endsWith("See Objects."));
   assert.ok(!a.includes("Case"));
   assert.equal(h[3].text, "Small Group has View All or Modify All on the object Zed, where Big Group has less. See Objects.");
+});
+
+await test("highlights: every risk carries its side and a short text for the grouped view", () => {
+  const h = heavyPair().highlights.filter((x) => x.kind === "risk");
+  assert.deepEqual(h.map((x) => x.side), ["a", "a", "a", "b"]);
+  assert.ok(h[0].short.startsWith("“") && h[0].short.endsWith("”") && !h[0].short.includes("Big Group"), h[0].short);
+  assert.ok(h[2].short.startsWith("View All or Modify All on 8 objects where Small Group has less, including Account, Lead and Thing0"), h[2].short);
+  assert.equal(h[2].text, `Big Group has ${h[2].short}`);
+  assert.equal(h[3].short, "View All or Modify All on the object Zed, where Big Group has less. See Objects.");
+  // A system permission only in B gets side "b" and no group name in the short text.
+  const x = structuredClone(A);
+  const y = structuredClone(A);
+  y.userPermissions.PermissionsAssignPermissionSets = "Assign Permission Sets";
+  const g = compareSnapshots(x, y).highlights.find((r) => r.area === "general" && r.text.includes("Assign Permission Sets"));
+  assert.ok(g, "expected a general risk for Assign Permission Sets");
+  assert.equal(g.side, "b");
+  assert.equal(g.short, "“Assign Permission Sets”");
+  assert.ok(g.text.startsWith("Only ") && g.text.endsWith("has “Assign Permission Sets”."));
 });
 
 await test("verdict counts what each group gives that the other does not", () => {
@@ -814,7 +832,10 @@ await test("sort: A to Z, Z to A, natural numbers, no case, empty last", () => {
   const rows = ["item 10", "Item 2", "banana", "", "Apple"].map((label, i) => ({ label, a: i % 2 ? "Read" : null, status: "same" }));
   assert.deepEqual(sortRows(rows, "item").map((r) => r.label), ["Apple", "banana", "Item 2", "item 10", ""]);
   assert.deepEqual(sortRows(rows, "item", "desc").map((r) => r.label), ["item 10", "Item 2", "banana", "Apple", ""]);
-  assert.deepEqual(sortRows(rows, "a").map((r) => r.a), ["Read", "Read", null, null, null]);
+  // Text columns (here with a part, like What's inside) keep empty last.
+  const parts = rows.map((r) => ({ ...r, part: "sets" }));
+  assert.deepEqual(sortRows(parts, "a").map((r) => r.a), ["Read", "Read", null, null, null]);
+  assert.deepEqual(sortRows(parts, "a", "desc").map((r) => r.a), ["Read", "Read", null, null, null]);
   assert.equal(rows[0].label, "item 10"); // input untouched
   assert.deepEqual(sortRows(rows, null), rows);
 });
@@ -826,7 +847,7 @@ await test("sort: object flags and the Difference column sort by what is shown",
     { label: "O3", status: "same", a: ["Read"], b: ["Read"] },
   ];
   assert.deepEqual(sortRows(rows, "diff", "asc", "Sales", "Service").map((r) => r.label), ["O2", "O1", "O3"]);
-  assert.deepEqual(sortRows(rows, "b").map((r) => r.label), ["O3", "O1", "O2"]);
+  assert.deepEqual(sortRows(rows, "b").map((r) => r.label), ["O2", "O3", "O1"]); // least rights first
 });
 
 await test("sort: grouped lists sort inside each object, and the item column orders the objects", () => {
@@ -838,7 +859,8 @@ await test("sort: grouped lists sort inside each object, and the item column ord
   assert.deepEqual(names(sortGrouped(rows, "item")), ["Account.Fax", "Account.Name", "Contact.Age", "Contact.Zip"]);
   assert.deepEqual(names(sortGrouped(rows, "item", "desc")), ["Contact.Zip", "Contact.Age", "Account.Name", "Account.Fax"]);
   // Another column: the objects stay in their original order.
-  assert.deepEqual(names(sortGrouped(rows, "a")), ["Contact.Age", "Contact.Zip", "Account.Name", "Account.Fax"]);
+  assert.deepEqual(names(sortGrouped(rows, "a")), ["Contact.Zip", "Contact.Age", "Account.Fax", "Account.Name"]);
+  assert.deepEqual(names(sortGrouped(rows, "a", "desc")), ["Contact.Age", "Contact.Zip", "Account.Name", "Account.Fax"]);
 });
 
 await test("sort: What is inside keeps its two parts; the CSV follows the sort", () => {
@@ -849,6 +871,82 @@ await test("sort: What is inside keeps its two parts; the CSV follows the sort",
   assert.deepEqual(sortSection(rows, "components", { col: "item", dir: "desc" }).map((r) => r.label), ["B", "A", "C", "A"]);
   const sorted = toRows(R, "objectPermissions", { sort: { col: "item", dir: "desc" } }).slice(1).map((r) => r[2]);
   assert.deepEqual(sorted, sortRows(R.sections.objectPermissions, "item", "desc").map((r) => r.label));
+});
+
+await test("sort: tick columns put the tick first, then the dash, each by name", () => {
+  const rows = [
+    { label: "Zeta", a: true }, { label: "Beta", a: false }, { label: "alpha", a: true }, { label: "Gamma", a: false },
+  ];
+  assert.deepEqual(sortRows(rows, "a").map((r) => r.label), ["alpha", "Zeta", "Beta", "Gamma"]);
+  assert.deepEqual(sortRows(rows, "a", "desc").map((r) => r.label), ["Beta", "Gamma", "alpha", "Zeta"]);
+});
+
+await test("sort: object rights go from least to most, by count then strongest right", () => {
+  const rows = [
+    { label: "Modify", a: ["Read", "Create", "Edit", "Delete", "ViewAllRecords", "ModifyAllRecords"] },
+    { label: "None", a: [] },
+    { label: "TwoB", a: ["Read", "Edit"] },
+    { label: "One", a: ["Read"] },
+    { label: "TwoA", a: ["Read", "Create"] },
+    { label: "OneDel", a: ["Delete"] },
+  ];
+  assert.deepEqual(sortRows(rows, "a").map((r) => r.label), ["None", "One", "OneDel", "TwoA", "TwoB", "Modify"]);
+  assert.deepEqual(sortRows(rows, "a", "desc").map((r) => r.label), ["Modify", "TwoB", "TwoA", "OneDel", "One", "None"]);
+  const tie = [{ label: "B", a: ["Read"] }, { label: "A", a: ["Read"] }];
+  assert.deepEqual(sortRows(tie, "a", "desc").map((r) => r.label), ["A", "B"]);
+});
+
+await test("sort: field access is No access, Read, Edit; fields stay inside their objects", () => {
+  const rows = [
+    { group: "Account", label: "Y", a: "Edit" }, { group: "Account", label: "X", a: "No access" }, { group: "Account", label: "Z", a: "Read" },
+    { group: "Case", label: "C", a: "Read" }, { group: "Case", label: "B", a: "Edit" },
+  ];
+  const names = (list) => list.map((r) => r.label);
+  assert.deepEqual(names(sortGrouped(rows, "a")), ["X", "Z", "Y", "C", "B"]);
+  assert.deepEqual(names(sortGrouped(rows, "a", "desc")), ["Y", "Z", "X", "B", "C"]);
+});
+
+await test("sort: tab settings go Hidden or not set, Available, Shown", () => {
+  const rows = [
+    { label: "T1", a: "Shown" }, { label: "T2", a: null }, { label: "T3", a: "Available (hidden by default)" },
+    { label: "T4", a: "Hidden" }, { label: "T0", a: "Shown" },
+  ];
+  assert.deepEqual(sortRows(rows, "a").map((r) => r.label), ["T2", "T4", "T3", "T0", "T1"]);
+  assert.deepEqual(sortRows(rows, "a", "desc").map((r) => r.label), ["T0", "T1", "T3", "T2", "T4"]);
+});
+
+await test("sort: What is inside Removed values and other text columns keep text order, empty last", () => {
+  const rows = [
+    { part: "muted", label: "F1", a: "Removed: Edit", kind: "Field" }, { part: "muted", label: "F2", a: null, kind: "Tab" },
+    { part: "muted", label: "F3", a: "Removed", kind: "Tab" }, { part: "muted", label: "F4", a: "Removed: Read", kind: "Field" },
+  ];
+  assert.deepEqual(sortRows(rows, "a").map((r) => r.label), ["F3", "F1", "F4", "F2"]);
+  assert.deepEqual(sortRows(rows, "a", "desc").map((r) => r.label), ["F4", "F1", "F3", "F2"]);
+  assert.deepEqual(sortRows(rows, "type").map((r) => r.label), ["F1", "F4", "F2", "F3"]);
+});
+
+await test("tab number equals the card's difference lines (muting set, Hidden tab)", () => {
+  const res = fake({
+    components: [
+      { part: "sets", group: "Permission set", status: "onlyA" },
+      { part: "sets", group: "Muting permission set", status: "onlyB" }, // left out of the card
+      { part: "muted", status: "onlyA" }, { part: "muted", status: "differ" }, { part: "muted", status: "same" },
+    ],
+    tabs: [
+      { status: "onlyA", a: "Hidden", b: null },      // nobody can see it: not a difference
+      { status: "differ", a: "Hidden", b: "Shown" },  // one side can see it
+      { status: "differ", a: "Shown", b: "Available (hidden by default)" },
+      { status: "same", a: "Shown", b: "Shown" },
+    ],
+    objectPermissions: [{ status: "onlyA", a: ["Read"], b: [] }, { status: "differ", a: ["Read"], b: ["Edit"] }, { status: "same", a: ["Read"], b: ["Read"] }],
+    userPermissions: [{ status: "onlyB", a: false, b: true }, { status: "same", a: true, b: true }],
+  });
+  assert.equal(tabDiffCount(res, "components"), 3); // 1 set + 1 muted only + 1 muted differ
+  assert.equal(tabDiffCount(res, "tabs"), 2);
+  assert.equal(tabDiffCount(res, "objectPermissions"), 2);
+  assert.equal(tabDiffCount(res, "userPermissions"), 1);
+  assert.equal(tabDiffCount(res, "setupAccess"), 0);
+  assert.equal(tabDiffCount(res, "overview"), 0);
 });
 
 await test("sort: 2,000 rows sort quickly", () => {
