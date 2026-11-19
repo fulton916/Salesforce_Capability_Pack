@@ -8,7 +8,7 @@ import path from "node:path";
 import { SfApi, soqlLike } from "../extension/lib/sfconn.js";
 import { searchUsers, readUserAccess } from "../extension/lib/useraccess.js";
 import {
-  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText,
+  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
 } from "../extension/lib/usercompare.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -130,8 +130,8 @@ export async function run(test) {
     const by = Object.fromEntries(a.sections.permissionSets.map((p) => [p.key, p]));
     assert.equal(by.Opportunity_Edit.direct, true);
     assert.deepEqual(by.Opportunity_Edit.groups.map((g) => g.label), ["Sales Core"]);
-    assert.equal(howText(by.Opportunity_Edit), "Assigned directly, and through group: Sales Core");
-    assert.equal(howText(by["acme__Lead_Convert"]), "Through group: Sales Core");
+    assert.equal(howText(by.Opportunity_Edit), "Assigned directly and through the group Sales Core");
+    assert.equal(howText(by["acme__Lead_Convert"]), "Through the group Sales Core");
     assert.equal(howText(by.Sales_Reports), "Assigned directly");
     assert.equal(by.Sales_Reports.licence, "Reporting Licence");
   });
@@ -156,7 +156,7 @@ export async function run(test) {
     assert.equal(a.sections.permissionSets.length, 3, "other areas still read");
     const denied = userRoutes({ routes: [[/FROM GroupMember/, () => ({ fail: "insufficient access", code: "INSUFFICIENT_ACCESS" })]] });
     const b = await readUserAccess(apiFor(denied), "005A");
-    assert.match(b.unavailable.queues, /could not be read/);
+    assert.match(b.unavailable.queues, /could not be read\. Your user may not have permission to see this\. Ask an admin to check\./);
     assert.ok(!/insufficient/.test(b.unavailable.queues), "raw error stays out of the plain message");
     validateAccess(b);
   });
@@ -176,7 +176,7 @@ export async function run(test) {
   });
 
   await test("plural helper: 1 is singular, 0 and many are plural", () => {
-    assert.equal(plural(1, "licence", "licences"), "1 licence");
+    assert.equal(plural(1, "license", "licenses"), "1 license");
     assert.equal(plural(0, "territory", "territories"), "0 territories");
     assert.equal(countText(1, "permissionSetGroups"), "1 permission set group");
     assert.equal(countText(3, "permissionSetGroups"), "3 permission set groups");
@@ -223,7 +223,7 @@ export async function run(test) {
     assert.deepEqual(r.counts.publicGroups, { onlyA: 1, onlyB: 1, same: 1, differ: 0, total: 3, totalA: 2, totalB: 2 });
     assert.deepEqual(r.counts.permissionSets, { onlyA: 1, onlyB: 1, same: 2, differ: 1, total: 5, totalA: 4, totalB: 4 });
     assert.deepEqual(r.counts.territories, { onlyA: 1, onlyB: 0, same: 0, differ: 0, total: 1, totalA: 1, totalB: 0 });
-    assert.match(r.verdict.text, /Alex Example and Blake Sample each have access the other does not\./);
+    assert.match(r.verdict.text, /Alex Example and Blake Sample each have access the other does not \(\d+ differences in total\)\./);
     const twin = structuredClone(sample("user_a.json"));
     twin.user.username = "alex.two@example.com";
     const same = compareUsers(sample("user_a.json"), twin);
@@ -250,6 +250,24 @@ export async function run(test) {
     assert.ok(csv.endsWith("plain,\r\n"));
   });
 
+  await test("CSV: detail lines are joined with '; ', no line breaks inside cells", () => {
+    const set = { key: "P", label: "P", direct: false, groups: [{ key: "G", label: "G" }], licence: "Reporting License" };
+    const mk = (items) => ({
+      schema: "sf-user-access/1", user: { name: "U", username: "u@example.com" }, unavailable: {}, warnings: [],
+      sections: { permissionSets: items },
+    });
+    const r = compareUsers(mk([set]), mk([]));
+    const rows = toRows(r, "permissionSets");
+    assert.ok(rows.length > 1);
+    const cells = rows.flat();
+    assert.ok(cells.every((c) => !String(c).includes("\n")));
+    assert.ok(cells.some((c) => String(c).includes("; ")));
+    const csv = toCsv(rows);
+    assert.ok(!/\n(?!$)/.test(csv.replace(/\r\n/g, "")));
+    const single = toRowsSingle(mk([set]), "permissionSets");
+    assert.ok(single.flat().every((c) => !String(c).includes("\n")) && single.flat().some((c) => String(c).includes("; ")));
+  });
+
   await test("both sample files load and validate, and overlap", () => {
     const a = validateAccess(sample("user_a.json"));
     const b = validateAccess(sample("user_b.json"));
@@ -268,6 +286,93 @@ export async function run(test) {
     assert.deepEqual(matchUsers(users, "example alex").users.map((u) => u.name), ["Alex Example"]);
     assert.equal(matchUsers(users, "example.com").users.length, 2);
     assert.equal(matchUsers(users, "zzz").users.length, 0);
+  });
+
+  await test("wording: details on separate lines, hidden Details column rule, total in verdict, Different", () => {
+    const set = { key: "P", label: "P", direct: true, groups: [{ key: "G", label: "G" }], licence: "Reporting License" };
+    assert.equal(detailText("permissionSets", set), "Assigned directly and through the group G\nNeeds license: Reporting License");
+    assert.equal(detailText("profile", { key: "p", licence: "Salesforce" }), "User license: Salesforce");
+    assert.equal(detailText("permissionSetGroups", { key: "g", muting: [], status: "Outdated" }), "Not up to date (Outdated). In Setup, open this group and wait for its status to say Updated.");
+    assert.equal(hasDetails(singleRows(sample("user_a.json"), "queues")), false);
+    assert.equal(hasDetails([{ detail: "" }, { detail: "x" }]), true);
+    assert.equal(statusText("differ"), "Different");
+    const r = compareUsers(sample("user_a.json"), sample("user_b.json"));
+    const total = Object.values(r.counts).reduce((n, c) => n + c.onlyA + c.onlyB + c.differ, 0);
+    assert.ok(r.verdict.text.includes(`(${total} differences in total)`));
+  });
+
+  await test("a missing user gets a plain message", async () => {
+    await assert.rejects(readUserAccess(apiFor([[/FROM User WHERE/, () => []]]), "005X"), /could not be found.*Search again/);
+  });
+
+  // ---- comparison cards ----
+  const mk = (name, sections) => validateAccess({
+    schema: "sf-user-access/1", user: { id: name, name, username: `${name}@x.test`, isActive: true },
+    sections: Object.fromEntries(SECTION_KEYS.map((k) => [k, (sections[k] || []).map((x) => (typeof x === "string" ? { key: x, label: x } : x))])),
+  });
+  const say = (lines) => lines.map((l) => l.segs.map((g) => g.text).join(""));
+  const five = ["g1", "g2", "g3", "g4", "g5"];
+
+  await test("cards: 5 shared groups and 1 only for the second user", () => {
+    const r = compareUsers(mk("Ann", { permissionSetGroups: five }), mk("Bob", { permissionSetGroups: [...five, "g6"] }));
+    assert.deepEqual(say(userCardLines(r, "permissionSetGroups")), ["5 permission set groups both have", "0 only Ann has", "1 only Bob has"]);
+    const lines = userCardLines(r, "permissionSetGroups");
+    assert.equal(lines[1].segs[2].side, "a");
+    assert.equal(lines[2].segs[2].side, "b");
+    assert.equal(lines[0].segs[0].bold, true);
+  });
+
+  await test("cards: singular noun, thousands separators, same-in-both line after the numbers", () => {
+    const r = compareUsers(mk("Ann", { queues: ["q"] }), mk("Bob", { queues: ["q"] }));
+    assert.deepEqual(say(userCardLines(r, "queues")), ["1 queue both have", "0 only Ann has", "0 only Bob has", "✓ Same in both"]);
+    const many = Array.from({ length: 1200 }, (_, i) => `t${i}`);
+    const big = compareUsers(mk("Ann", { territories: many }), mk("Bob", {}));
+    assert.equal(say(userCardLines(big, "territories"))[1], "1,200 only Ann has");
+  });
+
+  await test("cards: permission sets show the assigned-differently line", () => {
+    const direct = { key: "ps1", label: "ps1", direct: true, groups: [] };
+    const viaGroup = { key: "ps1", label: "ps1", direct: false, groups: [{ key: "g", label: "G" }] };
+    const r = compareUsers(mk("Ann", { permissionSets: [direct, "ps2"] }), mk("Bob", { permissionSets: [viaGroup] }));
+    assert.deepEqual(say(userCardLines(r, "permissionSets")), [
+      "1 permission set both have", "1 only Ann has", "0 only Bob has", "1 of those assigned differently (directly or through a group)"]);
+    // other areas never show that line
+    assert.equal(userCardLines(r, "queues").length, 1);
+  });
+
+  await test("cards: neither has any", () => {
+    const r = compareUsers(mk("Ann", {}), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "publicGroups")), ["Neither has any"]);
+  });
+
+  await test("cards: profile and role show the value", () => {
+    const r = compareUsers(mk("Ann", { profile: ["Standard"], role: ["East"] }), mk("Bob", { profile: ["Standard"], role: [] }));
+    assert.deepEqual(say(userCardLines(r, "profile")), ["✓ Same in both: Standard"]);
+    assert.deepEqual(say(userCardLines(r, "role")), ["Ann: East", "Bob: no role"]);
+    const d = compareUsers(mk("Ann", { profile: ["Standard"] }), mk("Bob", { profile: ["Admin"] }));
+    assert.deepEqual(say(userCardLines(d, "profile")), ["Ann: Standard", "Bob: Admin"]);
+  });
+
+  await test("cards: neither has a role or profile reads as same", () => {
+    const r = compareUsers(mk("Ann", {}), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "role")), ["✓ Same in both: no role"]);
+    assert.deepEqual(say(userCardLines(r, "profile")), ["✓ Same in both: no profile"]);
+    assert.equal(userCardLines(r, "role")[0].cls, "same");
+    assert.equal(r.counts.role.onlyA + r.counts.role.onlyB + r.counts.role.differ, 0);
+  });
+
+  await test("cards: one has a role, the other none", () => {
+    const r = compareUsers(mk("Ann", { role: ["East"] }), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "role")), ["Ann: East", "Bob: no role"]);
+    const r2 = compareUsers(mk("Ann", {}), mk("Bob", { role: ["West"] }));
+    assert.deepEqual(say(userCardLines(r2, "role")), ["Ann: no role", "Bob: West"]);
+  });
+
+  await test("org header leaves out missing parts instead of printing null", () => {
+    const org = { name: "Acme", isSandbox: true };
+    assert.deepEqual(orgParts(org, "h.example.com", null).map((p) => p.text), ["Acme", "Sandbox", "h.example.com"]);
+    assert.deepEqual(orgParts(org, "", "DEV SERVER").map((p) => p.text), ["Acme", "Sandbox", "DEV SERVER"]);
+    for (const p of orgParts(org, null, undefined)) assert.ok(p && p.text && p.text !== "null");
   });
 
   await test("the new files never use innerHTML, localStorage or chrome.storage", () => {

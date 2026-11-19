@@ -12,3 +12,6 @@
 .card .one { font-weight: 600; }
 .unavail { color: var(--muted); background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
 .yes { color: var(--good); font-weight: 700; }
+
+/* One fact per line in the detail text (how a permission set is reached, license, muting). */
+.how { white-space: pre-line; }

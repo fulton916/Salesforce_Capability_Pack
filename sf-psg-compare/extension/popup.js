@@ -6,12 +6,17 @@ const TOOLS = [
   {
     page: "psg-compare.html",
     title: "Compare permission set groups",
-    description: "See what two groups contain and what they allow",
+    description: "Find out how two permission set groups differ",
   },
   {
     page: "user-access.html",
-    title: "User access",
+    title: "Look up user access",
     description: "See what a user can access, or compare two users",
+  },
+  {
+    page: "hierarchy.html",
+    title: "Territory & role hierarchy",
+    description: "See the whole territory or role tree; export it for Excel",
   },
 ];
 
@@ -30,10 +35,10 @@ try { host = new URL(tab?.url || "").hostname; } catch { /* not a URL */ }
 const inOrg = isSalesforceHost(host);
 
 if (inOrg) {
-  state.textContent = "Salesforce org in this tab:";
+  state.textContent = "Connected to this org:";
   hostEl.textContent = host;
 } else {
-  state.textContent = "Open a Salesforce org in this tab, then click the extension again.";
+  state.textContent = "These tools work on a Salesforce page. Go to a Salesforce tab (any page in your org), then click the Salesforce Capability Pack icon again.";
 }
 
 for (const tool of TOOLS) {

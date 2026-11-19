@@ -22,6 +22,10 @@ manager. Do that task, nothing more.
 4. Run the package's tests before you report:
    - Python packages: `python tests/run_tests.py` (needs `openpyxl`)
    - sf-psg-compare: `node tests/run_tests.mjs`
+   If you check a page in the browser, start your own dev server with a free `--port` (for
+   example 8766 or higher) unless the brief gives one. Stop only the server you started; never
+   kill another process on 8765. Before you report a page as checked, look at every view or mode
+   it has (for example each switch or tab), not only the first.
 5. Report back with:
    - files changed, and a short description of each change
    - test command and its last lines of output

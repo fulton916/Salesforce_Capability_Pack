@@ -33,7 +33,7 @@ export async function searchUsers(api, text, limit = 50) {
 function plainMessage(e, what, offText) {
   const raw = `${e?.errorCode || ""} ${e?.message || ""}`;
   if (offText && (e?.territoriesOff || /INVALID_TYPE|not supported|sObject type/i.test(raw))) return offText;
-  return `${what} could not be read. Your user may not be allowed to see it.`;
+  return `${what} could not be read. Your user may not have permission to see this. Ask an admin to check.`;
 }
 
 async function licenceNames(api, ids, warnings) {
@@ -85,7 +85,7 @@ async function readPermissionSets(api, userId, warnings) {
       groups.set(g.Id, { key: qualified(g.NamespacePrefix, g.DeveloperName), label: g.MasterLabel || g.DeveloperName, status: g.Status || null, muting: [] });
     }
   }
-  for (const id of groupIds) if (!groups.has(id)) groups.set(id, { key: id, label: "A group your user cannot see", status: null, muting: [] });
+  for (const id of groupIds) if (!groups.has(id)) groups.set(id, { key: id, label: "A group you do not have permission to see", status: null, muting: [] });
 
   // What each group is made of. Muting permission sets are shown on the group, not as a permission set.
   const components = [];
@@ -193,7 +193,7 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     `FROM User WHERE Id = ${soqlString(userId)}`
   );
   const u = records[0];
-  if (!u) throw new Error(`User ${userId} not found.`);
+  if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
 
   const sections = { profile: [], role: [], permissionSetGroups: [], permissionSets: [], permissionSetLicenses: [], publicGroups: [], queues: [], territories: [] };
   if (u.Profile) sections.profile.push({ key: u.Profile.Name, label: u.Profile.Name, licence: u.Profile.UserLicense?.Name || null });
@@ -209,10 +209,10 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     }
   };
 
-  progress("Reading permission sets, groups, licences and territories");
+  progress("Reading permission sets, groups, licenses and territories");
   await Promise.all([
     soft(["permissionSets", "permissionSetGroups"], "Permission sets and groups", () => readPermissionSets(api, userId, warnings)),
-    soft(["permissionSetLicenses"], "Permission set licences", async () => ({ permissionSetLicenses: await readLicences(api, userId) })),
+    soft(["permissionSetLicenses"], "Permission set licenses", async () => ({ permissionSetLicenses: await readLicences(api, userId) })),
     soft(["publicGroups", "queues"], "Public groups and queues", () => readMemberships(api, userId)),
     soft(["territories"], "Territories", async () => ({ territories: await readTerritories(api, userId) }), "Territories are not turned on in this org."),
   ]);

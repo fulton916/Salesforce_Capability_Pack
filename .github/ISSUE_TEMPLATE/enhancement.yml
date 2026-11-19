@@ -14,6 +14,7 @@ body:
       options:
         - PSG Compare (extension)
         - User access (extension)
+        - Territory & role hierarchy (extension)
         - Extension menu / other
         - sf-country-state-codes
         - sf-safe-translation-push

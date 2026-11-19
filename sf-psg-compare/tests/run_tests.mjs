@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../extension/lib/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../extension/lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, sortRows, sortGrouped, sortSection } from "../extension/lib/compare.js";
+import { SECTION_TITLES, SECTION_HELP, compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection } from "../extension/lib/compare.js";
 import { matchPsgs, searchWords } from "../extension/lib/pick.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -27,6 +27,7 @@ async function test(name, fn) {
 
 await (await import("./user_access_tests.mjs")).run(test);
 await (await import("./feedback_tests.mjs")).run(test);
+await (await import("./hierarchy_tests.mjs")).run(test);
 
 // ---------- fakes ----------
 
@@ -131,6 +132,15 @@ await test("401 gives a readable message", async () => {
   await assert.rejects(api.query("SELECT Id FROM User"), /Reload the Salesforce tab/);
 });
 
+await test("401 keeps the plain text on top and the raw text in detail", async () => {
+  const api = new SfApi({
+    apiHost: "x.my.salesforce.com", sessionId: "S",
+    fetchImpl: async () => ({ ok: false, status: 401, text: async () => JSON.stringify([{ message: "Session expired or invalid", errorCode: "INVALID_SESSION_ID" }]) }),
+  });
+  await assert.rejects(api.query("SELECT Id FROM User"), (e) =>
+    e.message === "Your Salesforce session has expired. Reload the Salesforce tab, then try again." && e.detail === "Session expired or invalid" && e.status === 401);
+});
+
 await test("soqlString escapes quotes and backslashes; chunk splits", () => {
   assert.equal(soqlString("O'Brien\\x"), "'O\\'Brien\\\\x'");
   assert.deepEqual(chunk([1, 2, 3, 4, 5], 2), [[1, 2], [3, 4], [5]]);
@@ -225,9 +235,18 @@ await test("setup access is named across 15/18-character Ids; unknown types are 
   assert.equal(s.setupAccess["MysteryType|0XYAAA000000001AAA"].byId, true);
 });
 
+await test("a group that is missing or not set up gives a plain message", async () => {
+  const none = snapshotRoutes();
+  none.query.unshift([/FROM PermissionSetGroup WHERE Id/, () => []]);
+  await assert.rejects(takeSnapshot(apiWith(none), "0PGX"), (e) => e.plain === true && e.message === "This group could not be found. It may have been deleted. Reload the page and pick it again.");
+  const noAgg = snapshotRoutes();
+  noAgg.query.unshift([/FROM PermissionSet WHERE PermissionSetGroupId/, () => []]);
+  await assert.rejects(takeSnapshot(apiWith(noAgg), "0PG1"), (e) => e.plain === true && e.message.startsWith("Salesforce has not finished setting up this group yet."));
+});
+
 await test("a group that is not Updated gets a warning", async () => {
   const s = await takeSnapshot(apiWith(snapshotRoutes({ status: "Outdated" })), "0PG1");
-  assert.ok(s.warnings.some((w) => w.startsWith("Status is Outdated")));
+  assert.ok(s.warnings.some((w) => w.startsWith("Not up to date (Outdated)")));
 });
 
 await test("listPsgs qualifies namespaced names", async () => {
@@ -238,7 +257,7 @@ await test("listPsgs qualifies namespaced names", async () => {
 await test("validateSnapshot accepts the samples and rejects other JSON", () => {
   validateSnapshot(sample("sample_a.json"));
   validateSnapshot(sample("sample_b.json"));
-  assert.throws(() => validateSnapshot({ hello: 1 }), /Not a PSG snapshot/);
+  assert.throws(() => validateSnapshot({ hello: 1 }), /Not a saved group file/);
   const broken = sample("sample_a.json");
   delete broken.fieldPermissions;
   assert.throws(() => validateSnapshot(broken), /missing "fieldPermissions"/);
@@ -258,7 +277,7 @@ await test("system permissions: only-B high-risk permission is a headline", () =
   assert.equal(row("userPermissions", "PermissionsViewAllData").status, "onlyB");
   assert.equal(row("userPermissions", "PermissionsViewAllData").highRisk, true);
   assert.equal(row("userPermissions", "PermissionsApiEnabled").status, "same");
-  assert.ok(texts.includes("Only Sales Manager has “View All Data”."), texts.join("\n"));
+  assert.ok(texts.includes("Only Sales Manager has View All Data."), texts.join("\n"));
 });
 
 await test("objects: flag-level differences in both directions", () => {
@@ -269,7 +288,7 @@ await test("objects: flag-level differences in both directions", () => {
   assert.equal(row("objectPermissions", "Campaign").status, "onlyA");
   assert.equal(row("objectPermissions", "Quota__c").status, "onlyB");
   assert.equal(row("objectPermissions", "Widget__c").status, "same");
-  assert.ok(texts.some((t) => /^Sales Manager has View All or Modify All on 2 objects where Sales Rep has less.*Opportunity/.test(t)), texts.join("\n"));
+  assert.ok(texts.some((t) => /^Sales Manager can view or change every record on 2 objects \(.*Opportunity.*\), where .+ has less\. See Objects\.$/.test(t)), texts.join("\n"));
 });
 
 await test("fields: read vs edit", () => {
@@ -287,7 +306,7 @@ await test("contents, setup access and tabs", () => {
   assert.equal(row("components", "Sales_Core").status, "same");
   const muted = R.sections.components.filter((r) => r.part === "muted");
   const mOpp = muted.find((r) => r.key === "Opportunity");
-  assert.deepEqual([mOpp.status, mOpp.a, mOpp.label, mOpp.kind], ["onlyA", "Removed: Delete", "Opportunity", "Object"]);
+  assert.deepEqual([mOpp.status, mOpp.a, mOpp.label, mOpp.kind], ["onlyA", "Delete removed", "Opportunity", "Object"]);
   assert.equal(muted.find((r) => r.label === "Export Reports").a, "Removed");
   assert.equal(muted.find((r) => r.label === "Export Reports").kind, "System permission");
   assert.ok(muted.some((r) => r.label === "Export Reports"));
@@ -300,14 +319,14 @@ await test("contents, setup access and tabs", () => {
 await test("overview and verdict", () => {
   assert.equal(row("overview", "Users assigned").a, "398 active (412 in total)");
   assert.equal(row("overview", "Muting permission set").b, "None");
-  assert.ok(texts.includes(`Each group gives access the other does not: Sales Rep gives ${R.gives.a} items of access Sales Manager doesn't; Sales Manager gives ${R.gives.b} items of access Sales Rep doesn't.`), texts.join("\n"));
+  assert.ok(texts.includes(`Sales Rep has ${R.gives.a} things Sales Manager doesn't. Sales Manager has ${R.gives.b} things Sales Rep doesn't.`), texts.join("\n"));
   assert.ok(R.gives.a > 0 && R.gives.b > R.gives.a);
   assert.equal(R.counts.userPermissions.onlyB, 5);
 });
 
 await test("a group compared with itself is identical", () => {
   const same = compareSnapshots(A, structuredClone(A));
-  assert.equal(same.highlights.find((h) => h.level === "good")?.text, "Both groups give exactly the same access.");
+  assert.equal(same.highlights.find((h) => h.level === "good")?.text, "Both groups have exactly the same access.");
   for (const k of ["userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabs", "components"]) {
     assert.equal(same.counts[k].same, same.counts[k].total, k);
   }
@@ -318,8 +337,8 @@ await test("superset is detected", () => {
   bigger.psg.label = "Rep Plus";
   bigger.userPermissions.PermissionsManageUsers = "Manage Users";
   const r = compareSnapshots(bigger, A);
-  assert.ok(r.highlights.some((h) => h.text === "Rep Plus gives everything Sales Rep gives, and more (1 item of access that Sales Rep does not)."));
-  assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus has “Manage Users”."));
+  assert.ok(r.highlights.some((h) => h.text === "Rep Plus has everything Sales Rep has, and 1 more."));
+  assert.ok(r.highlights.some((h) => h.level === "risk" && h.text === "Only Rep Plus has Manage Users."));
 });
 
 await test("different orgs are called out", () => {
@@ -382,19 +401,17 @@ await test("highlights: general permissions first, objects condensed to one line
   assert.deepEqual(h.map((x) => x.area), ["general", "general", "objects", "objects"]);
   const a = h[2].text;
   // Thing0,2,4,6,8,10 + Account + Lead = 8 objects with View All or Modify All
-  assert.ok(a.startsWith("Big Group has View All or Modify All on 8 objects where Small Group has less, including Account, Lead and Thing0"), a);
-  assert.ok(a.endsWith("See Objects."));
+  assert.equal(a, "Big Group can view or change every record on 8 objects (Account, Lead, Thing0 and 5 more), where Small Group has less. See Objects.");
   assert.ok(!a.includes("Case"));
-  assert.equal(h[3].text, "Small Group has View All or Modify All on the object Zed, where Big Group has less. See Objects.");
+  assert.equal(h[3].text, "Small Group can view or change every record on 1 object (Zed), where Big Group has less. See Objects.");
 });
 
 await test("highlights: every risk carries its side and a short text for the grouped view", () => {
   const h = heavyPair().highlights.filter((x) => x.kind === "risk");
   assert.deepEqual(h.map((x) => x.side), ["a", "a", "a", "b"]);
-  assert.ok(h[0].short.startsWith("“") && h[0].short.endsWith("”") && !h[0].short.includes("Big Group"), h[0].short);
-  assert.ok(h[2].short.startsWith("View All or Modify All on 8 objects where Small Group has less, including Account, Lead and Thing0"), h[2].short);
-  assert.equal(h[2].text, `Big Group has ${h[2].short}`);
-  assert.equal(h[3].short, "View All or Modify All on the object Zed, where Big Group has less. See Objects.");
+  assert.ok(!/[“”]/.test(h[0].short) && !h[0].short.includes("Big Group"), h[0].short);
+  assert.equal(h[2].short, "More access to every record on 8 objects (Account, Lead, Thing0 and 5 more) than Small Group. See Objects.");
+  assert.equal(h[3].short, "More access to every record on 1 object (Zed) than Big Group. See Objects.");
   // A system permission only in B gets side "b" and no group name in the short text.
   const x = structuredClone(A);
   const y = structuredClone(A);
@@ -402,8 +419,8 @@ await test("highlights: every risk carries its side and a short text for the gro
   const g = compareSnapshots(x, y).highlights.find((r) => r.area === "general" && r.text.includes("Assign Permission Sets"));
   assert.ok(g, "expected a general risk for Assign Permission Sets");
   assert.equal(g.side, "b");
-  assert.equal(g.short, "“Assign Permission Sets”");
-  assert.ok(g.text.startsWith("Only ") && g.text.endsWith("has “Assign Permission Sets”."));
+  assert.equal(g.short, "Assign Permission Sets");
+  assert.ok(g.text.startsWith("Only ") && g.text.endsWith("has Assign Permission Sets."));
 });
 
 await test("verdict counts what each group gives that the other does not", () => {
@@ -412,18 +429,21 @@ await test("verdict counts what each group gives that the other does not", () =>
   // B: Zed__c + Account.F3
   assert.deepEqual(r.gives, { a: 2 + 15 + 2, b: 2 });
   assert.equal(r.highlights.find((x) => x.kind === "verdict").text,
-    "Each group gives access the other does not: Big Group gives 19 items of access Small Group doesn't; Small Group gives 2 items of access Big Group doesn't.");
+    "Big Group has 19 things Small Group doesn't. Small Group has 2 things Big Group doesn't.");
+  // the second, muted line says what is counted
+  assert.ok(r.highlights.find((x) => x.kind === "verdict").detail ===
+    "Counts system permissions, objects, fields, apps and other access, and tabs (not permission sets). If both groups have an item but one has more, such as Edit instead of Read, it counts for that group.");
   assert.deepEqual(givesCounts(compareSnapshots(A, structuredClone(A)).sections), { a: 0, b: 0 });
   assert.ok(compareSnapshots(A, structuredClone(A)).highlights[0].text.startsWith("Both groups"));
 });
 
-await test("objects line: Modify All added on top of View All still reads as 'has less'", () => {
+await test("objects line: Modify All added on top of View All still counts", () => {
   const x = structuredClone(A);
   const y = structuredClone(A);
   x.objectPermissions.Case = { Read: true, ViewAllRecords: true, ModifyAllRecords: true };
   y.objectPermissions.Case = { Read: true, ViewAllRecords: true };
   const t = compareSnapshots(x, y).highlights.find((h) => h.area === "objects").text;
-  assert.ok(/^Sales Rep has View All or Modify All on the object Case, where .* has less\./.test(t), t);
+  assert.ok(/^Sales Rep can view or change every record on 1 object \(Case\), where .+ has less\. See Objects\.$/.test(t), t);
 });
 
 await test("fields: a difference says which side has more", () => {
@@ -431,10 +451,10 @@ await test("fields: a difference says which side has more", () => {
   assert.deepEqual([f2.status, f2.more], ["differ", "a"]);
 });
 
-await test("permission sets show Included, licence as secondary text; counts are split", () => {
+await test("permission sets show In this group, license as secondary text; counts are split", () => {
   const sets = R.sections.components.filter((x) => x.part === "sets");
-  assert.ok(sets.every((x) => x.a === null || x.a === "Included"));
-  assert.ok(sets.some((x) => x.aSub === "Salesforce licence" || x.bSub === "Salesforce licence"), JSON.stringify(sets));
+  assert.ok(sets.every((x) => x.a === null || x.a === "In this group"));
+  assert.ok(sets.some((x) => x.aSub === "needs Salesforce license" || x.bSub === "needs Salesforce license"), JSON.stringify(sets));
   const regular = sets.filter((x) => x.group !== "Muting permission set");
   assert.equal(R.counts.componentSets.total, regular.length);
   assert.equal(R.counts.componentMutingSet.total, sets.length - regular.length);
@@ -459,7 +479,7 @@ await test("muted item on both sides with different values is Different, not Sam
   x.muting.effective.fieldPermissions = { "Account.AnnualRevenue": { Read: true, Edit: true } };
   y.muting.effective.fieldPermissions = { "Account.AnnualRevenue": { Read: true } };
   const m = compareSnapshots(x, y).sections.components.find((r) => r.part === "muted" && r.key === "Account.AnnualRevenue");
-  assert.deepEqual([m.status, m.a, m.b, m.kind], ["differ", "Removed: Read, Edit", "Removed: Read", "Field"]);
+  assert.deepEqual([m.status, m.a, m.b, m.kind], ["differ", "Read, Edit removed", "Read removed", "Field"]);
 });
 
 await test("filterRows and CSV follow differences-only and search", () => {
@@ -471,8 +491,8 @@ await test("filterRows and CSV follow differences-only and search", () => {
   const s = toRows(R, "fieldPermissions", { search: "account › annual" });
   assert.ok(s.length > 1 && s.slice(1).every((r) => /Annual/.test(r[2])));
   assert.ok(toRows(R, null, { diffOnly: true }).slice(1).every((r) => r[0] === "Summary" || r[4] !== "Same"));
-  const kinds = toRows(R, "components").filter((r) => r[1] === "Taken away by muting").map((r) => r[9]);
-  assert.ok(kinds.length && kinds.every((k) => ["Object", "Field", "System permission", "Tab", "App, page or code"].includes(k)), kinds.join());
+  const kinds = toRows(R, "components").filter((r) => r[1] === "Removed by muting").map((r) => r[9]);
+  assert.ok(kinds.length && kinds.every((k) => ["Object", "Field", "System permission", "Tab", "App or other access"].includes(k)), kinds.join());
 });
 
 await test("search treats punctuation as a separator", () => {
@@ -570,16 +590,16 @@ await test("muting: compare lists only effective items, in plain words, plus one
   const muted = r.sections.components.filter((x) => x.part === "muted");
   const got = muted.map((x) => `${x.label}: ${x.a}`).sort();
   assert.deepEqual(got, [
-    "Customer Account: Removed: Delete",
-    "Customer Account › Customer Segmentation: Removed: Read, Edit",
-    "Customer Account › F2: Removed: Edit",
-    "Customer Account › F4: Removed: Edit",
-    "Customer Account › F5: Removed: Read, Edit",
-    "Log Entry (tab): Removed",
+    "Customer Account: Delete removed",
+    "Customer Account › Customer Segmentation: Read, Edit removed",
+    "Customer Account › F2: Edit removed",
+    "Customer Account › F4: Edit removed",
+    "Customer Account › F5: Read, Edit removed",
+    "Log Entry: Removed",
     "Perm 5: Removed",
   ].sort());
-  const note = r.highlights.find((h) => h.text.includes("had nothing to take away"));
-  assert.ok(note && note.text.includes("5 other items"), JSON.stringify(r.highlights));
+  const note = r.highlights.find((h) => h.text.includes("removes nothing") || h.text.includes("remove nothing"));
+  assert.ok(note && note.text === "G: the muting permission set has 5 more items, but they remove nothing, so they are not listed.", JSON.stringify(r.highlights));
 });
 
 await test("v1 snapshots still load and compare; their muted items do not claim removal", () => {
@@ -592,11 +612,11 @@ await test("v1 snapshots still load and compare; their muted items do not claim 
   const r = compareSnapshots(v1, sample("sample_b.json"));
   const muted = r.sections.components.filter((x) => x.part === "muted");
   assert.ok(muted.length >= 3);
-  // only the old file's side says "may not have been given"
+  // only the old file's side says "not confirmed"
   assert.ok(muted.filter((x) => x.a !== null).every((x) => x.legacy), "A side is legacy");
   assert.ok(muted.filter((x) => x.a === null).every((x) => !x.legacy), "B side is not");
   assert.deepEqual(r.mutedLegacy, { a: true, b: false });
-  assert.ok(toRows(r).some((x) => x[1] === "Muted (may not have been given)"));
+  assert.ok(toRows(r).some((x) => x[1] === "Removed by muting (not confirmed, older saved file)"));
   assert.equal(r.sections.fieldPermissions.find((x) => x.key === "Account.AnnualRevenue").label, "Annual Revenue");
 });
 
@@ -611,7 +631,7 @@ await test("field labels come from the org in one query; a failed read falls bac
   routes.query.unshift([/FROM FieldDefinition/, () => { throw new Error("boom"); }]);
   const bad = await takeSnapshot(apiWith(routes), "0PG1");
   assert.deepEqual(bad.fieldLabels, {});
-  assert.equal(bad.warnings.filter((w) => w.includes("field names could not be read")).length, 1);
+  assert.equal(bad.warnings.filter((w) => w.includes("Could not read the names of some fields")).length, 1);
   assert.equal(compareSnapshots(bad, bad).sections.fieldPermissions.find((x) => x.key === "Account.Plain__c").label, "Plain");
 });
 
@@ -652,7 +672,7 @@ await test("external credential principals are read through the Tooling API; unn
   assert.equal(s.setupAccess["ExternalCredentialParameter|Cred_One.Auth"].typeLabel, "External credential principal");
   assert.equal(s.setupAccess["ExternalClientApplication|Sync_App"].label, "Sync App");
   assert.equal(Object.values(s.setupAccess).filter((e) => e.byId).length, 2);
-  assert.ok(s.warnings.includes("2 external credential principals could not be named in this org; they are listed by Id, which differs between orgs."), s.warnings.join("\n"));
+  assert.ok(s.warnings.includes("2 external credential principals could not be named in this org, so they are listed by Id, which differs between orgs."), s.warnings.join("\n"));
   const row = compareSnapshots(s, s).sections.setupAccess.find((x) => x.key === "0puAAA000000002AAA");
   assert.equal(row.label, "Name not available (Id 0puAAA000000002AAA)");
   assert.equal(row.group, "External credential principal");
@@ -747,6 +767,7 @@ await test("search puts names that start with the text first, and caps the list"
 
 const fake = (sections) => ({ sections: { components: [], userPermissions: [], objectPermissions: [], fieldPermissions: [], setupAccess: [], tabs: [], ...sections } });
 const text = (res, k) => cardLines(res, k).lines.map((l) => `${l.n.toLocaleString("en-US")} ${l.before}${l.side ? ` <${l.side}>` : ""}${l.after ? ` ${l.after}` : ""}`);
+const totals = (res, k) => { const t = cardLines(res, k).totals; return `${t.a}/${t.b} ${t.noun}`; };
 
 await test("cards: system permissions, apps and objects count what each side has", () => {
   const res = fake({
@@ -758,11 +779,12 @@ await test("cards: system permissions, apps and objects count what each side has
     ],
     setupAccess: [{ status: "onlyA", a: true, b: false }],
   });
-  assert.deepEqual(text(res, "userPermissions"), ["3 system permissions <a> has", "2 system permissions <b> has", "3 only one group has"]);
-  assert.deepEqual(text(res, "objectPermissions"), [
-    "2 objects <a> can access", "3 objects <b> can access", "1 object only one group can access",
-    "1 object both can access, but with different rights (Read, Create, Edit, Delete…)"]);
-  assert.deepEqual(text(res, "setupAccess"), ["1 item <a> can use", "0 items <b> can use", "1 only one group can use"]);
+  assert.deepEqual(text(res, "userPermissions"), ["3 system permissions only one group has"]);
+  assert.equal(totals(res, "userPermissions"), "3/2 system permissions");
+  assert.deepEqual(text(res, "objectPermissions"), ["1 object only one group can access", "1 object with different rights"]);
+  assert.equal(totals(res, "objectPermissions"), "2/3 objects");
+  assert.deepEqual(text(res, "setupAccess"), ["1 item only one group can use"]);
+  assert.equal(totals(res, "setupAccess"), "1/0 items");
 });
 
 await test("cards: fields count Read or Edit; tabs ignore Hidden; zero lines stay", () => {
@@ -777,10 +799,10 @@ await test("cards: fields count Read or Edit; tabs ignore Hidden; zero lines sta
       { status: "onlyA", a: "Hidden", b: null },
     ],
   });
-  assert.deepEqual(text(res, "fieldPermissions"), [
-    "3 fields <a> can see", "2 fields <b> can see", "1 field only one group can see", "1 field both can see, but one can edit and the other can only read"]);
-  assert.deepEqual(text(res, "tabs"), [
-    "2 tabs <a> can see", "2 tabs <b> can see", "2 tabs only one group can see", "0 tabs both can see, but set differently (shown or hidden by default)"]);
+  assert.deepEqual(text(res, "fieldPermissions"), ["1 field only one group can see", "1 field where one group can edit and the other can only read"]);
+  assert.equal(totals(res, "fieldPermissions"), "3/2 fields");
+  assert.deepEqual(text(res, "tabs"), ["2 tabs only one group can see", "0 tabs set up differently (shown or hidden by default)"]);
+  assert.equal(totals(res, "tabs"), "2/2 tabs");
   assert.deepEqual(cardCounts(fake({})).tabs, { a: 0, b: 0, only: 0, differ: 0 });
 });
 
@@ -808,17 +830,44 @@ await test("cards: What is inside leaves out the muting permission set; singular
   });
   assert.deepEqual(cardCounts(res).components, { a: 2, b: 2, only: 2, mutedOnly: 1, mutedDiffer: 1 });
   assert.deepEqual(text(res, "components"), [
-    "2 permission sets in <a>", "2 permission sets in <b>", "2 permission sets in only one group",
-    "1 thing muting takes away in only one group", "1 thing both groups' muting takes away, but differently"]);
-  assert.equal(text(fake({ components: [set("onlyA")] }), "components")[2], "1 permission set in only one group");
+    "2 permission sets in only one group",
+    "1 item removed by muting in only one group", "1 item removed by muting in both, but differently"]);
+  assert.equal(totals(res, "components"), "2/2 permission sets");
+  assert.equal(text(fake({ components: [set("onlyA")] }), "components")[0], "1 permission set in only one group");
+  // no card line says "things"
+  assert.ok(!["userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabs", "components"].some((k) => text(res, k).some((t) => /thing/.test(t))));
 });
 
 await test("cards: identical groups show the two totals and Same in both", () => {
   const res = fake({ tabs: [{ status: "same", a: "Shown", b: "Shown" }], components: [{ part: "sets", group: "Permission set", status: "same" }] });
   assert.equal(cardLines(res, "tabs").same, true);
-  assert.deepEqual(text(res, "tabs"), ["1 tab <a> can see", "1 tab <b> can see"]);
+  assert.deepEqual(text(res, "tabs"), []);
+  assert.equal(totals(res, "tabs"), "1/1 tabs");
   assert.equal(cardLines(res, "components").same, true);
   assert.equal(cardLines(fake({ userPermissions: [{ status: "onlyA", a: true, b: false }] }), "userPermissions").same, false);
+});
+
+await test("group status wording: Updated is Up to date, anything else says what to do", () => {
+  assert.equal(groupStatus("Updated"), "Up to date");
+  assert.equal(groupStatus("Outdated"), "Not up to date (Outdated). In Setup, open this group and wait for its status to say Updated.");
+  assert.ok(groupStatus(null).startsWith("Not up to date (unknown)"));
+  assert.equal(R.sections.overview.find((r) => r.key === "Status").a, "Up to date");
+});
+
+await test("tab set differently says what differs; other rows get no text", () => {
+  const r = { status: "differ", a: "Shown", b: "Hidden" };
+  assert.equal(tabDiffText(r, "Sales Rep", "Sales Manager"), "Different: shown by default in Sales Rep, hidden in Sales Manager");
+  assert.equal(tabDiffText({ status: "differ", a: "Available (hidden by default)", b: "Shown" }, "A", "B"), "Different: available but hidden by default in A, shown by default in B");
+  assert.equal(tabDiffText({ status: "onlyA", a: "Shown", b: null }), null);
+  assert.equal(tabDiffText({ status: "differ", a: ["Read"], b: ["Edit"] }), null);
+  assert.equal(sortRows([r], "diff", "asc", "Sales Rep", "Sales Manager").length, 1);
+});
+
+await test("visible wording: license (US), area names, no PSG or snapshot words", () => {
+  const titles = Object.values(SECTION_TITLES).join("|");
+  assert.ok(titles.includes("Apps and other access") && titles.includes("Tab settings"));
+  assert.ok(!/PSG|snapshot|licence/i.test(titles + Object.values(SECTION_HELP).join("|")));
+  assert.ok(R.sections.components.filter((r) => r.part === "muted").every((r) => !/\(tab\)/.test(r.label)));
 });
 
 await test("cards on the sample result agree with the list rows", () => {

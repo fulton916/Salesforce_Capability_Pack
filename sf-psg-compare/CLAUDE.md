@@ -2,9 +2,11 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) that compares two
-Salesforce permission set groups. It reads the org through the REST API with the user's existing
-browser session and never writes to the org.
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with three read-only tools,
+named in the toolbar menu "Compare permission set groups", "Look up user access" and "Territory & role hierarchy". It reads the
+org through the REST API with the user's existing browser session and never writes to the org.
+Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
+Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
 
 - `extension/lib/sfconn.js` — finds the API session from the `sid` cookie; `SfApi.query` pages
   through `nextRecordsUrl`.
@@ -13,14 +15,15 @@ browser session and never writes to the org.
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on both pages.
-- `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
+- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all three pages.
+- `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
+- `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
-## User access (second tool)
+## Look up user access (second tool)
 
-A read-only page, `extension/user-access.html`, that shows one user's access (profile and licence,
+A read-only page, `extension/user-access.html`, that shows one user's access (profile and license,
 role, permission set groups, permission sets with "directly / through group", permission set
-licences, public groups, queues, territories) and compares two users. Same look as the compare page:
+licenses, public groups, queues, territories) and compares two users. Same look as the compare page:
 it links `psg-compare.css` and adds a little in `user-access.css`.
 
 - `extension/lib/useraccess.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with
@@ -37,12 +40,39 @@ it links `psg-compare.css` and adds a little in `user-access.css`.
   no `innerHTML`, `localStorage` or `chrome.storage` (a test checks); group and queue membership is
   direct only (say so in help text). Not covered: object/field access, nested group membership.
 
+## Territory & role hierarchy (third tool)
+
+A read-only page, `extension/hierarchy.html`, that shows the whole territory tree (Territory2, one
+model) or role tree (UserRole), opened out, with a search that narrows the page to one branch and a
+CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarchy.css`.
+
+- `extension/lib/hierarchy.js` — pure, tested: `buildTree` (sorted by name, numbers by value; missing
+  parent goes to the top level; a loop is cut at its first member by name (`loopCut`), and every member is flagged `inLoop`; iterative walks, so deep
+  chains are safe), `flatten`, `pathOf`, `branchOf`, `searchNodes` (pick.js words, limit 50, results carry
+  the path), `exportRows` (stepped "Level 1..N", "API name", "Path"), `exportFileName`, `summaryText`,
+  `treeNotes`. Re-exports `toCsv` from `compare.js` (which guards cells starting with = + - @ tab CR).
+- `extension/lib/hierarchyread.js` — `readTerritoryModels` (`{on: false}` when the org has no
+  territories: the `Territory2Model` query fails with INVALID_TYPE; no describeGlobal call, it was slow), `readTerritories(api,
+  modelId)`, `readRoles` (portal roles left out, counted with `COUNT()`).
+- `extension/hierarchy.js` — the page. Flat rows built once with a DocumentFragment; folding only
+  toggles `hidden` on a row range; "Show API names" is a CSS class; the search renders at most 50
+  list items. `?host=`, `?dev=1`, `?demo=1` as elsewhere. Demo:
+  `http://127.0.0.1:8765/hierarchy.html?demo=1`.
+- Samples: `extension/samples/hierarchy_territories.json`, `hierarchy_roles.json` (made-up, written
+  by hand; `make_samples.py` does not rebuild them).
+- Tests: `tests/hierarchy_tests.mjs`, run from `tests/run_tests.mjs` (includes the no-innerHTML,
+  no-storage guard for the new files).
+- Rules that matter: reads only; org text only through `textContent` / `el()`; nothing stored; names
+  that repeat are told apart by path, never by name alone.
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
-  "is the sandbox PSG the same as production?" → this tool.
+  "is the sandbox PSG the same as production?" → Compare permission set groups.
+- "What can this user access?", "how do these two users differ?" → Look up user access.
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
+- "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.
 
 ## Working on the code
 
@@ -59,7 +89,7 @@ it links `psg-compare.css` and adds a little in `user-access.css`.
    the user names): `python tools/dev_server.py --target-org <alias>`, open `?dev=1`. Pages
    reload by themselves on file changes, so there is no need to ask the user to reload Chrome.
 8. Write UI text for admins, not developers: labels before API names, plain words, no raw
-   error dumps in the main view (they go to Technical notes).
+   error dumps in the main view (they go under "Notes" or a folded "Technical details").
 
 ## Guardrails
 

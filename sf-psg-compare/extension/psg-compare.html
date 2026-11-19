@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Permission Set Group Compare</title>
+<title>Compare permission set groups</title>
 <link rel="stylesheet" href="psg-compare.css">
 </head>
 <body>
 <header class="top">
-  <h1>Permission Set Group Compare</h1>
+  <h1>Compare permission set groups</h1>
   <div class="org" id="org">Not connected</div>
   <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
 </header>
@@ -36,6 +36,7 @@
     </div>
     <div class="actions">
       <button id="compare" class="primary big" disabled>Compare</button>
+      <span id="compareHint" class="hint">Choose both groups first.</span>
     </div>
     <div id="progressBox" class="progress" hidden>
       <div class="pbar"><div class="pfill" id="pfill"></div></div>
@@ -45,13 +46,14 @@
     <div id="error" class="error" hidden></div>
     <details class="files">
       <summary>Compare with a saved file instead (for example, a group from another org)</summary>
-      <p class="hint">After a comparison, use <b>Download → Save group to a file</b>. You can load that file here later, in this org or another one.</p>
-      <div class="file-row"><span class="side a">A</span> <input type="file" class="snap" data-side="a" accept=".json,application/json" aria-label="Saved file for group A"></div>
-      <div class="file-row"><span class="side b">B</span> <input type="file" class="snap" data-side="b" accept=".json,application/json" aria-label="Saved file for group B"></div>
+      <p class="hint">After a comparison, use <b>Download → Save … to a file</b>. You can load that file here later, in this org or another one.</p>
+      <div class="file-row"><span class="side a">A</span> <input type="file" class="snap" data-side="a" accept=".json,application/json" aria-label="Saved group file for the first group"></div>
+      <div class="file-row"><span class="side b">B</span> <input type="file" class="snap" data-side="b" accept=".json,application/json" aria-label="Saved group file for the second group"></div>
     </details>
   </section>
 
   <section id="results" hidden>
+    <div class="alert" id="warnAlert" role="alert" hidden>Some information could not be read, so these results may be incomplete. See Notes below.</div>
     <div class="panel hero">
       <div class="vs">
         <div class="who a" id="whoA"></div>
@@ -59,14 +61,15 @@
         <div class="who b" id="whoB"></div>
       </div>
       <p class="verdict" id="verdict"></p>
+      <p class="verdict-note" id="verdictNote"></p>
     </div>
 
-    <p class="cards-title">Differences by area</p>
+    <p class="cards-title">Where the groups differ</p>
     <div class="cards" id="cards"></div>
 
     <div class="panel" id="riskPanel" hidden>
       <h2>Worth a closer look</h2>
-      <p class="hint">Powerful access that only one of the groups gives.</p>
+      <p class="hint">Broad access that only one of the groups has. Check these first.</p>
       <div id="riskGroups"></div>
     </div>
 
@@ -83,11 +86,12 @@
         <details class="menu">
           <summary class="button">Download ▾</summary>
           <div class="menu-items">
-            <button id="csvTab">This list, as shown (Excel CSV)</button>
-            <button id="csvDiff">Whole comparison, differences only (Excel CSV)</button>
-            <button id="csvAll">Whole comparison, everything (Excel CSV)</button>
-            <button id="saveA">Save group A to a file</button>
-            <button id="saveB">Save group B to a file</button>
+            <button id="csvTab">This list, as shown (CSV for Excel)</button>
+            <button id="csvDiff">All differences (CSV for Excel)</button>
+            <button id="csvAll">Everything (CSV for Excel)</button>
+            <hr>
+            <button id="saveA">Save first group to a file</button>
+            <button id="saveB">Save second group to a file</button>
           </div>
         </details>
       </div>
@@ -100,12 +104,12 @@
     </div>
 
     <details class="panel notes" id="notesPanel" hidden>
-      <summary id="notesTitle">Technical notes</summary>
+      <summary id="notesTitle">Notes</summary>
       <ul id="notes"></ul>
     </details>
   </section>
 
-  <p class="footer">Read-only: this page only looks at your org, it never changes anything.</p>
+  <p class="footer">Read-only: this page only reads from your org and never changes anything.</p>
 </main>
 <script type="module" src="psg-compare.js"></script>
 </body>

@@ -11,6 +11,7 @@ export const REPO_URL = "https://github.com/fulton916/Salesforce_Capability_Pack
 export const FEEDBACK_TOOLS = {
   psg: "PSG Compare (extension)",
   access: "User access (extension)",
+  hierarchy: "Territory & role hierarchy (extension)",
   menu: "Extension menu / other",
 };
 

@@ -173,6 +173,7 @@ def main():
     srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(login, a.port))
     print(f"Live org:  http://127.0.0.1:{a.port}/psg-compare.html?dev=1")
     print(f"Demo:      http://127.0.0.1:{a.port}/psg-compare.html?demo=1")
+    print(f"Hierarchy: http://127.0.0.1:{a.port}/hierarchy.html?demo=1")
     print("Read-only: only GET requests are forwarded. Ctrl+C to stop.")
     try:
         srv.serve_forever()
