@@ -3,7 +3,7 @@ import { readOrg } from "./lib/snapshot.js";
 import { searchUsers, readUserAccess } from "./lib/useraccess.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
-  matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf,
+  matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
 } from "./lib/usercompare.js";
 import { startLiveReload } from "./lib/livereload.js";
 
@@ -80,7 +80,7 @@ function showOrg(o, host, via) {
     via ? el("span", { class: "badge demo", text: via }) : null,
     el("span", { class: "host", text: host })
   );
-  document.title = `User access – ${o.name || host}`;
+  document.title = `Look up user access – ${o.name || host}`;
 }
 
 async function connect() {
@@ -178,8 +178,8 @@ function setupCombo(side) {
     }, el("span", { class: "nm", text: u.name }),
        u.isActive ? null : el("span", { class: "tag-inactive", text: "Inactive" }),
        el("span", { class: "dev plain", text: [u.username, u.profile].filter(Boolean).join(" · ") })));
-    if (!users.length) lis.push(el("li", { class: "none", text: "No user matches that." }));
-    if (more) lis.push(el("li", { class: "none", text: "There are more matches. Keep typing to narrow the list." }));
+    if (!users.length) lis.push(el("li", { class: "none", text: "No user found. Try a different part of the name or username." }));
+    if (more) lis.push(el("li", { class: "none", text: `Showing the first ${users.length}. Keep typing to narrow the list.` }));
     list.replaceChildren(...lis);
     list.hidden = false;
     input.setAttribute("aria-expanded", "true");
@@ -265,8 +265,8 @@ function renderChosen(side) {
   const box = $(`.picker[data-side="${side}"] .chosen`);
   if (!s.user) { box.replaceChildren(); return; }
   const nodes = [];
-  if (side === "b") nodes.push(el("button", { class: "link", text: "Remove this user and go back to one user", onclick: () => removeSide("b") }));
-  if (side === "b" && !state.sides.a.access) nodes.push(el("div", { class: "sub", text: "Choose the first user (A) to see the comparison." }));
+  if (side === "b") nodes.push(el("button", { class: "link", text: "Stop comparing", onclick: () => removeSide("b") }));
+  if (side === "b" && !state.sides.a.access) nodes.push(el("div", { class: "sub", text: "Choose the first user to see the comparison." }));
   box.replaceChildren(...nodes);
 }
 
@@ -327,6 +327,9 @@ function unavailableMsg(k) {
 }
 
 function renderCards() {
+  // One user: the Summary tab already lists every count, so the cards would only repeat it.
+  $("#cards").hidden = !state.result;
+  if (!state.result) { $("#cards").replaceChildren(); return; }
   $("#cards").replaceChildren(...SECTIONS.map((s) => {
     const k = s.key;
     const na = unavailableMsg(k);
@@ -336,9 +339,9 @@ function renderCards() {
       lines.push(el("div", { class: "na", text: "Not available" }));
     } else if (state.result) {
       const c = state.result.counts[k];
-      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), ` only ${nameOf("a")}`));
-      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), ` only ${nameOf("b")}`));
-      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), " assigned differently"));
+      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), ` only ${nameOf("a")} has`));
+      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), ` only ${nameOf("b")} has`));
+      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), " set up differently"));
       ok = !(c.onlyA + c.onlyB + c.differ);
       if (ok) lines.push(el("div", { class: "same", text: c.total ? "✓ Same in both" : "Neither has any" }));
     } else {
@@ -356,7 +359,7 @@ function renderNotes() {
     ...(state.sides.a.access.warnings || []),
   ];
   $("#notesPanel").hidden = !notes.length;
-  $("#notesTitle").textContent = `Technical notes (${notes.length})`;
+  $("#notesTitle").textContent = `Notes (${notes.length})`;
   $("#notes").replaceChildren(...notes.map((t) => el("li", { text: t })));
 }
 
@@ -372,18 +375,22 @@ function openTab(k, scroll = false) {
 function tabCount(k) {
   if (state.result) {
     const c = state.result.counts[k];
-    return { n: c.onlyA + c.onlyB + c.differ, title: "Differences" };
+    const n = c.onlyA + c.onlyB + c.differ;
+    return { n, title: plural(n, "difference", "differences") };
   }
-  return { n: itemsOf(state.sides.a.access, k).length, title: "Items" };
+  const n = itemsOf(state.sides.a.access, k).length;
+  return { n, title: plural(n, "item", "items") };
 }
 
 function renderTabs() {
   $("#tabs").replaceChildren(...TAB_ORDER.map((k) => {
     const { n, title } = k === "overview" ? { n: 0 } : tabCount(k);
-    return el("button", { role: "tab", "aria-selected": String(state.tab === k), onclick: () => openTab(k) },
+    const attrs = { role: "tab", "aria-selected": String(state.tab === k), onclick: () => openTab(k) };
+    if (k !== "overview") attrs["aria-label"] = `${SECTION_TITLES[k]}, ${title}`;
+    return el("button", attrs,
       SECTION_TITLES[k], k === "overview" ? null : el("span", { class: `n${n ? "" : " zero"}`, title, text: String(n) }));
   }));
-  $("#help").textContent = SECTION_HELP[state.tab] || "";
+  $("#help").textContent = state.tab === "overview" && !state.result ? "A quick look at each area. Click a tab to see the list." : SECTION_HELP[state.tab] || "";
   $(".seg").hidden = state.tab === "overview" || !state.result;
 }
 
@@ -431,11 +438,12 @@ function columns() {
   if (state.tab === "overview") {
     return cmp
       ? { head: ["", headA, headB], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: r.a }), el("td", { text: r.b })] }
-      : { head: ["", "This user"], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: r.a })] };
+      : { head: ["", "Access"], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: r.a })] };
   }
   if (cmp) {
     return { head: [SECTION_TITLES[state.tab], headA, headB, "Difference"], row: (r) => [itemCell(r), presence(r.a, r.detailA), presence(r.b, r.detailB), el("td", {}, statusChip(r))] };
   }
+  if (!hasDetails(currentRows())) return { head: [SECTION_TITLES[state.tab]], row: (r) => [itemCell(r)] };
   return { head: [SECTION_TITLES[state.tab], "Details"], row: (r) => [itemCell(r), el("td", { class: "how", text: r.detail })] };
 }
 

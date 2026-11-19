@@ -2,9 +2,11 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) that compares two
-Salesforce permission set groups. It reads the org through the REST API with the user's existing
-browser session and never writes to the org.
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with three read-only tools,
+named in the toolbar menu "Compare permission set groups", "Look up user access" and "Territory & role hierarchy". It reads the
+org through the REST API with the user's existing browser session and never writes to the org.
+Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
+Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
 
 - `extension/lib/sfconn.js` — finds the API session from the `sid` cookie; `SfApi.query` pages
   through `nextRecordsUrl`.
@@ -13,13 +15,14 @@ browser session and never writes to the org.
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
+- `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
+- `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
-## User access (second tool)
+## Look up user access (second tool)
 
-A read-only page, `extension/user-access.html`, that shows one user's access (profile and licence,
+A read-only page, `extension/user-access.html`, that shows one user's access (profile and license,
 role, permission set groups, permission sets with "directly / through group", permission set
-licences, public groups, queues, territories) and compares two users. Same look as the compare page:
+licenses, public groups, queues, territories) and compares two users. Same look as the compare page:
 it links `psg-compare.css` and adds a little in `user-access.css`.
 
 - `extension/lib/useraccess.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with
@@ -64,7 +67,8 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
-  "is the sandbox PSG the same as production?" → this tool.
+  "is the sandbox PSG the same as production?" → Compare permission set groups.
+- "What can this user access?", "how do these two users differ?" → Look up user access.
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
 - "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.
@@ -84,7 +88,7 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
    the user names): `python tools/dev_server.py --target-org <alias>`, open `?dev=1`. Pages
    reload by themselves on file changes, so there is no need to ask the user to reload Chrome.
 8. Write UI text for admins, not developers: labels before API names, plain words, no raw
-   error dumps in the main view (they go to Technical notes).
+   error dumps in the main view (they go under "Notes" or a folded "Technical details").
 
 ## Guardrails
 

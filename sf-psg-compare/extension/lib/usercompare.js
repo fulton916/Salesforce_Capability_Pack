@@ -10,13 +10,13 @@ export const ACCESS_SCHEMA = "sf-user-access/1";
 
 /** The areas, in display order. `noun` is for "3 permission sets", `one` for "1 permission set". */
 export const SECTIONS = [
-  { key: "profile", title: "Profile", one: "profile", noun: "profiles", help: "The profile gives the user their base access and decides which user licence they have." },
-  { key: "role", title: "Role", one: "role", noun: "roles", help: "The role decides which records the user can see through the role hierarchy." },
-  { key: "permissionSetGroups", title: "Permission set groups", one: "permission set group", noun: "permission set groups", help: "Bundles of permission sets assigned to the user. A group that has a muting permission set takes some access away; it is shown next to the group as \"Muting permission set\"." },
-  { key: "permissionSets", title: "Permission sets", one: "permission set", noun: "permission sets", help: "Permission sets the user gets, either assigned directly or through a permission set group. Permission sets that belong to a profile, and the summary sets Salesforce keeps for groups, are left out." },
-  { key: "permissionSetLicenses", title: "Permission set licences", one: "licence", noun: "licences", help: "Extra licences assigned to the user that unlock features for some permission sets." },
-  { key: "publicGroups", title: "Public groups", one: "public group", noun: "public groups", help: "Public groups the user is a direct member of. Membership through roles or through other groups inside a group is not shown." },
-  { key: "queues", title: "Queues", one: "queue", noun: "queues", help: "Queues the user is a direct member of. Membership through roles or through groups inside a queue is not shown." },
+  { key: "profile", title: "Profile", one: "profile", noun: "profiles", help: "The profile gives the user their base access and decides which user license they have." },
+  { key: "role", title: "Role", one: "role", noun: "roles", help: "The role decides which records the user can see through the role hierarchy (for example, records owned by people below them)." },
+  { key: "permissionSetGroups", title: "Permission set groups", one: "permission set group", noun: "permission set groups", help: "Groups of permission sets assigned to the user. If a group has a muting permission set, that set removes some access and is listed beside the group." },
+  { key: "permissionSets", title: "Permission sets", one: "permission set", noun: "permission sets", help: "Permission sets the user has, assigned directly or through a group. Sets that come built into a profile are not shown." },
+  { key: "permissionSetLicenses", title: "Permission set licenses", one: "license", noun: "licenses", help: "Licenses that some permission sets need before they work for this user." },
+  { key: "publicGroups", title: "Public groups", one: "public group", noun: "public groups", help: "Only groups the user was added to directly. Groups they get through a role or another group are not shown." },
+  { key: "queues", title: "Queues", one: "queue", noun: "queues", help: "Only queues the user was added to directly. Queues they get through a role or a group are not shown." },
   { key: "territories", title: "Territories", one: "territory", noun: "territories", help: "Sales territories the user is assigned to." },
 ];
 /** "1 queue", "3 queues". `one` and `many` are the singular and plural nouns. */
@@ -29,7 +29,7 @@ export function countText(n, sectionKey) {
 }
 
 export const SECTION_KEYS = SECTIONS.map((s) => s.key);
-export const SECTION_TITLES = { overview: "Overview", ...Object.fromEntries(SECTIONS.map((s) => [s.key, s.title])) };
+export const SECTION_TITLES = { overview: "Summary", ...Object.fromEntries(SECTIONS.map((s) => [s.key, s.title])) };
 export const SECTION_HELP = {
   overview: "A quick look at each area. Click a card above, or a tab, to see the list.",
   ...Object.fromEntries(SECTIONS.map((s) => [s.key, s.help])),
@@ -55,10 +55,10 @@ export const itemsOf = (access, key) => access?.sections?.[key] || [];
 /** How the user gets a permission set, in words. */
 export function howText(item) {
   const groups = (item.groups || []).map((g) => g.label || g.key);
-  const through = groups.length ? `Through group${groups.length > 1 ? "s" : ""}: ${groups.join(", ")}` : "";
-  if (item.direct && through) return `Assigned directly, and ${through.charAt(0).toLowerCase()}${through.slice(1)}`;
+  const through = groups.length ? `the group${groups.length > 1 ? "s" : ""} ${groups.join(", ")}` : "";
+  if (item.direct && through) return `Assigned directly and through ${through}`;
   if (item.direct) return "Assigned directly";
-  return through;
+  return through ? `Through ${through}` : "";
 }
 
 /** Extra words shown next to an item (how it was given, licence, muting). */
@@ -67,14 +67,14 @@ export function detailText(sectionKey, item) {
   const parts = [];
   if (sectionKey === "permissionSets") {
     parts.push(howText(item));
-    if (item.licence) parts.push(`Licence: ${item.licence}`);
+    if (item.licence) parts.push(`Needs license: ${item.licence}`);
   } else if (sectionKey === "permissionSetGroups") {
     if (item.muting?.length) parts.push(`Muting permission set${item.muting.length > 1 ? "s" : ""}: ${item.muting.join(", ")}`);
-    if (item.status && item.status !== "Updated") parts.push(`Needs recalculation (${item.status})`);
+    if (item.status && item.status !== "Updated") parts.push(`Not up to date (${item.status}). In Setup, open this group and wait for its status to say Updated.`);
   } else if (sectionKey === "profile") {
-    if (item.licence) parts.push(`User licence: ${item.licence}`);
+    if (item.licence) parts.push(`User license: ${item.licence}`);
   }
-  return parts.filter(Boolean).join(" · ");
+  return parts.filter(Boolean).join("\n"); // one fact per line (the page keeps the line breaks)
 }
 
 /** One user's rows for a list: [{key, label, item, detail}], sorted by label. */
@@ -83,6 +83,9 @@ export function singleRows(access, sectionKey) {
     .map((item) => ({ key: item.key, label: item.label || item.key, item, detail: detailText(sectionKey, item) }))
     .sort((x, y) => x.label.localeCompare(y.label));
 }
+
+/** True when at least one row has something to show in a Details column. */
+export const hasDetails = (rows) => rows.some((r) => r.detail);
 
 /** Item count per area for one user. */
 export function summarize(access) {
@@ -110,7 +113,7 @@ export function displayNames(a, b) {
 }
 
 export function statusText(status, nameA = "A", nameB = "B") {
-  return { same: "Same", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Assigned differently" }[status] || status;
+  return { same: "Same", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Different" }[status] || status;
 }
 
 /** Compare two users. Rows are matched by API name, so users from different orgs compare cleanly. */
@@ -151,7 +154,8 @@ function verdict(counts, names) {
   if (!onlyA && !onlyB) return { text: `${a} and ${b} have the same access, but some of it comes to them in different ways.`, level: "good" };
   if (!onlyB) return { text: `${a} has everything ${b} has, and more.`, level: "" };
   if (!onlyA) return { text: `${b} has everything ${a} has, and more.`, level: "" };
-  return { text: `${a} and ${b} each have access the other does not.`, level: "" };
+  const total = onlyA + onlyB + differ;
+  return { text: `${a} and ${b} each have access the other does not (${plural(total, "difference", "differences")} in total).`, level: "" };
 }
 
 function notesOf(a, b, names) {
@@ -163,6 +167,11 @@ function notesOf(a, b, names) {
   return notes;
 }
 
+/** Detail text for a CSV cell: the on-screen line breaks become "; " so every cell is one line. */
+function oneLine(text) {
+  return String(text || "").replace(/\n/g, "; ");
+}
+
 /** Rows for CSV, comparing two users. `onlySection` limits it to one area. */
 export function toRows(result, onlySection = null) {
   const { a: A, b: B } = result.names;
@@ -170,7 +179,7 @@ export function toRows(result, onlySection = null) {
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
     for (const r of result.sections[k]) {
-      rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? r.detailA || "Yes" : "No", r.b ? r.detailB || "Yes" : "No"]);
+      rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : "No", r.b ? oneLine(r.detailB) || "Yes" : "No"]);
     }
   }
   return rows;
@@ -181,7 +190,7 @@ export function toRowsSingle(access, onlySection = null) {
   const rows = [["User", "Username", "Area", "Item", "API name", "Details"]];
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
-    for (const r of singleRows(access, k)) rows.push([access.user.name, access.user.username, SECTION_TITLES[k], r.label, r.key, r.detail]);
+    for (const r of singleRows(access, k)) rows.push([access.user.name, access.user.username, SECTION_TITLES[k], r.label, r.key, oneLine(r.detail)]);
   }
   return rows;
 }

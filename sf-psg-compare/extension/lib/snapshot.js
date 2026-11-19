@@ -8,7 +8,7 @@
 // assigned to the group gets from it. It is only current when the group's Status is 'Updated'.
 
 import { chunk, soqlString } from "./sfconn.js";
-import { humanize } from "./compare.js";
+import { humanize, groupStatus } from "./compare.js";
 
 // v2 adds: fieldLabels, muting.tabSettings and muting.effective (what the muting set really removes).
 // v1 files (saved earlier) are still accepted; the comparison falls back for the missing parts.
@@ -156,8 +156,8 @@ async function nameSetup(api, records, warnings) {
     if (unnamed) {
       const noun = `${spec ? lowerFirst(typeLabel) : typeLabel.toLowerCase()}${unnamed === 1 ? "" : "s"}`;
       warnings.push(
-        `${unnamed} ${noun} could not be named in this org${reason ? ` (${reason})` : ""}; ` +
-        `${unnamed === 1 ? "it is" : "they are"} listed by Id, which differs between orgs.`
+        `${unnamed} ${noun} could not be named in this org, so ${unnamed === 1 ? "it is" : "they are"} listed by Id, which differs between orgs.` +
+        `${reason ? ` (${reason})` : ""}`
       );
     }
   }
@@ -194,7 +194,7 @@ async function readFieldLabels(api, fieldKeys, warnings) {
       failed = true;
     }
   });
-  if (failed) warnings.push("Some field names could not be read from the org, so those fields are shown with names made from their API names.");
+  if (failed) warnings.push("Could not read the names of some fields, so their API names are shown instead. Your user may be missing access in Setup.");
   return out;
 }
 
@@ -301,7 +301,7 @@ async function mutedEffect(api, muting, compIds, agg, opFields, warnings) {
     eff.nothingToTake = Math.max(0, total - effective);
     return eff;
   } catch (e) {
-    warnings.push(`Could not work out what the muting permission set really takes away (${e.message}).`);
+    warnings.push(`Could not work out what the muting permission set removes, so that list may be incomplete. (${e.message})`);
     return null;
   }
 }
@@ -315,7 +315,7 @@ async function licenceNames(api, ids, warnings) {
       const { records } = await api.query(`SELECT Id, ${field} FROM ${sobject} WHERE Id IN (${list})`);
       for (const r of records) out[r.Id] = r[field];
     } catch (e) {
-      warnings.push(`Could not read ${sobject} names (${e.message}).`);
+      warnings.push(`Could not read the license names, so some permission sets may not show their license. (${e.message})`);
     }
   }
   return out;
@@ -340,6 +340,11 @@ export async function readOrg(api, apiHost) {
   return { id: o.Id, name: o.Name, isSandbox: o.IsSandbox === true, instance: o.InstanceName, edition: o.OrganizationType, host: apiHost };
 }
 
+/** An error whose message is already plain words for the user (the page shows it as is). */
+function plain(message) {
+  return Object.assign(new Error(message), { plain: true });
+}
+
 /** Read one PSG into a snapshot. `progress(text)` is called before each step. */
 export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}) {
   const warnings = [];
@@ -350,13 +355,13 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
     `SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, Description, Status FROM PermissionSetGroup WHERE Id = ${idLit}`
   );
   const g = psgRes.records[0];
-  if (!g) throw new Error(`Permission set group ${psgId} not found.`);
+  if (!g) throw plain("This group could not be found. It may have been deleted. Reload the page and pick it again.");
 
   const aggRes = await api.query(`SELECT Id, Type FROM PermissionSet WHERE PermissionSetGroupId = ${idLit}`);
   const agg = aggRes.records.find((r) => r.Type === "Group") || aggRes.records[0];
-  if (!agg) throw new Error(`No aggregate permission set found for group ${g.DeveloperName}.`);
+  if (!agg) throw plain("Salesforce has not finished setting up this group yet. Open it in Setup, wait for its status to say Updated, then try again.");
   if (g.Status !== "Updated") {
-    warnings.push(`Status is ${g.Status}, not Updated: Salesforce has not finished recalculating this group, so its permissions may not match its components yet.`);
+    warnings.push(`${groupStatus(g.Status)} Its permissions may not match its permission sets yet.`);
   }
 
   progress("Reading component permission sets");
@@ -401,7 +406,7 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
           muting = { id: m.Id, sobject: "MutingPermissionSet", name, label: m.MasterLabel };
         }
       } catch (e) {
-        warnings.push(`Could not read the muting permission set (${e.message}).`);
+        warnings.push(`Could not read the muting permission set, so what it removes may be missing. (${e.message})`);
       }
     }
   }
@@ -424,11 +429,11 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
       ]);
     } catch (e) {
       muting.userPermissions = muting.objectPermissions = muting.fieldPermissions = muting.tabSettings = undefined;
-      warnings.push(`Could not read what the muting permission set removes (${e.message}).`);
+      warnings.push(`Could not read what the muting permission set removes, so that list may be incomplete. (${e.message})`);
     }
   };
   const readGlobal = api.describeGlobal().catch((e) => {
-    warnings.push(`Could not read object names; API names are shown instead (${e.message}).`);
+    warnings.push(`Could not read the names of some objects, so their API names are shown instead. Your user may be missing access in Setup. (${e.message})`);
     return { sobjects: [] };
   });
 
@@ -474,7 +479,7 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
   for (const o of global.sobjects || []) if (wanted.has(o.name)) objectLabels[o.name] = tidy(o.label);
 
   if (!Object.keys(userPermissions).length && !Object.keys(objPerms).length && components.length) {
-    warnings.push("The aggregate permission set returned no permissions although the group has components. Check the group's Status in Setup.");
+    warnings.push("No permissions were found for this group although it has permission sets. Check the group's status in Setup.");
   }
 
   return {
@@ -506,10 +511,10 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
 /** Check that a parsed JSON file is a snapshot this tool can read. */
 export function validateSnapshot(s) {
   if (!s || typeof s !== "object" || !ACCEPTED_SCHEMAS.includes(s.schema)) {
-    throw new Error(`Not a PSG snapshot (expected schema "${SNAPSHOT_SCHEMA}").`);
+    throw new Error(`Not a saved group file (expected schema "${SNAPSHOT_SCHEMA}").`);
   }
   for (const k of ["psg", "components", "userPermissions", "objectPermissions", "fieldPermissions", "setupAccess", "tabSettings"]) {
-    if (!(k in s)) throw new Error(`Snapshot is missing "${k}".`);
+    if (!(k in s)) throw new Error(`The saved group file is missing "${k}".`);
   }
   return s;
 }

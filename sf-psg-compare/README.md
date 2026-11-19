@@ -1,164 +1,38 @@
 # sf-psg-compare
 
-A Chrome extension that compares two Salesforce permission set groups (PSGs): what each one
-contains and what each one lets a user do.
+A Chrome extension with three read-only tools: **Compare permission set groups**, **Look up user
+access**, and **Territory & role hierarchy**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
-browser, so there is nothing to set up in the org: no connected app, no OAuth, no server.
+browser, so there is nothing to set up in the org. It only reads; it never changes anything.
 
-Read-only. It runs SOQL queries and describes. It never writes to the org.
+## What each tool answers
 
-## What it compares
+Compare permission set groups:
+- What is different between these two groups?
+- Does group X have anything group Y doesn't?
+- Is the sandbox version of a group the same as production?
 
-The page is written for admins, not developers. It shows labels ("Account › Annual Revenue"),
-not API names. Ticking "Show API names" prints the API name under every row of every list
-(even when it is the same as the label, such as Account).
+Look up user access:
+- What can this user access, and how do they get it (directly or through a group)?
+- How do two users' access differ?
 
-At the top it says the result in plain words, with how much: "Each group gives access the other
-does not: Sales Rep gives 4 items of access Sales Manager doesn't; Sales Manager gives 21 items of
-access Sales Rep doesn't." (An "item of access" is a system permission, object, field,
-app/page/code item or tab that only that group gives, or gives more of.) Under that:
+Territory & role hierarchy:
+- What does the whole territory or role tree look like, and what is under this one branch?
+- Can I get a branch into Excel?
 
-- **A card per area**, under "Differences by area". Every card lists the same kinds of lines, always
-  all of them (even when 0), with the group names in their colours and thousands separators:
-  - System permissions: "N system permissions A has", "... B has", "N only one group has".
-  - Objects: "N objects A can access", "... B can access", "N objects only one group can access",
-    "N objects both can access, but with different rights (Read, Create, Edit, Delete...)".
-  - Fields: "N fields A can see", "... B can see", "N fields only one group can see", "N fields both
-    can see, but one can edit and the other can only read".
-  - Apps, pages & code: "N items A can use", "... B can use", "N only one group can use".
-  - Tabs: "N tabs A can see" (a tab set to Hidden does not count), "... B can see", "N tabs only
-    one group can see", "N tabs both can see, but set differently (shown or hidden by default)".
-  - What's inside: "N permission sets in A", "... in B", "N permission sets in only one group",
-    "N things muting takes away in only one group", "N things both groups' muting takes away, but
-    differently". The muting permission set itself is not counted, but is still in the list.
+## Known limits
 
-  "A has" counts everything A has, whether B has it too or not. When a card has nothing that only
-  one group has and nothing different, it shows just the two totals and "✓ Same in both". Click a
-  card to open its list.
-- **Worth a closer look:** one block per group that has something, group A first. Each block has a
-  heading in that group's colour, "Only {group} has:", then its powerful system permissions (just
-  the permission name), then at most one line for View All / Modify All on objects, such as "View
-  All or Modify All on 938 objects where Sales Rep has less, including Account, Case and
-  Opportunity. See Objects." (Where the other group also has View All and this one adds Modify All,
-  that counts too.) If a group has more than 5 system permissions, its own "Show N more system
-  permissions" / "Show fewer" link is the last thing in its block.
-- **Technical notes** (folded away): anything the tool could not read, with what to do.
-
-| List | Shows |
-|---|---|
-| Summary | org, name, description, status, users assigned, permission sets inside, muting permission set, and how much each group gives |
-| System permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
-| Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object, and which ones only one group has |
-| Fields | No access / Read / Edit per field, in one collapsible block per object ("Account — 212 differences"). Long lists start collapsed; "Expand all / Collapse all"; searching opens the matching objects |
-| Apps, pages & code | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
-| Tabs | shown, available (hidden by default) or hidden |
-| What's inside | two parts: "Permission sets in each group" (with licence, and the muting permission set too), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, System permission, Tab, App/page/code) |
-
-Each list shows only the differences until you choose "Everything". Click a column heading to sort
-by it (A to Z; click again for Z to A; each heading shows small up and down arrows, and after a click one arrow shows the direction). Text sorts without regard to
-case and numbers by value ("Item 2" before "Item 10"); empty text cells ("—") always come last.
-Columns that show access sort by how much access there is: a tick column puts ✓ first, then —;
-the Objects, Fields and Tabs columns go from least to most access (click again for most first), and
-items with the same access are in name order. In Fields
-the rows sort inside each object, and the Field heading also orders the objects; What's inside keeps
-its two parts. The sort stays while you switch between "Only differences" and "Everything" or
-search, is remembered per list, and is used by "This list, as shown". Without a click the lists
-keep their usual order. The search ignores
-punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is the same
-as its card: things only one group has, plus things set up differently. While reading big groups the page shows "Step n of 5".
-
-**Download** saves a CSV that opens in Excel: "This list, as shown" (the differences-only choice,
-the search and the sort are applied; collapsed objects are still included), the whole comparison with
-differences only, or the whole comparison with everything. It can also save a group to a file for
-later. The CSV has a "Kind of item" column.
-
-Picking a group: type any part of its name or API name (words in any order) and press Enter or
-click it.
-
-### Net access, not the sum of the parts
-
-The permissions come from the group's aggregate permission set (`PermissionSet` with
-`Type = 'Group'`). Salesforce keeps that record as the component permission sets combined, minus
-the muting permission set. It is what a user assigned to the group actually gets from it.
-
-It is only current when the group's Status is **Updated**. If a group is `Outdated` or `Failed`,
-the tool says so at the top. Recalculate the group in Setup and compare again.
-
-### What muting really takes away
-
-A muting permission set can list things no permission set in the group gives, and Salesforce does
-not always apply a mute to the aggregate. So "Taken away by muting" lists an item only if it is
-muted, at least one permission set in the group gives it, and the aggregate no longer has it. On a
-field, Read muted takes away Read and Edit; Edit muted takes away Edit only. The notes add one line
-with how many muted items took nothing away. Snapshot files saved before this check
-(`sf-psg-snapshot/1`) still load; their muted items are shown under "Muted (may not have been
-given)" because they cannot say whether anything was removed.
-
-### Compare across orgs (sandbox vs production)
-
-"Save snapshot A/B" downloads the group as a JSON file. Load that file on either side later, in
-another org or with no org at all. Items are matched by API name (namespace included), never by
-Id, so a group in a sandbox compares cleanly with the same group in production.
-
-A snapshot holds permission names, object and field API names and counts. It holds no record
-data and no user names. It does hold the org name and host; treat it like any other org export.
-
-## User access
-
-A second page, **User access**, shows what one user has, in plain words, and can set two users side
-by side. It is read-only, like the compare page, and looks and works the same way (same
-stylesheet, cards, tabs, "Only differences / Everything", "Show API names", search box, Download).
-
-Type part of a name or username (words in any order) and pick the user from the list that opens
-under the box. Inactive users are marked "Inactive". The search runs in the org, so it works in orgs
-with thousands of users. Add a second user under "Compare with another user (optional)" to compare;
-"Remove this user" goes back to one user.
-
-It shows, for each user:
-
-| Area | What it shows |
-|---|---|
-| Profile | the profile and its user licence |
-| Role | the role |
-| Permission set groups | groups assigned to the user; a muting permission set is shown as "Muting permission set: ..." |
-| Permission sets | every permission set the user gets, and how: "Assigned directly", "Through group: ...", or both. Profile-owned sets and the summary sets Salesforce keeps for groups are left out |
-| Permission set licences | the permission set licences assigned |
-| Public groups, Queues | direct membership only. Membership through roles or groups inside groups is not shown |
-| Territories | the territories the user is assigned to |
-
-With two users, each card says how many items only one has, or "✓ Same in both". A permission set
-one user has directly and the other gets through a group counts as "assigned differently". Items are
-matched by API name, never by Id. **Download** saves "This list" or "Everything" as a CSV for Excel.
-Nothing about users is saved: there are no user snapshots, because they hold usernames.
-
-If an area cannot be read, only that area says so in plain words (for example "Territories are not
-turned on in this org") and the raw error goes to "Technical notes". When the org's territory feature is off, the page does not even ask for it. A failed search or read shows a plain message, with the raw Salesforce message folded under "Technical details".
-
-Objects it reads (all with `SELECT`, nothing else): `User`, `PermissionSetAssignment`,
-`PermissionSetGroup`, `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`,
-`UserLicense`, `PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
-`UserTerritory2Association`. Your user needs API Enabled and View Setup and Configuration, and
-access to see users.
-
-Try it: `python tools/dev_server.py --no-org`, then open
-<http://127.0.0.1:8765/user-access.html?demo=1> (two made-up users). Against an org through the dev
-server: `?dev=1`. The popup opens it as `user-access.html?host=<org host>`.
-
-Does not cover: field-level or object-level access, what a permission set contains, sharing and
-record access, group or queue membership through roles or nested groups, login history, or any
-change to a user. For removing access use `sf-user-access-teardown`.
-
-Run against live orgs so far (read-only): a Developer Edition org (search, permission sets,
-licences and compare worked; territories are off there and are handled) and a large sandbox with
-about 6,000 users. On the sandbox, a user with 3 permission set groups, 18 permission sets (9 only
-through groups), 11 licences, 3 public groups, 24 queues and 1 territory matched the org line by
-line, including a muting permission set, and a compare of two users worked. Not yet checked inside
-Chrome from the toolbar button (only through the dev server).
+- Not yet checked from the toolbar button inside Chrome. The checks so far used a local test
+  server (see "What has been tested").
+- A group is only read correctly when its Status is **Updated**. If it is Outdated or Failed, the
+  page says so; recalculate the group in Setup and compare again.
+- Look up user access does not cover field or object access, what a permission set contains,
+  sharing and record access, login history, or any change to a user.
 
 ## Territory & role hierarchy
 
-A third page shows the whole **territory** tree (Enterprise Territory Management) or the whole **role**
+The third tool shows the whole **territory** tree (Enterprise Territory Management) or the whole **role**
 tree, already open, so there is no clicking of plus signs as in Setup. It is read-only and looks and
 works like the other pages (same stylesheet, org name with Sandbox or Production, "Show API names").
 
@@ -205,61 +79,171 @@ To share it with a team without the Chrome Web Store, zip the `extension/` folde
 loads it unpacked. For a managed rollout, an admin can publish it as an unlisted Web Store item or
 push it by policy.
 
-## Use
-
-1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
-2. Click the extension. It is a menu of tools: choose **Compare permission set groups**,
-   **User access** or **Territory & role hierarchy**. A new tab opens, connected to that org. The compare page's header shows the org
-   name and whether it is a sandbox or production.
-3. Pick group A and group B (type in the filter box to narrow the list), or load a snapshot file
-   on either side.
-4. **Compare**. Each press reads the org again, so the result is current.
-
-### Try it without an org
-
-```
-python tools/dev_server.py --no-org
-```
-
-Then open <http://127.0.0.1:8765/psg-compare.html?demo=1>. It loads two made-up groups from
-`extension/samples/`.
-
-## Developing without reloading Chrome
-
-`tools/dev_server.py` serves the page and forwards its API calls to an org using the login the
-Salesforce CLI already has, so the page can be tested against a real org in any browser tab:
-
-```
-sf org login web --alias my-sandbox        # once, if the CLI is not logged in to the org
-python tools/dev_server.py --target-org my-sandbox
-```
-
-Open <http://127.0.0.1:8765/psg-compare.html?dev=1>.
-
-- **Read-only.** Only GET requests to `/services/data/` are forwarded; anything else gets 405.
-- **The token stays in the server.** The page never sees it. The server listens on 127.0.0.1 only
-  and refuses requests addressed to any other host name.
-- **Live reload.** Pages reload by themselves within about two seconds of a file change under
-  `extension/`. This also works for the unpacked extension loaded in Chrome: unpacked extensions
-  read their pages from disk, so page, JS and CSS edits need no "Reload" click while the dev
-  server runs. Changes to `manifest.json` still need one.
-
 ## What your user needs
 
 - API Enabled.
 - View Setup and Configuration (to read permission sets, groups and their permissions).
+- For Look up user access, also access to see users.
 - To name Apex classes and pages: read access to them is normal with View Setup. Items it cannot
   name are kept by Id with a note at the top.
+
+## How to use
+
+1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
+2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
+   and three buttons: **Compare permission set groups** ("Find out how two permission set groups
+   differ"), **Look up user access** ("See what a user can access, or compare two users") and
+   **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"). On
+   any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
+3. The tool opens in a new tab, connected to that org.
+
+### Compare permission set groups
+
+1. Pick group A and group B: type any part of the name or API name (words in any order), then press
+   Enter or click it. Or load a saved group file on either side.
+2. Click **Compare**. Each press reads the org again, so the result is current. While reading big
+   groups the page shows "Step n of 5".
+
+The result starts with a sentence saying who has what, for example "Sales Rep has 4 things Sales
+Manager doesn't. Sales Manager has 21 things Sales Rep doesn't." or "Sales Manager has everything
+Sales Rep has, and 21 more." (or "Both groups have exactly the same access."). A muted line under it
+says what is counted: system permissions, objects, fields, apps and other access, and tabs, not
+permission sets. Under that:
+
+- **Where the groups differ:** one card per area, each with totals for both groups and the number of
+  things only one group has or that are set up differently. A card with no differences says
+  "✓ Same in both". Click a card to open its list.
+- **Worth a closer look:** broad access that only one group has (powerful system permissions, View
+  All / Modify All on objects). Check these first.
+- **Notes** (folded away): anything the tool could not read, with what to do.
+
+The tabs, one list each:
+
+| Tab | Shows |
+|---|---|
+| Summary | org, name, API name, description, status, users assigned, permission sets in the group, muting permission set, and how many system permissions, objects, fields, apps and other access items, and tabs each group has |
+| System permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
+| Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object |
+| Fields | No access / Read / Edit per field, in one collapsible block per object |
+| Apps and other access | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
+| Tab settings | shown, available (hidden by default) or hidden |
+| What's inside | "Permission sets in each group" (with license, and the muting permission set too), and "Removed by muting" (what muting removes, by kind) |
+
+Working with a list:
+- Each list shows **Only differences** until you choose **Everything**. Status words are "Only
+  <group name>", "Different" and "Same".
+- Click a column heading to sort (A to Z; click again for Z to A). Text ignores case, numbers sort by
+  value, empty cells come last, and access columns sort from least to most access. The sort is
+  remembered per list and is kept when you switch views or search.
+- Search ignores punctuation ("Account › Annual" finds Account's Annual Revenue) and opens matching
+  objects in Fields.
+- "Show API names" prints the API name under every row. Labels are shown by default.
+- The number on each tab matches its card: things only one group has, plus things set up
+  differently.
+
+**Download** saves a CSV that opens in Excel (it has a "Kind of item" column):
+- "This list, as shown (CSV for Excel)": the current view, with search and sort applied
+- "All differences (CSV for Excel)": the whole comparison, differences only
+- "Everything (CSV for Excel)": the whole comparison
+- "Save <group name> to a file": saves a group so you can load it later
+
+**Compare across orgs (sandbox vs production).** Save a group to a file, then load that saved group
+file on either side later, in another org or with no org at all. Items are matched by API name
+(namespace included), never by Id. The file holds permission names, object and field API names and
+counts. It holds no record data and no user names, but it does hold the org name and host, so treat
+it like any other org export.
+
+**Net access, not the sum of the parts.** The result is what a user assigned to the group actually
+gets: the component permission sets combined, minus the muting permission set.
+
+**What muting removes.** "Removed by muting" lists an item only if it is muted, at least one
+permission set in the group has it, and the group no longer has it. On a field, Read muted removes
+Read and Edit; Edit muted removes Edit only. Saved group files from before this check still load;
+their muted items are shown as "Removed by muting (not confirmed, older saved file)" because they
+cannot say whether anything was removed.
+
+### Look up user access
+
+Type part of a name or username (words in any order) and pick the user from the list. Inactive
+users are marked "Inactive". Add a second user under "Second user (optional, to compare)" to compare;
+"Stop comparing" goes back to one user. It looks and works like the compare tool (cards, tabs,
+"Only differences" / "Everything", "Show API names", search, Download).
+
+| Area | What it shows |
+|---|---|
+| Profile | the profile and its user license |
+| Role | the role |
+| Permission set groups | groups assigned to the user; a muting permission set is shown as "Muting permission set: ..." |
+| Permission sets | every permission set the user gets, and how: "Assigned directly", "Through group: ...", or both. Profile-owned sets and the summary sets Salesforce keeps for groups are left out |
+| Permission set licenses | the permission set licenses assigned |
+| Public groups, Queues | direct membership only. Membership through roles or groups inside groups is not shown |
+| Territories | the territories the user is assigned to |
+
+With two users, each card says how many items only one has, or "✓ Same in both". A permission set
+one user has directly and the other gets through a group is marked "Different".
+**Download** offers "This list, as shown (CSV for Excel)" and "Everything (CSV for Excel)". Nothing
+about users is saved: there are no user files, because they hold usernames.
+
+If an area cannot be read, only that area says so in plain words (for example "Territories are not
+turned on in this org"), and the raw error goes under "Technical details" or "Notes". For removing
+access use `sf-user-access-teardown`.
+
+## What has been tested
+
+The offline tests cover the compare logic, the query and session handling, and the saved-file shape
+against faked API responses. Everything below was read-only.
+
+Compare permission set groups:
+- A Developer Edition org with 22 groups. For every group, the aggregate permission set's object
+  permissions matched its component permission sets. Spot-checked rows matched Setup. A compare of
+  two groups takes about 4 seconds.
+- A customer sandbox (Nov 2026) with 120 groups and 66 muting permission sets. Two groups had about
+  2,000 field permissions, 120 objects and 340 apps/pages/code items each, both with muting sets;
+  another pair had about 1,000 objects.
+  - Field rows (Read/Edit), object rows, system permissions, tabs, the names of Apex classes,
+    Visualforce pages, apps, custom permissions, connected apps, custom metadata and external
+    credential principals, the component lists and the user counts matched independent SOQL, line
+    by line.
+  - What a muting permission set removes was checked item by item: the aggregate equals the
+    components minus the effective mutes, for fields, objects, system permissions and tabs. One
+    Salesforce quirk showed up (a muted object Edit that stayed in the aggregate); the tool does
+    not report that as removed by muting.
+  - Timing: about 4 to 5 seconds per large group, about 10 to 15 seconds to compare two large groups.
+
+Look up user access:
+- A Developer Edition org (search, permission sets, licenses and compare worked; territories are off
+  there and are handled) and a large sandbox with about 6,000 users. On the sandbox, a user with 3
+  permission set groups, 18 permission sets (9 only through groups), 11 licenses, 3 public groups,
+  24 queues and 1 territory matched the org line by line, including a muting permission set, and a
+  compare of two users worked.
+
+Not tested:
+- Muted apps, pages and code (no muting permission set in that org mutes any).
+- The extension's own cookie session from the toolbar button inside Chrome (all live checks used the
+  dev server).
+- Opening the CSV in Excel.
+
+Before relying on those, compare two groups you know well and check a few rows against Setup.
+
+---
+
+# For developers
 
 ## How it reads the org
 
 All requests go from the extension page straight to `https://<your org>/services/data/v62.0/`.
-Nothing is sent anywhere else. Per group it runs about 25 to 30 queries (all reads):
+Nothing is sent anywhere else. Everything is a read (`SELECT`, describe, `COUNT()`); nothing writes.
+
+The permissions of a group come from its aggregate permission set (`PermissionSet` with
+`Type = 'Group'`). Salesforce keeps that record as the component permission sets combined, minus the
+muting permission set. It is only current when the group's Status is `Updated`. A muting permission
+set can list things no permission set in the group gives, and Salesforce does not always apply a
+mute to the aggregate, hence the "Removed by muting" check above. Per group it runs about 25 to 30 queries:
 
 | Read | Query |
 |---|---|
 | Group | `PermissionSetGroup`, its aggregate `PermissionSet` (`PermissionSetGroupId`) |
-| Contents | `PermissionSetGroupComponent`, then `PermissionSet` / `MutingPermissionSet`, licence names |
+| Contents | `PermissionSetGroupComponent`, then `PermissionSet` / `MutingPermissionSet`, license names |
 | System permissions | every boolean `Permissions*` field of `PermissionSet` (from describe), in chunks |
 | Objects / fields | `ObjectPermissions`, `FieldPermissions` where `ParentId` = aggregate permission set |
 | Field labels | `FieldDefinition` (real field labels), one query per 20 objects, at most 3 at a time. Labels are the ones Setup shows, which can occasionally differ from the label in a page layout or describe (for example a standard field renamed in one place). Fields the reading user cannot see keep a name made from the API name. If the query fails, labels are made from API names and the notes say so |
@@ -268,36 +252,16 @@ Nothing is sent anywhere else. Per group it runs about 25 to 30 queries (all rea
 | Muting | the muting set's own permissions, fields, objects and tabs; then, for those items only, what the other permission sets give (`FieldPermissions`, `ObjectPermissions`, `PermissionSetTabSetting`, the muted `Permissions*` fields, `SetupEntityAccess`) |
 | Assignments | `COUNT()` on `PermissionSetAssignment` |
 
-The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector
-finds it. It is held in memory for that tab only and never stored.
+Look up user access reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
+`PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`, `UserLicense`,
+`PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
+`UserTerritory2Association`. The user search runs in the org (LIKE, limit 50), so it works with
+thousands of users. When the org's territory feature is off, the page does not ask for it.
 
-## Not tested
-
-The offline tests (below) cover the compare logic, the query and session handling, and the
-snapshot shape against faked API responses.
-
-Run against live orgs so far (read-only):
-
-- A Developer Edition org with 22 groups. For every group, the aggregate permission set's object
-  permissions matched its component permission sets. Spot-checked rows matched Setup. A compare
-  of two groups takes about 4 seconds.
-- A customer sandbox (Nov 2026) with 120 groups and 66 muting permission sets. Two groups had about
-  2,000 field permissions, 120 objects and 340 apps/pages/code items each, both with muting sets;
-  another pair had about 1,000 objects.
-  - Field rows (Read/Edit), object rows, system permissions, tabs, the names of Apex classes,
-    Visualforce pages, apps, custom permissions, connected apps, custom metadata and external
-    credential principals, the component lists and the user counts matched independent SOQL, line
-    by line.
-  - What a muting permission set takes away was checked item by item: the aggregate equals the
-    components minus the effective mutes, for fields, objects, system permissions and tabs. One
-    Salesforce quirk showed up (a muted object Edit that stayed in the aggregate); the tool does
-    not report that as taken away.
-  - Timing: about 4 to 5 seconds per large group, about 10 to 15 seconds to compare two large groups.
-
-Not checked: muted apps, pages and code (no muting permission set in that org mutes any); the
-Chrome extension's own cookie session (those checks used the dev server); opening the CSV in
-Excel. Before relying on those, compare two groups you know well and check a few rows against
-Setup.
+The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector finds
+it. It is held in memory for that tab only and never stored. Visible text says "license"; data keys
+keep the old `licence` spelling so saved files still load. Saved group files use
+`sf-psg-snapshot/2`; `/1` files still load.
 
 ## Tests
 
@@ -307,7 +271,37 @@ Offline, Node 18 or later, nothing to install:
 node tests/run_tests.mjs
 ```
 
-`python tests/make_samples.py` rebuilds the sample snapshots and the icons.
+`python tests/make_samples.py` rebuilds the sample files and the icons.
+
+## Try it without an org
+
+```
+python tools/dev_server.py --no-org
+```
+
+Open <http://127.0.0.1:8765/psg-compare.html?demo=1> (two made-up groups from `extension/samples/`)
+or <http://127.0.0.1:8765/user-access.html?demo=1> (two made-up users).
+
+## Developing without reloading Chrome
+
+`tools/dev_server.py` serves the pages and forwards their API calls to an org using the login the
+Salesforce CLI already has, so a page can be tested against a real org in any browser tab:
+
+```
+sf org login web --alias my-sandbox        # once, if the CLI is not logged in to the org
+python tools/dev_server.py --target-org my-sandbox
+```
+
+Open <http://127.0.0.1:8765/psg-compare.html?dev=1> or `user-access.html?dev=1`. The popup opens a
+tool as `<page>?host=<org host>`.
+
+- **Read-only.** Only GET requests to `/services/data/` are forwarded; anything else gets 405.
+- **The token stays in the server.** The page never sees it. The server listens on 127.0.0.1 only
+  and refuses requests addressed to any other host name.
+- **Live reload.** Pages reload by themselves within about two seconds of a file change under
+  `extension/`. This also works for the unpacked extension loaded in Chrome: unpacked extensions
+  read their pages from disk, so page, JS and CSS edits need no "Reload" click while the dev
+  server runs. Changes to `manifest.json` still need one.
 
 ## Files
 
@@ -315,8 +309,8 @@ node tests/run_tests.mjs
 |---|---|
 | `extension/manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs; Salesforce hosts only) |
 | `extension/popup.*` | Toolbar popup: a menu of tools. Detects the org in the current tab and opens the chosen page |
-| `extension/psg-compare.*` | The compare page |
-| `extension/user-access.*` | The User access page (html, js, and a little extra css on top of `psg-compare.css`) |
+| `extension/psg-compare.*` | The Compare permission set groups page |
+| `extension/user-access.*` | The Look up user access page (html, js, and a little extra css on top of `psg-compare.css`) |
 | `extension/lib/useraccess.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
 | `extension/lib/usercompare.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
 | `extension/hierarchy.*` | The Territory & role hierarchy page (html, js, and extra css on top of `psg-compare.css`) |

@@ -39,7 +39,7 @@ const state = {
   territories: { on: null, models: [], modelId: null, trees: new Map(), error: null },
   roles: { tree: null, portalCount: null, error: null },
   failed: false, // the read for the current view failed
-  tech: [], // raw messages for Technical notes
+  tech: [], // raw messages for Notes
   branch: null, // the node chosen in the search box, or null for the whole hierarchy
   tree: null, // the tree on screen
   rows: [], // one entry per drawn row: {li, btn, size, folded}
@@ -89,7 +89,7 @@ const setProgress = (t) => { $("#progress").textContent = t || ""; };
 
 function renderTech() {
   $("#notesPanel").hidden = !state.tech.length;
-  $("#notesTitle").textContent = `Technical notes (${state.tech.length})`;
+  $("#notesTitle").textContent = `Notes (${state.tech.length})`;
   $("#notes").replaceChildren(...state.tech.map((t) => el("li", { text: t })));
 }
 

@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>User access</title>
+<title>Look up user access</title>
 <link rel="stylesheet" href="psg-compare.css">
 <link rel="stylesheet" href="user-access.css">
 </head>
 <body>
 <header class="top">
-  <h1>User access</h1>
+  <h1>Look up user access</h1>
   <div class="org" id="org">Not connected</div>
 </header>
 
@@ -19,7 +19,7 @@
     <p class="hint">Type part of a name or username. You can add a second user to compare the two side by side.</p>
     <div class="pickers">
       <div class="picker" data-side="a">
-        <label class="pick-label" for="input-a"><span class="side a">A</span> User</label>
+        <label class="pick-label" for="input-a"><span class="side a">A</span> First user</label>
         <div class="combo org-only">
           <input type="text" id="input-a" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-a" autocomplete="off" placeholder="Start typing a name or username">
           <ul class="psg-list" id="list-a" role="listbox" hidden></ul>
@@ -27,7 +27,7 @@
         <div class="chosen"></div>
       </div>
       <div class="picker" data-side="b">
-        <label class="pick-label" for="input-b"><span class="side b">B</span> Compare with another user (optional)</label>
+        <label class="pick-label" for="input-b"><span class="side b">B</span> Second user (optional, to compare)</label>
         <div class="combo org-only">
           <input type="text" id="input-b" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-b" autocomplete="off" placeholder="Start typing a name or username">
           <ul class="psg-list" id="list-b" role="listbox" hidden></ul>
@@ -64,8 +64,8 @@
         <details class="menu">
           <summary class="button">Download ▾</summary>
           <div class="menu-items">
-            <button id="csvTab">This list (Excel CSV)</button>
-            <button id="csvAll">Everything (Excel CSV)</button>
+            <button id="csvTab">This list, as shown (CSV for Excel)</button>
+            <button id="csvAll">Everything (CSV for Excel)</button>
           </div>
         </details>
       </div>
@@ -73,12 +73,12 @@
     </div>
 
     <details class="panel notes" id="notesPanel" hidden>
-      <summary id="notesTitle">Technical notes</summary>
+      <summary id="notesTitle">Notes</summary>
       <ul id="notes"></ul>
     </details>
   </section>
 
-  <p class="footer">Read-only: this page only looks at your org, it never changes anything. Nothing about the users is saved.</p>
+  <p class="footer">Read-only: this page only reads from your org and never changes anything. Nothing about the users is saved.</p>
 </main>
 <script type="module" src="user-access.js"></script>
 </body>

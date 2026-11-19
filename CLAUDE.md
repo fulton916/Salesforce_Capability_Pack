@@ -18,7 +18,7 @@ Org administration:
 - `sf-country-state-codes`: CLI. Export State and Country/Territory picklists to Excel.
 - `sf-territory-export`: CLI. Read-only Territory Management export to Excel.
 - `sf-user-access-teardown`: CLI. Query, and only with `--execute` plus confirmation, remove user access.
-- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with three read-only tools: PSG Compare (compare two permission set groups), User access (look up or compare users' access) and Territory & role hierarchy (see the whole territory or role tree, narrow it to one branch, export it for Excel).
+- `sf-psg-compare`: Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with three read-only tools: "Compare permission set groups" (PSG Compare; compares two groups), "Look up user access" (looks up or compares users' access) and "Territory & role hierarchy" (shows the whole territory or role tree, narrows it to one branch, exports it for Excel).
 
 CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need `openpyxl`
 (`pip install -r requirements.txt` in the package). Node is needed only for the extension's tests.
