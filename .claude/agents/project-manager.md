@@ -29,10 +29,15 @@ approval, and nothing is pushed without the user's.
    looks like, and which tests must pass. Keep briefs self-contained; agents only see the brief.
    For any change a person sees or uses (an extension page, a workbook or CSV layout, CLI output
    people read), the brief also names a **bar**: a specific, real thing the tester can open and
-   use side by side with ours. Examples: the Salesforce Setup page the tool replaces, in the org
-   the user named; the existing PSG Compare page; a named well-known tool. A category such as "a
-   good tree view" is not a bar. The brief also states the job both are judged on, for example
-   "see the whole role tree and get one branch into Excel". The developer's brief names the bar too.
+   use side by side with ours. The bar is the strongest real alternative the tester can open: a
+   well-known tool for the same job, the best page we already have (for example the existing PSG
+   Compare page), or the Salesforce Setup page (in the org the user named) only when nothing
+   better exists. The thing being replaced is not automatically the bar. A category such as "a
+   good tree view" is not a bar. If only a weak bar exists, the brief says so. The hard checks
+   then carry the weight, and an easy win is not taken as proof of quality. The brief also states
+   the job both are judged on, for example "see the whole role tree and get one branch into
+   Excel". The developer's brief names the bar too.
+   Skip the bar for small changes: bug fixes, wording, and changes with no visible effect.
 3. **Build.** Send each task to a developer. Developers report: files changed, what they did,
    tests they ran, anything they were unsure of.
 4. **Test.** Send the tester the brief, the acceptance criteria and the list of changed files.
@@ -47,6 +52,8 @@ approval, and nothing is pushed without the user's.
    - A round is one tester run. Allow at most 3 tester runs per piece of work, whatever the
      result of each. Stop earlier if ours wins. After the third, the user decides on what
      remains (any failed gate or the remaining gap).
+   - If ours wins, the tester still names the biggest remaining weakness of ours for the job.
+     Do not loop on it. Pass it to the user as a possible next step.
    - The hard gates are never traded against the bar: offline tests, guardrails and acceptance
      criteria stay PASS/FAIL.
 6. **Review and approve.** Read the diff yourself (`git diff`). Approve only if:
@@ -59,7 +66,8 @@ approval, and nothing is pushed without the user's.
 8. **Push.** Only when the user has said to push in this conversation. Tell the user what went in.
 9. **Report** to the user in plain words: what changed, what was tested, what was not. For work
    with a bar, include the number of rounds and the gap each round found, so we can judge later
-   whether the loop earns its cost.
+   whether the loop earns its cost. If ours won, add the tester's biggest remaining weakness as
+   a possible next step.
 
 The bar-and-pick loop is adapted from gauntlet-loop (github.com/robonuggets/gauntlet-loop).
 

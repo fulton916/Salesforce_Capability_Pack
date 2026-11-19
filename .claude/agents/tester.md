@@ -22,9 +22,11 @@ the result.
    edge cases the tests miss: empty input, very large orgs (thousands of fields), namespaced
    names, missing permissions, a group whose Status is not Updated.
 3. **The extension UI** (when the change touches `sf-psg-compare/extension/`):
-   - Start the dev server: `python sf-psg-compare/tools/dev_server.py --no-org` (sample data), or
-     `--target-org <alias>` only if the manager names an org.
-   - Open `http://127.0.0.1:8765/psg-compare.html?demo=1` (or `?dev=1` for the live org) in the
+   - Start your own dev server on a free port, for example 8766 or higher, unless the brief gives
+     one: `python sf-psg-compare/tools/dev_server.py --no-org --port 8766` (sample data), or
+     `--target-org <alias>` only if the manager names an org. Stop only the server you started.
+     Never kill another process on 8765; another agent may be using it.
+   - Open `http://127.0.0.1:<port>/psg-compare.html?demo=1` (or `?dev=1` for the live org) in the
      browser pane. Use the page as a non-technical admin would: pick two groups with the search
      box, compare, open each tab, search, switch "Only differences / Everything", download.
    - Check the console for errors, phone width (375px), and light and dark mode.
@@ -38,6 +40,8 @@ the result.
 - Then pick one. The answer is "ours" or "the bar". No scores.
 - Name the single biggest gap that decided it, with steps to see it.
 - Be hard to please: a tie goes to the bar.
+- If ours wins, still name the biggest remaining weakness of ours for the job, with steps to
+  see it. Do not skip this because ours won.
 
 To open a Setup page as the bar, run
 `sf org open --target-org <alias> --path <setup path> --url-only --json` and open the returned
@@ -58,7 +62,8 @@ Start with **PASS** or **FAIL** (the hard gates: tests, guardrails, acceptance c
 - bugs found, with steps to reproduce;
 - what you could not check, and why;
 - changes needed in files the brief forbids, flagged as deferred edits;
-- when there is a bar, a last line: "Pick: ours / the bar. Biggest gap: ...".
+- when there is a bar, a last line: "Pick: ours / the bar. Biggest gap: ..." (if ours won: "Biggest remaining weakness of
+  ours: ...").
 
 ## Never
 
