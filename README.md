@@ -53,6 +53,15 @@ Reference documentation (no code, nothing to run):
 | [sf-psg-compare](sf-psg-compare/) | Chrome extension | The "Salesforce Capability Pack" extension: a toolbar menu with three tools. **Compare permission set groups** compares two permission set groups side by side (contents, muting, system permissions, object and field access, Apex/pages/apps/custom permissions and tabs) with a plain-language summary, CSV export and saved group files for sandbox-vs-production compares. **Look up user access** searches a user and shows their profile and user license, role, permission set groups, permission sets (direct or through a group), permission set licenses, public groups, queues and territories, or compares two users side by side, with CSV export. **Territory & role hierarchy** shows the whole territory or role tree fully expanded, narrows it to one branch with a search, and exports what is shown to Excel (.csv) with the tree in the cells (Level columns, API name, Path). Uses your browser login; read-only. |
 | [sf-user-access-teardown](sf-user-access-teardown/) | CLI | For a list of user IDs, queries and (only with `--execute` plus a confirmation) bulk-removes permission set groups, permission sets, licences, territories, groups, queues and role. Query-only by default; keeps CSV results. |
 
+## Report a bug or suggest an improvement
+
+Use these forms for any tool in the pack (you need a GitHub account with access to this private repository):
+
+- [Report a bug](https://github.com/fulton916/Salesforce_Capability_Pack/issues/new?template=bug.yml)
+- [Suggest an improvement](https://github.com/fulton916/Salesforce_Capability_Pack/issues/new?template=enhancement.yml)
+
+The Chrome extension has the same two links built in. Describe problems with made-up names. Do not paste usernames, record data, org IDs, session IDs or screenshots that show org data.
+
 ## Safety
 
 These tools can change production metadata and user access. Every package that writes defaults to read-only or dry run, and says in its README which step writes to the org. Rehearse in a sandbox first. None of the code has been run against your org; check the "not tested" notes in each README.

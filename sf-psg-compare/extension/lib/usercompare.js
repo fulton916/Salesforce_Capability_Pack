@@ -146,6 +146,51 @@ export function compareUsers(a, b) {
   return { a, b, names, sections, counts, unavailable, verdict: verdict(counts, names), notes: notesOf(a, b, names) };
 }
 
+const fmt = (n) => Number(n).toLocaleString("en-US");
+
+/**
+ * What one card says when two users are compared. Returns lines: {cls, segs: [{text, bold?, side?}]}.
+ * `side` is "a" or "b" (the page colours the user's name); cls "same" is the green tick line.
+ * List areas always show the shared count and each user's own count, even when 0.
+ * Profile and role show the actual value.
+ */
+export function userCardLines(result, key) {
+  const sec = SECTIONS.find((x) => x.key === key);
+  const c = result.counts[key];
+  const A = result.names.a;
+  const B = result.names.b;
+  const line = (cls, ...segs) => ({ cls, segs });
+  const T = (text) => ({ text });
+  if (key === "profile" || key === "role") {
+    const va = itemsOf(result.a, key)[0]?.label || "None";
+    const vb = itemsOf(result.b, key)[0]?.label || "None";
+    if (va === vb) return [line("same", T(`✓ Same in both: ${va === "None" ? `no ${sec.one}` : va}`))];
+    const show = (v) => (v === "None" ? `no ${sec.one}` : v);
+    return [line("", { text: A, side: "a" }, T(`: ${show(va)}`)), line("", { text: B, side: "b" }, T(`: ${show(vb)}`))];
+  }
+  if (!c.totalA && !c.totalB) return [line("same", T("Neither has any"))];
+  const lines = [
+    line("", { text: fmt(c.same + c.differ), bold: true }, T(` ${c.same + c.differ === 1 ? sec.one : sec.noun} both have`)),
+    line("", { text: fmt(c.onlyA), bold: true }, T(" only "), { text: A, side: "a" }, T(" has")),
+    line("", { text: fmt(c.onlyB), bold: true }, T(" only "), { text: B, side: "b" }, T(" has")),
+  ];
+  if (key === "permissionSets") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those assigned differently (directly or through a group)")));
+  if (!c.onlyA && !c.onlyB && !c.differ) lines.push(line("same", T("✓ Same in both")));
+  return lines;
+}
+
+/** Header parts for the connected org: [{cls, text}]. Missing values are left out (never "null"). */
+export function orgParts(org, host, via) {
+  const [kind, cls] = org.isSandbox ? ["Sandbox", "sbx"]
+    : /developer|trial/i.test(org.edition || "") ? [org.edition, "sbx"] : ["Production", "prod"];
+  return [
+    { tag: "strong", cls: "", text: org.name || org.id },
+    { tag: "span", cls: `badge ${cls}`, text: kind },
+    via ? { tag: "span", cls: "badge demo", text: via } : null,
+    host ? { tag: "span", cls: "host", text: host } : null,
+  ].filter((p) => p && p.text);
+}
+
 function verdict(counts, names) {
   let onlyA = 0, onlyB = 0, differ = 0;
   for (const c of Object.values(counts)) { onlyA += c.onlyA; onlyB += c.onlyB; differ += c.differ; }

@@ -3,6 +3,7 @@ import { listPsgs, readOrg, takeSnapshot, validateSnapshot } from "./lib/snapsho
 import { compareSnapshots, toRows, toCsv, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, groupStatus, tabDiffText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
 import { matchPsgs } from "./lib/pick.js";
 import { startLiveReload } from "./lib/livereload.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
@@ -93,12 +94,12 @@ function orgKind(o) {
 
 function showOrg(o, host, via) {
   const [kind, cls] = orgKind(o);
-  $("#org").replaceChildren(
+  $("#org").replaceChildren(...[
     el("strong", { text: o.name || o.id }), " ",
     el("span", { class: `badge ${cls}`, text: kind }),
     via ? el("span", { class: "badge demo", text: via }) : null,
-    el("span", { class: "host", text: host })
-  );
+    host ? el("span", { class: "host", text: host }) : null
+  ].filter(Boolean));
   document.title = `Compare permission set groups – ${o.name || host}`;
 }
 
@@ -686,3 +687,14 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) $(".
 
 connect();
 startLiveReload();
+
+// Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.
+{
+  let manifestVersion = "";
+  try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* dev server */ }
+  const version = versionText(manifestVersion, navigator);
+  const link = (text, kind) => el("a", {
+    href: issueUrl({ kind, tool: FEEDBACK_TOOLS.psg, version }), target: "_blank", rel: "noopener noreferrer", text,
+  });
+  $("#feedback").replaceChildren(link("Report a bug", "bug"), " · ", link("Suggest an improvement", "enhancement"));
+}
