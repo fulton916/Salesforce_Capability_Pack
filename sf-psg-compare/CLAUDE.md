@@ -9,9 +9,10 @@ browser session and never writes to the org.
 - `extension/lib/sfconn.js` — finds the API session from the `sid` cookie; `SfApi.query` pages
   through `nextRecordsUrl`.
 - `extension/lib/snapshot.js` — `takeSnapshot(api, psgId)` reads one group into a JSON snapshot
-  (`schema: "sf-psg-snapshot/1"`). Permissions come from the group's aggregate permission set
+  (`schema: "sf-psg-snapshot/2"`; `/1` files still load, see `ACCEPTED_SCHEMAS`). Permissions come from the group's aggregate permission set
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
-- `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights}`. Pure.
+- `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
+- `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
 - `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
 
 ## User access (second tool)
@@ -65,7 +66,10 @@ it links `psg-compare.css` and adds a little in `user-access.css`.
 - Do not store the session id (no `chrome.storage`, no `localStorage`).
 - Do not commit snapshots taken from a real org. `.gitignore` ignores `snapshots/` and
   `psg_*.json` outside `extension/samples/`.
-- The tool has not been run against a live org. Say so when reporting results, until it has.
+- Verified against a live sandbox (read-only, through the dev server): fields, objects, system
+  permissions, tabs, setup-item names, component lists, user counts, and what muting takes away
+  for fields, objects, system permissions and tabs. Not verified: muted apps/pages/code, the
+  extension's own cookie session path, opening the CSV in Excel. Say so when reporting results.
 
 ## Verify against an org
 

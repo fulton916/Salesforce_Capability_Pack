@@ -26,7 +26,7 @@ def comp(name, label, licence="Salesforce", muting=False):
 
 def snap(dev, label, desc, comps, muting, assigned, user, objs, fields, setup, tabs):
     return {
-        "schema": "sf-psg-snapshot/1",
+        "schema": "sf-psg-snapshot/2",
         "takenAt": "2026-11-18T15:00:00.000Z",
         "org": ORG,
         "psg": {"id": "0PG00000000000" + dev[:4].upper(), "developerName": dev, "label": label,
@@ -39,9 +39,17 @@ def snap(dev, label, desc, comps, muting, assigned, user, objs, fields, setup, t
         "fieldPermissions": fields,
         "setupAccess": {f"{t}|{n}": {"type": t, "typeLabel": tl, "name": n, "label": lab} for t, tl, n, lab in setup},
         "tabSettings": tabs,
+        "objectLabels": {o: OBJECT_LABELS[o] for o in objs if o in OBJECT_LABELS},
+        "fieldLabels": {f: FIELD_LABELS[f] for f in fields if f in FIELD_LABELS},
         "warnings": [],
     }
 
+
+OBJECT_LABELS = {"Widget__c": "Widget", "Quota__c": "Sales Quota"}
+FIELD_LABELS = {
+    "Account.AnnualRevenue": "Annual Revenue", "Account.Rating": "Account Rating", "Account.Industry": "Industry",
+    "Widget__c.Color__c": "Shade", "Widget__c.Size__c": "Dimensions", "Quota__c.Target__c": "Quota Target",
+}
 
 COMMON_USER = {
     "PermissionsApiEnabled": "API Enabled",
@@ -68,9 +76,16 @@ REP = snap(
     [comp("Sales_Core", "Sales Core"), comp("Report_Runner", "Report Runner"), comp("Widget_User", "Widget User"),
      comp("Sales_Rep_Muting", "Sales Rep Muting", None, True)],
     {"id": "0PS000000000MUTE", "sobject": "PermissionSet", "name": "Sales_Rep_Muting", "label": "Sales Rep Muting",
-     "userPermissions": {"PermissionsExportReport": "Export Reports"},
+     "userPermissions": {"PermissionsExportReport": "Export Reports", "PermissionsManageUsers": "Manage Users"},
      "objectPermissions": {"Opportunity": obj("Delete")},
-     "fieldPermissions": {"Account.AnnualRevenue": {"Read": False, "Edit": True}}},
+     "fieldPermissions": {"Account.AnnualRevenue": {"Read": False, "Edit": True}},
+     "tabSettings": {"standard-Forecasting3": "DefaultOn"},
+     # What the muting set really takes away. ManageUsers is muted but no component gives it.
+     "effective": {"userPermissions": {"PermissionsExportReport": "Export Reports"},
+                   "objectPermissions": {"Opportunity": obj("Delete")},
+                   "fieldPermissions": {"Account.AnnualRevenue": {"Read": False, "Edit": True}},
+                   "tabSettings": {"standard-Forecasting3": "DefaultOn"},
+                   "setupAccess": {}, "nothingToTake": 1}},
     {"total": 412, "active": 398},
     dict(COMMON_USER),
     {"Account": obj("Read", "Create", "Edit"), "Contact": obj("Read", "Create", "Edit"),

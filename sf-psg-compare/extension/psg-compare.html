@@ -35,7 +35,11 @@
     </div>
     <div class="actions">
       <button id="compare" class="primary big" disabled>Compare</button>
-      <span id="progress" role="status"></span>
+    </div>
+    <div id="progressBox" class="progress" hidden>
+      <div class="pbar"><div class="pfill" id="pfill"></div></div>
+      <div id="progress" class="ptext" role="status" aria-live="polite"></div>
+      <div class="hint">Large groups can take 10 seconds or more.</div>
     </div>
     <div id="error" class="error" hidden></div>
     <details class="files">
@@ -56,6 +60,7 @@
       <p class="verdict" id="verdict"></p>
     </div>
 
+    <p class="cards-title">Differences by area</p>
     <div class="cards" id="cards"></div>
 
     <div class="panel" id="riskPanel" hidden>
@@ -63,6 +68,7 @@
       <p class="hint">Powerful access that only one of the groups gives.</p>
       <ul class="risks" id="risks"></ul>
       <button class="link" id="moreRisks" hidden></button>
+      <ul class="risks" id="riskObjects"></ul>
     </div>
 
     <div class="panel" id="detail">
@@ -78,13 +84,19 @@
         <details class="menu">
           <summary class="button">Download ▾</summary>
           <div class="menu-items">
-            <button id="csvTab">This list (Excel CSV)</button>
-            <button id="csvAll">Full comparison (Excel CSV)</button>
+            <button id="csvTab">This list, as shown (Excel CSV)</button>
+            <button id="csvDiff">Whole comparison, differences only (Excel CSV)</button>
+            <button id="csvAll">Whole comparison, everything (Excel CSV)</button>
             <button id="saveA">Save group A to a file</button>
             <button id="saveB">Save group B to a file</button>
           </div>
         </details>
       </div>
+      <div class="listtools" id="listTools" hidden>
+        <button class="link" id="expandAll">Expand all</button>
+        <button class="link" id="collapseAll">Collapse all</button>
+      </div>
+      <p class="scrollhint">Scroll sideways to see all columns.</p>
       <div class="tablewrap" id="table"></div>
     </div>
 

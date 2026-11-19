@@ -11,30 +11,61 @@ Read-only. It runs SOQL queries and describes. It never writes to the org.
 ## What it compares
 
 The page is written for admins, not developers. It shows labels ("Account › Annual Revenue"),
-not API names; "Show API names" adds them.
+not API names. Ticking "Show API names" prints the API name under every row of every list
+(even when it is the same as the label, such as Account).
 
-At the top it says the result in plain words, for example "Sales Manager gives everything Sales
-Rep gives, and more." Under that:
+At the top it says the result in plain words, with how much: "Each group gives access the other
+does not: Sales Rep gives 4 items of access Sales Manager doesn't; Sales Manager gives 21 items of
+access Sales Rep doesn't." (An "item of access" is a system permission, object, field,
+app/page/code item or tab that only that group gives, or gives more of.) Under that:
 
-- **A card per area** with how many items only one group has, or "✓ Same in both". Click a card
-  to open its list.
-- **Worth a closer look:** powerful access only one group gives, such as "Only Sales Manager has
-  “View All Data”" or "Sales Manager can Delete, View All, Modify All Opportunity records; Sales
-  Rep cannot."
-- **Technical notes** (folded away): anything the tool could not read.
+- **A card per area**, under "Differences by area". Every card lists the same kinds of lines, always
+  all of them (even when 0), with the group names in their colours and thousands separators:
+  - System permissions: "N system permissions A has", "... B has", "N only one group has".
+  - Objects: "N objects A can access", "... B can access", "N objects only one group can access",
+    "N objects both can access, but with different rights (Read, Create, Edit, Delete...)".
+  - Fields: "N fields A can see", "... B can see", "N fields only one group can see", "N fields both
+    can see, but one can edit and the other can only read".
+  - Apps, pages & code: "N items A can use", "... B can use", "N only one group can use".
+  - Tabs: "N tabs A can see" (a tab set to Hidden does not count), "... B can see", "N tabs only
+    one group can see", "N tabs both can see, but set differently (shown or hidden by default)".
+  - What's inside: "N permission sets in A", "... in B", "N permission sets in only one group",
+    "N things muting takes away in only one group", "N things both groups' muting takes away, but
+    differently". The muting permission set itself is not counted, but is still in the list.
+
+  "A has" counts everything A has, whether B has it too or not. When a card has nothing that only
+  one group has and nothing different, it shows just the two totals and "✓ Same in both". Click a
+  card to open its list.
+- **Worth a closer look:** powerful system permissions only one group gives (first), then at most
+  one line per group for View All / Modify All on objects, such as "Sales Manager has View All or
+  Modify All on 938 objects where Sales Rep has less, including Account, Case and Opportunity. See
+  Objects." (Where the other group also has View All and this one adds Modify All, that counts too.)
+- **Technical notes** (folded away): anything the tool could not read, with what to do.
 
 | List | Shows |
 |---|---|
 | Summary | org, name, description, status, users assigned, permission sets inside, muting permission set, and how much each group gives |
-| General permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
+| System permissions | every system permission (Export Reports, View All Data…). Powerful ones are tagged |
 | Objects | Read, Create, Edit, Delete, View All Fields, View All, Modify All per object, and which ones only one group has |
-| Fields | No access / Read / Edit per field, grouped by object |
+| Fields | No access / Read / Edit per field, in one collapsible block per object ("Account — 212 differences"). Long lists start collapsed; "Expand all / Collapse all"; searching opens the matching objects |
 | Apps, pages & code | apps, Visualforce pages, Apex classes, custom permissions, connected apps, named and external credentials, custom settings / metadata types, flows |
 | Tabs | shown, available (hidden by default) or hidden |
-| What's inside | the permission sets each group is built from (with licence), and what each muting permission set takes away |
+| What's inside | two parts: "Permission sets in each group" (with licence, and the muting permission set too), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, System permission, Tab, App/page/code) |
 
-Each list shows only the differences until you choose "Everything". **Download** saves the list
-or the full comparison as a CSV that opens in Excel, or saves a group to a file for later.
+Each list shows only the differences until you choose "Everything". Click a column heading to sort
+by it (A to Z; click again for Z to A; a small arrow shows the sort). Text sorts without regard to
+case and numbers by value ("Item 2" before "Item 10"); empty cells ("—") always come last. In Fields
+the rows sort inside each object, and the Field heading also orders the objects; What's inside keeps
+its two parts. The sort stays while you switch between "Only differences" and "Everything" or
+search, is remembered per list, and is used by "This list, as shown". Without a click the lists
+keep their usual order. The search ignores
+punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is how
+many differences it has. While reading big groups the page shows "Step n of 5".
+
+**Download** saves a CSV that opens in Excel: "This list, as shown" (the differences-only choice,
+the search and the sort are applied; collapsed objects are still included), the whole comparison with
+differences only, or the whole comparison with everything. It can also save a group to a file for
+later. The CSV has a "Kind of item" column.
 
 Picking a group: type any part of its name or API name (words in any order) and press Enter or
 click it.
@@ -47,6 +78,16 @@ the muting permission set. It is what a user assigned to the group actually gets
 
 It is only current when the group's Status is **Updated**. If a group is `Outdated` or `Failed`,
 the tool says so at the top. Recalculate the group in Setup and compare again.
+
+### What muting really takes away
+
+A muting permission set can list things no permission set in the group gives, and Salesforce does
+not always apply a mute to the aggregate. So "Taken away by muting" lists an item only if it is
+muted, at least one permission set in the group gives it, and the aggregate no longer has it. On a
+field, Read muted takes away Read and Edit; Edit muted takes away Edit only. The notes add one line
+with how many muted items took nothing away. Snapshot files saved before this check
+(`sf-psg-snapshot/1`) still load; their muted items are shown under "Muted (may not have been
+given)" because they cannot say whether anything was removed.
 
 ### Compare across orgs (sandbox vs production)
 
@@ -170,7 +211,7 @@ Open <http://127.0.0.1:8765/psg-compare.html?dev=1>.
 ## How it reads the org
 
 All requests go from the extension page straight to `https://<your org>/services/data/v62.0/`.
-Nothing is sent anywhere else. Per group it runs about 15 to 25 queries:
+Nothing is sent anywhere else. Per group it runs about 25 to 30 queries (all reads):
 
 | Read | Query |
 |---|---|
@@ -178,8 +219,10 @@ Nothing is sent anywhere else. Per group it runs about 15 to 25 queries:
 | Contents | `PermissionSetGroupComponent`, then `PermissionSet` / `MutingPermissionSet`, licence names |
 | System permissions | every boolean `Permissions*` field of `PermissionSet` (from describe), in chunks |
 | Objects / fields | `ObjectPermissions`, `FieldPermissions` where `ParentId` = aggregate permission set |
-| Setup access | `SetupEntityAccess`, then the named object per type (some through the Tooling API) |
+| Field labels | `FieldDefinition` (real field labels), one query per 20 objects, at most 3 at a time. Labels are the ones Setup shows, which can occasionally differ from the label in a page layout or describe (for example a standard field renamed in one place). Fields the reading user cannot see keep a name made from the API name. If the query fails, labels are made from API names and the notes say so |
+| Setup access | `SetupEntityAccess`, then the named object per type (external credential principals through the Tooling API). Items that cannot be named are listed as "Name not available (Id …)" with a count in the notes |
 | Tabs | `PermissionSetTabSetting` |
+| Muting | the muting set's own permissions, fields, objects and tabs; then, for those items only, what the other permission sets give (`FieldPermissions`, `ObjectPermissions`, `PermissionSetTabSetting`, the muted `Permissions*` fields, `SetupEntityAccess`) |
 | Assignments | `COUNT()` on `PermissionSetAssignment` |
 
 The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector
@@ -195,13 +238,23 @@ Run against live orgs so far (read-only):
 - A Developer Edition org with 22 groups. For every group, the aggregate permission set's object
   permissions matched its component permission sets. Spot-checked rows matched Setup. A compare
   of two groups takes about 4 seconds.
-- A larger org (about 1,300 field permissions and 300 Apex/app items per group). It showed
-  that `MutingPermissionSet` has no `NamespacePrefix` field (fixed), and that
-  `ExternalCredentialParameter` items needed naming (added).
+- A customer sandbox (Nov 2026) with 120 groups and 66 muting permission sets. Two groups had about
+  2,000 field permissions, 120 objects and 340 apps/pages/code items each, both with muting sets;
+  another pair had about 1,000 objects.
+  - Field rows (Read/Edit), object rows, system permissions, tabs, the names of Apex classes,
+    Visualforce pages, apps, custom permissions, connected apps, custom metadata and external
+    credential principals, the component lists and the user counts matched independent SOQL, line
+    by line.
+  - What a muting permission set takes away was checked item by item: the aggregate equals the
+    components minus the effective mutes, for fields, objects, system permissions and tabs. One
+    Salesforce quirk showed up (a muted object Edit that stayed in the aggregate); the tool does
+    not report that as taken away.
+  - Timing: about 4 to 5 seconds per large group, about 10 to 15 seconds to compare two large groups.
 
-Not yet checked against a live org: field permissions and Apex/app names line by line, and what a
-muting permission set takes away. Before relying on those, compare two groups you know well and
-check a few rows against Setup.
+Not checked: muted apps, pages and code (no muting permission set in that org mutes any); the
+Chrome extension's own cookie session (those checks used the dev server); opening the CSV in
+Excel. Before relying on those, compare two groups you know well and check a few rows against
+Setup.
 
 ## Tests
 
