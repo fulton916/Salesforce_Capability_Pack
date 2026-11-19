@@ -60,7 +60,7 @@ const TAB_LABELS = { DefaultOn: "Shown", DefaultOff: "Available (hidden by defau
 export const SECTION_TITLES = {
   overview: "Summary",
   components: "What's inside",
-  userPermissions: "General permissions",
+  userPermissions: "System permissions",
   objectPermissions: "Objects",
   fieldPermissions: "Fields",
   setupAccess: "Apps, pages & code",
@@ -155,7 +155,7 @@ export const PART_SETS_HELP = "The permission sets each group is built from. A u
 const MUTING_SET_GROUP = "Muting permission set";
 export const PART_MUTED = "Taken away by the muting permission set";
 
-const KIND_WORDS = { user: "General permission", object: "Object", field: "Field", tab: "Tab", setup: "App, page or code" };
+const KIND_WORDS = { user: "System permission", object: "Object", field: "Field", tab: "Tab", setup: "App, page or code" };
 const KIND_ORDER = Object.values(KIND_WORDS);
 
 function compareComponents(a, b, labels, fieldLabels) {
@@ -366,7 +366,7 @@ function overview(a, b, sections) {
   add("Users assigned", assigned(a), assigned(b));
   add("Permission sets inside", (a.components || []).filter((c) => !c.isMuting).length, (b.components || []).filter((c) => !c.isMuting).length);
   add("Muting permission set", a.muting?.label || a.muting?.name || "None", b.muting?.label || b.muting?.name || "None");
-  add("General permissions", has(sections.userPermissions, "a"), has(sections.userPermissions, "b"));
+  add("System permissions", has(sections.userPermissions, "a"), has(sections.userPermissions, "b"));
   add("Objects", has(sections.objectPermissions, "a"), has(sections.objectPermissions, "b"));
   add("Fields", has(sections.fieldPermissions, "a"), has(sections.fieldPermissions, "b"));
   add("Apps, pages & code", has(sections.setupAccess, "a"), has(sections.setupAccess, "b"));
@@ -395,6 +395,165 @@ export function givesCounts(sections) {
   return t;
 }
 
+
+// ---------- summary cards ----------
+
+const pl = (n, one, many = one + "s") => (n === 1 ? one : many);
+const hasTab = (v) => !!v && v !== TAB_LABELS.Hidden;
+
+/**
+ * Numbers for the six summary cards. "X has" counts rows where side X has the item, whether the
+ * other side has it too or not; `only` is what exactly one group has; `differ` is both with
+ * different settings. What's inside leaves out the muting permission set itself.
+ */
+export function cardCounts(result) {
+  const S = result.sections;
+  const side = (rows, has) => ({
+    a: rows.filter((r) => r.status !== "onlyB" && has(r.a)).length,
+    b: rows.filter((r) => r.status !== "onlyA" && has(r.b)).length,
+    only: rows.filter((r) => r.status === "onlyA" || r.status === "onlyB").length,
+    differ: rows.filter((r) => r.status === "differ").length,
+  });
+  const present = (v) => !!v;
+  const sets = S.components.filter((r) => r.part === "sets" && r.group !== MUTING_SET_GROUP);
+  const muted = S.components.filter((r) => r.part === "muted");
+  return {
+    userPermissions: side(S.userPermissions, present),
+    objectPermissions: side(S.objectPermissions, (v) => Array.isArray(v) && v.length > 0),
+    fieldPermissions: side(S.fieldPermissions, (v) => v === "Read" || v === "Edit"),
+    setupAccess: side(S.setupAccess, present),
+    // A Hidden tab cannot be seen, so judge by what each side can see, not by the row status.
+    tabs: {
+      a: S.tabs.filter((r) => hasTab(r.a)).length,
+      b: S.tabs.filter((r) => hasTab(r.b)).length,
+      only: S.tabs.filter((r) => hasTab(r.a) !== hasTab(r.b)).length,
+      differ: S.tabs.filter((r) => hasTab(r.a) && hasTab(r.b) && r.a !== r.b).length,
+    },
+    components: {
+      a: sets.filter((r) => r.status !== "onlyB").length,
+      b: sets.filter((r) => r.status !== "onlyA").length,
+      only: sets.filter((r) => r.status === "onlyA" || r.status === "onlyB").length,
+      mutedOnly: muted.filter((r) => r.status === "onlyA" || r.status === "onlyB").length,
+      mutedDiffer: muted.filter((r) => r.status === "differ").length,
+    },
+  };
+}
+
+/**
+ * The lines of one card, in the words shown on the page. Each line is { n, side, before, after }:
+ * the page prints "{n} {before} {group name for side} {after}". `side` is "a", "b" or null.
+ * When the groups are the same for that card only the two totals are returned and `same` is true.
+ */
+export function cardLines(result, key) {
+  const c = cardCounts(result)[key];
+  const L = (n, before, side, after = "") => ({ n, side, before, after });
+  let lines;
+  let same;
+  if (key === "userPermissions") {
+    const w = (n) => `system ${pl(n, "permission")}`;
+    lines = [L(c.a, w(c.a), "a", "has"), L(c.b, w(c.b), "b", "has"), L(c.only, "only one group has", null)];
+    same = !c.only;
+  } else if (key === "objectPermissions") {
+    const w = (n) => pl(n, "object");
+    lines = [L(c.a, w(c.a), "a", "can access"), L(c.b, w(c.b), "b", "can access"),
+      L(c.only, `${w(c.only)} only one group can access`, null),
+      L(c.differ, `${w(c.differ)} both can access, but with different rights (Read, Create, Edit, Delete…)`, null)];
+    same = !c.only && !c.differ;
+  } else if (key === "fieldPermissions") {
+    const w = (n) => pl(n, "field");
+    lines = [L(c.a, w(c.a), "a", "can see"), L(c.b, w(c.b), "b", "can see"),
+      L(c.only, `${w(c.only)} only one group can see`, null),
+      L(c.differ, `${w(c.differ)} both can see, but one can edit and the other can only read`, null)];
+    same = !c.only && !c.differ;
+  } else if (key === "setupAccess") {
+    const w = (n) => pl(n, "item");
+    lines = [L(c.a, w(c.a), "a", "can use"), L(c.b, w(c.b), "b", "can use"), L(c.only, "only one group can use", null)];
+    same = !c.only;
+  } else if (key === "tabs") {
+    const w = (n) => pl(n, "tab");
+    lines = [L(c.a, w(c.a), "a", "can see"), L(c.b, w(c.b), "b", "can see"),
+      L(c.only, `${w(c.only)} only one group can see`, null),
+      L(c.differ, `${w(c.differ)} both can see, but set differently (shown or hidden by default)`, null)];
+    same = !c.only && !c.differ;
+  } else {
+    const w = (n) => pl(n, "permission set");
+    const t = (n) => pl(n, "thing");
+    lines = [L(c.a, `${w(c.a)} in`, "a"), L(c.b, `${w(c.b)} in`, "b"),
+      L(c.only, `${w(c.only)} in only one group`, null),
+      L(c.mutedOnly, `${t(c.mutedOnly)} muting takes away in only one group`, null),
+      L(c.mutedDiffer, `${t(c.mutedDiffer)} both groups' muting takes away, but differently`, null)];
+    same = !c.only && !c.mutedOnly && !c.mutedDiffer;
+  }
+  return { lines: same ? lines.slice(0, 2) : lines, same };
+}
+
+// ---------- sorting ----------
+
+const COLLATOR = new Intl.Collator("en", { numeric: true, sensitivity: "base" });
+
+/** The text a column shows for a row, for sorting. "" means empty (shown as a dash). */
+export function sortText(r, col, nameA = "A", nameB = "B") {
+  const flags = (v) => v.map((f) => FLAG_LABELS[f] || f).join(", ");
+  const val = (v) => (v === null || v === undefined || v === false || (Array.isArray(v) && !v.length) ? "" : v === true ? "Yes" : Array.isArray(v) ? flags(v) : String(v));
+  switch (col) {
+    case "item": return String(r.label ?? "");
+    case "type": return String((r.kind ?? r.group) || "");
+    case "a": return val(r.a);
+    case "b": return val(r.b);
+    case "diff": {
+      if (r.status === "same") return "Same";
+      if (Array.isArray(r.a) && (r.aExtra?.length || r.bExtra?.length)) {
+        return [r.aExtra?.length ? `Only ${nameA}: ${flags(r.aExtra)}` : "", r.bExtra?.length ? `Only ${nameB}: ${flags(r.bExtra)}` : ""].filter(Boolean).join(" ");
+      }
+      if (r.status === "differ" && r.more) return `Different: ${r.more === "a" ? nameA : nameB} has more`;
+      return statusText(r.status, nameA, nameB);
+    }
+    default: return "";
+  }
+}
+
+/**
+ * Sort rows by a column, `dir` "asc" (A to Z) or "desc". Case does not matter and numbers sort by
+ * value (Item 2 before Item 10). Empty values always come last. Returns a new array; ties keep their order.
+ */
+export function sortRows(rows, col, dir = "asc", nameA = "A", nameB = "B") {
+  if (!col) return rows;
+  const sign = dir === "desc" ? -1 : 1;
+  const keyed = rows.map((r, i) => ({ r, i, t: sortText(r, col, nameA, nameB) }));
+  keyed.sort((x, y) => {
+    if (!x.t !== !y.t) return x.t ? -1 : 1;
+    return sign * COLLATOR.compare(x.t, y.t) || x.i - y.i;
+  });
+  return keyed.map((k) => k.r);
+}
+
+/** Like sortRows for rows grouped by `group` (Fields by object): sort inside each group; the item column also orders the groups. */
+export function sortGrouped(rows, col, dir = "asc", nameA = "A", nameB = "B") {
+  if (!col) return rows;
+  const groups = new Map();
+  for (const r of rows) {
+    const g = r.group || "Other";
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(r);
+  }
+  let names = [...groups.keys()];
+  if (col === "item") {
+    const sign = dir === "desc" ? -1 : 1;
+    names = names.map((n, i) => ({ n, i })).sort((x, y) => sign * COLLATOR.compare(x.n, y.n) || x.i - y.i).map((x) => x.n);
+  }
+  return names.flatMap((n) => sortRows(groups.get(n), col, dir, nameA, nameB));
+}
+
+/** Sort one section's rows as its list does: What's inside keeps its two parts, Fields keep their objects. */
+export function sortSection(rows, section, sort, nameA = "A", nameB = "B") {
+  if (!sort || !sort.col || section === "overview") return rows;
+  const { col, dir } = sort;
+  if (section === "components") {
+    return [...sortRows(rows.filter((r) => r.part !== "muted"), col, dir, nameA, nameB), ...sortRows(rows.filter((r) => r.part === "muted"), col, dir, nameA, nameB)];
+  }
+  return section === "fieldPermissions" ? sortGrouped(rows, col, dir, nameA, nameB) : sortRows(rows, col, dir, nameA, nameB);
+}
+
 /** Plain-language findings. kind: verdict | risk | area | note. */
 function highlights(a, b, sections) {
   const out = [];
@@ -410,7 +569,7 @@ function highlights(a, b, sections) {
   else if (gives.b && !gives.a) push("verdict", "info", `${B} gives everything ${A} gives, and more (${things(gives.b)} that ${A} does not).`);
   else push("verdict", "info", `Each group gives access the other does not: ${A} gives ${things(gives.a)} ${B} doesn't; ${B} gives ${things(gives.b)} ${A} doesn't.`);
 
-  // General permissions first, one line each.
+  // System permissions first, one line each.
   for (const r of sections.userPermissions.filter((x) => x.highRisk && x.status !== "same")) {
     out.push({ kind: "risk", area: "general", level: "risk", text: `Only ${r.status === "onlyA" ? A : B} has “${r.label}”.` });
   }
@@ -429,7 +588,7 @@ function highlights(a, b, sections) {
 
   const n = (k, st) => sections[k].filter((r) => r.status === st).length;
   const summary = [
-    ["userPermissions", "general permission"],
+    ["userPermissions", "system permission"],
     ["objectPermissions", "object"],
     ["fieldPermissions", "field"],
     ["setupAccess", "app, page or code item", "apps, pages or code items"],
@@ -506,9 +665,9 @@ export function filterRows(rows, { section = "", diffOnly = false, search = "" }
 
 /**
  * Flatten a comparison (or one section of it) into rows for CSV export.
- * `diffOnly` and `search` narrow the rows the same way the page does.
+ * `diffOnly` and `search` narrow the rows the same way the page does; `sort` ({ col, dir }) orders one section.
  */
-export function toRows(result, onlySection = null, { diffOnly = false, search = "" } = {}) {
+export function toRows(result, onlySection = null, { diffOnly = false, search = "", sort = null } = {}) {
   const A = result.a.psg.label || result.a.psg.developerName;
   const B = result.b.psg.label || result.b.psg.developerName;
   const header = ["Section", "Group", "Item", "API name", "Difference", A, B, `Only ${A}`, `Only ${B}`, "Kind of item"];
@@ -516,7 +675,7 @@ export function toRows(result, onlySection = null, { diffOnly = false, search = 
   const withSub = (v, sub) => (v === null ? "No" : sub ? `${cell(v)} · ${sub}` : cell(v));
   for (const [k, all] of Object.entries(result.sections)) {
     if (onlySection && k !== onlySection) continue;
-    for (const r of filterRows(all, { section: k, diffOnly, search })) {
+    for (const r of sortSection(filterRows(all, { section: k, diffOnly, search }), k, onlySection ? sort : null, A, B)) {
       const muted = r.part === "muted";
       rows.push([
         SECTION_TITLES[k],

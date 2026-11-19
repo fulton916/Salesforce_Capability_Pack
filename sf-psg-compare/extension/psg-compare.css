@@ -158,16 +158,11 @@ details.files summary { cursor: pointer; color: var(--accent); }
 .card:hover { border-color: var(--accent); }
 .card-title { font-weight: 700; font-size: 15px; margin-bottom: 4px; }
 .card b { font-size: 16px; }
-.card .ca b { color: var(--a); }
-.card .cb b { color: var(--b); }
-.cards-hint { margin: 0 0 8px; color: var(--muted); font-size: 12px; }
-.cards-title { margin: 0 0 2px; font-weight: 600; color: var(--muted); font-size: 14px; }
-.card .ca, .card .cb { display: flex; gap: 8px; align-items: baseline; }
-.card .ca span { color: var(--a); }
-.card .cb span { color: var(--b); }
-.card div:not(.card-title):not(.card-kind):not(.same):not(.ca):not(.cb) { display: flex; gap: 8px; align-items: baseline; }
+.cards-title { margin: 0 0 8px; font-weight: 600; color: var(--muted); font-size: 14px; }
+.card-line { display: flex; gap: 8px; align-items: baseline; }
 .card b { flex: none; }
-.card-kind { color: var(--muted); font-size: 12px; font-weight: 600; margin-top: 4px; }
+.card .who-a { color: var(--a); font-weight: 600; }
+.card .who-b { color: var(--b); font-weight: 600; }
 .card .same { color: var(--good); }
 
 .risks { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
@@ -199,6 +194,9 @@ details.files summary { cursor: pointer; color: var(--accent); }
 .tablewrap { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 14px; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+button.sorthead { border: 0; background: none; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; border-radius: 4px; }
+button.sorthead:hover:not(:disabled) { color: var(--accent); text-decoration: underline; }
+.sortarrow { margin-left: 6px; font-size: 11px; color: var(--accent); }
 th { position: sticky; top: 0; background: var(--panel); font-weight: 600; z-index: 1; white-space: nowrap; }
 td.item { font-weight: 500; }
 td.grp { color: var(--muted); }

@@ -6,7 +6,7 @@ import path from "node:path";
 
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../extension/lib/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../extension/lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts } from "../extension/lib/compare.js";
+import { compareSnapshots, toRows, toCsv, humanize, filterRows, givesCounts, cardCounts, cardLines, sortRows, sortGrouped, sortSection } from "../extension/lib/compare.js";
 import { matchPsgs, searchWords } from "../extension/lib/pick.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -286,7 +286,7 @@ await test("contents, setup access and tabs", () => {
   const mOpp = muted.find((r) => r.key === "Opportunity");
   assert.deepEqual([mOpp.status, mOpp.a, mOpp.label, mOpp.kind], ["onlyA", "Removed: Delete", "Opportunity", "Object"]);
   assert.equal(muted.find((r) => r.label === "Export Reports").a, "Removed");
-  assert.equal(muted.find((r) => r.label === "Export Reports").kind, "General permission");
+  assert.equal(muted.find((r) => r.label === "Export Reports").kind, "System permission");
   assert.ok(muted.some((r) => r.label === "Export Reports"));
   assert.equal(muted.find((r) => r.key === "Account.AnnualRevenue").label, "Account › Annual Revenue");
   assert.equal(row("setupAccess", "Approve_Discounts").status, "onlyB");
@@ -451,7 +451,7 @@ await test("filterRows and CSV follow differences-only and search", () => {
   assert.ok(s.length > 1 && s.slice(1).every((r) => /Annual/.test(r[2])));
   assert.ok(toRows(R, null, { diffOnly: true }).slice(1).every((r) => r[0] === "Summary" || r[4] !== "Same"));
   const kinds = toRows(R, "components").filter((r) => r[1] === "Taken away by muting").map((r) => r[9]);
-  assert.ok(kinds.length && kinds.every((k) => ["Object", "Field", "General permission", "Tab", "App, page or code"].includes(k)), kinds.join());
+  assert.ok(kinds.length && kinds.every((k) => ["Object", "Field", "System permission", "Tab", "App, page or code"].includes(k)), kinds.join());
 });
 
 await test("search treats punctuation as a separator", () => {
@@ -720,6 +720,141 @@ await test("search puts names that start with the text first, and caps the list"
   const r = matchPsgs(many, "group");
   assert.equal(r.items.length, 100);
   assert.equal(r.total, 150);
+});
+
+// ---------- summary cards and sorting ----------
+
+const fake = (sections) => ({ sections: { components: [], userPermissions: [], objectPermissions: [], fieldPermissions: [], setupAccess: [], tabs: [], ...sections } });
+const text = (res, k) => cardLines(res, k).lines.map((l) => `${l.n.toLocaleString("en-US")} ${l.before}${l.side ? ` <${l.side}>` : ""}${l.after ? ` ${l.after}` : ""}`);
+
+await test("cards: system permissions, apps and objects count what each side has", () => {
+  const res = fake({
+    userPermissions: [
+      { status: "same", a: true, b: true }, { status: "onlyA", a: true, b: false }, { status: "onlyA", a: true, b: false }, { status: "onlyB", a: false, b: true },
+    ],
+    objectPermissions: [
+      { status: "same", a: ["Read"], b: ["Read"] }, { status: "onlyB", a: [], b: ["Read", "Edit"] }, { status: "differ", a: ["Read"], b: ["Read", "Edit"] },
+    ],
+    setupAccess: [{ status: "onlyA", a: true, b: false }],
+  });
+  assert.deepEqual(text(res, "userPermissions"), ["3 system permissions <a> has", "2 system permissions <b> has", "3 only one group has"]);
+  assert.deepEqual(text(res, "objectPermissions"), [
+    "2 objects <a> can access", "3 objects <b> can access", "1 object only one group can access",
+    "1 object both can access, but with different rights (Read, Create, Edit, Delete…)"]);
+  assert.deepEqual(text(res, "setupAccess"), ["1 item <a> can use", "0 items <b> can use", "1 only one group can use"]);
+});
+
+await test("cards: fields count Read or Edit; tabs ignore Hidden; zero lines stay", () => {
+  const res = fake({
+    fieldPermissions: [
+      { status: "differ", a: "Edit", b: "Read" }, { status: "same", a: "Read", b: "Read" }, { status: "onlyA", a: "Read", b: "No access" },
+    ],
+    tabs: [
+      { status: "same", a: "Shown", b: "Shown" },
+      { status: "differ", a: "Shown", b: "Hidden" },
+      { status: "onlyB", a: null, b: "Available (hidden by default)" },
+      { status: "onlyA", a: "Hidden", b: null },
+    ],
+  });
+  assert.deepEqual(text(res, "fieldPermissions"), [
+    "3 fields <a> can see", "2 fields <b> can see", "1 field only one group can see", "1 field both can see, but one can edit and the other can only read"]);
+  assert.deepEqual(text(res, "tabs"), [
+    "2 tabs <a> can see", "2 tabs <b> can see", "2 tabs only one group can see", "0 tabs both can see, but set differently (shown or hidden by default)"]);
+  assert.deepEqual(cardCounts(fake({})).tabs, { a: 0, b: 0, only: 0, differ: 0 });
+});
+
+await test("cards: tab counts follow who can see the tab (Hidden cannot be seen)", () => {
+  const tabs = (...rows) => cardCounts(fake({ tabs: rows.map(([status, a, b]) => ({ status, a, b })) })).tabs;
+  // Hidden in one group, absent in the other: nobody can see it, not counted
+  assert.deepEqual(tabs(["onlyA", "Hidden", null]), { a: 0, b: 0, only: 0, differ: 0 });
+  assert.deepEqual(tabs(["onlyB", null, "Hidden"]), { a: 0, b: 0, only: 0, differ: 0 });
+  // Hidden in both, or Hidden vs Hidden: not counted
+  assert.deepEqual(tabs(["same", "Hidden", "Hidden"]), { a: 0, b: 0, only: 0, differ: 0 });
+  // Shown in one, Hidden in the other: only one group can see it
+  assert.deepEqual(tabs(["differ", "Shown", "Hidden"]), { a: 1, b: 0, only: 1, differ: 0 });
+  assert.deepEqual(tabs(["differ", "Hidden", "Available (hidden by default)"]), { a: 0, b: 1, only: 1, differ: 0 });
+  // Shown in one, absent in the other: only one group
+  assert.deepEqual(tabs(["onlyA", "Shown", null]), { a: 1, b: 0, only: 1, differ: 0 });
+  // Shown vs Available (DefaultOn vs DefaultOff): both can see, set differently
+  assert.deepEqual(tabs(["differ", "Shown", "Available (hidden by default)"]), { a: 1, b: 1, only: 0, differ: 1 });
+});
+
+await test("cards: What is inside leaves out the muting permission set; singular words", () => {
+  const set = (status, group = "Permission set") => ({ part: "sets", group, status });
+  const muted = (status) => ({ part: "muted", status });
+  const res = fake({
+    components: [set("same"), set("onlyA"), set("onlyB", "Muting permission set"), set("onlyB"), muted("onlyA"), muted("differ"), muted("same")],
+  });
+  assert.deepEqual(cardCounts(res).components, { a: 2, b: 2, only: 2, mutedOnly: 1, mutedDiffer: 1 });
+  assert.deepEqual(text(res, "components"), [
+    "2 permission sets in <a>", "2 permission sets in <b>", "2 permission sets in only one group",
+    "1 thing muting takes away in only one group", "1 thing both groups' muting takes away, but differently"]);
+  assert.equal(text(fake({ components: [set("onlyA")] }), "components")[2], "1 permission set in only one group");
+});
+
+await test("cards: identical groups show the two totals and Same in both", () => {
+  const res = fake({ tabs: [{ status: "same", a: "Shown", b: "Shown" }], components: [{ part: "sets", group: "Permission set", status: "same" }] });
+  assert.equal(cardLines(res, "tabs").same, true);
+  assert.deepEqual(text(res, "tabs"), ["1 tab <a> can see", "1 tab <b> can see"]);
+  assert.equal(cardLines(res, "components").same, true);
+  assert.equal(cardLines(fake({ userPermissions: [{ status: "onlyA", a: true, b: false }] }), "userPermissions").same, false);
+});
+
+await test("cards on the sample result agree with the list rows", () => {
+  const c = cardCounts(R);
+  const rows = R.sections.objectPermissions;
+  assert.equal(c.objectPermissions.only, rows.filter((r) => r.status === "onlyA" || r.status === "onlyB").length);
+  assert.equal(c.objectPermissions.a, rows.filter((r) => r.a.length).length);
+  assert.equal(c.userPermissions.a, R.sections.userPermissions.filter((r) => r.a).length);
+});
+
+await test("sort: A to Z, Z to A, natural numbers, no case, empty last", () => {
+  const rows = ["item 10", "Item 2", "banana", "", "Apple"].map((label, i) => ({ label, a: i % 2 ? "Read" : null, status: "same" }));
+  assert.deepEqual(sortRows(rows, "item").map((r) => r.label), ["Apple", "banana", "Item 2", "item 10", ""]);
+  assert.deepEqual(sortRows(rows, "item", "desc").map((r) => r.label), ["item 10", "Item 2", "banana", "Apple", ""]);
+  assert.deepEqual(sortRows(rows, "a").map((r) => r.a), ["Read", "Read", null, null, null]);
+  assert.equal(rows[0].label, "item 10"); // input untouched
+  assert.deepEqual(sortRows(rows, null), rows);
+});
+
+await test("sort: object flags and the Difference column sort by what is shown", () => {
+  const rows = [
+    { label: "O1", status: "differ", a: ["Read"], b: ["Read", "Edit"], aExtra: [], bExtra: ["Edit"] },
+    { label: "O2", status: "onlyA", a: ["Read"], b: [], aExtra: ["Read"], bExtra: [] },
+    { label: "O3", status: "same", a: ["Read"], b: ["Read"] },
+  ];
+  assert.deepEqual(sortRows(rows, "diff", "asc", "Sales", "Service").map((r) => r.label), ["O2", "O1", "O3"]);
+  assert.deepEqual(sortRows(rows, "b").map((r) => r.label), ["O3", "O1", "O2"]);
+});
+
+await test("sort: grouped lists sort inside each object, and the item column orders the objects", () => {
+  const rows = [
+    { group: "Contact", label: "Zip", a: "Read" }, { group: "Contact", label: "Age", a: "Edit" },
+    { group: "Account", label: "Name", a: "Read" }, { group: "Account", label: "Fax", a: null },
+  ];
+  const names = (list) => list.map((r) => `${r.group}.${r.label}`);
+  assert.deepEqual(names(sortGrouped(rows, "item")), ["Account.Fax", "Account.Name", "Contact.Age", "Contact.Zip"]);
+  assert.deepEqual(names(sortGrouped(rows, "item", "desc")), ["Contact.Zip", "Contact.Age", "Account.Name", "Account.Fax"]);
+  // Another column: the objects stay in their original order.
+  assert.deepEqual(names(sortGrouped(rows, "a")), ["Contact.Age", "Contact.Zip", "Account.Name", "Account.Fax"]);
+});
+
+await test("sort: What is inside keeps its two parts; the CSV follows the sort", () => {
+  const rows = [
+    { part: "sets", label: "B", status: "same" }, { part: "muted", label: "A", status: "same", kind: "Field" },
+    { part: "sets", label: "A", status: "same" }, { part: "muted", label: "C", status: "same", kind: "Tab" },
+  ];
+  assert.deepEqual(sortSection(rows, "components", { col: "item", dir: "desc" }).map((r) => r.label), ["B", "A", "C", "A"]);
+  const sorted = toRows(R, "objectPermissions", { sort: { col: "item", dir: "desc" } }).slice(1).map((r) => r[2]);
+  assert.deepEqual(sorted, sortRows(R.sections.objectPermissions, "item", "desc").map((r) => r.label));
+});
+
+await test("sort: 2,000 rows sort quickly", () => {
+  const rows = Array.from({ length: 2000 }, (_, i) => ({ label: `Field ${(i * 7919) % 2000}`, a: i % 3 ? "Read" : null, status: "same" }));
+  const t0 = performance.now();
+  sortRows(rows, "item");
+  sortRows(rows, "a", "desc");
+  assert.ok(performance.now() - t0 < 500, `took ${performance.now() - t0} ms`);
 });
 
 console.log(failures.length ? `\n${failures.length} FAILED, ${passed} passed` : `\nAll ${passed} checks passed.`);

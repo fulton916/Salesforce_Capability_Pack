@@ -1,6 +1,6 @@
 import { SfApi, findSession } from "./lib/sfconn.js";
 import { listPsgs, readOrg, takeSnapshot, validateSnapshot } from "./lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, filterRows, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
+import { compareSnapshots, toRows, toCsv, filterRows, cardLines, sortRows, sortGrouped, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
 import { matchPsgs } from "./lib/pick.js";
 import { startLiveReload } from "./lib/livereload.js";
 
@@ -9,7 +9,7 @@ const DEMO = params.has("demo");
 const DEV = params.has("dev"); // served by tools/dev_server.py, which forwards API calls to the org
 const HOST = params.get("host");
 const MAX_ROWS = 2000; // rows drawn per list; downloads have everything
-const RISKS_SHOWN = 5; // general-permission lines shown before "Show more"
+const RISKS_SHOWN = 5; // system-permission lines shown before "Show more"
 const OPEN_BELOW = 60; // a grouped list with this many rows or fewer starts expanded
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -42,6 +42,7 @@ const state = {
   allRisks: false,
   fieldMode: "auto", // grouped Fields list: auto (by length), all open, all closed
   toggled: new Set(), // objects the user flipped from that default
+  sort: {}, // per list: { col, dir } where dir is "asc" or "desc"; no entry = the default order
 };
 
 const nameOf = (side) => {
@@ -303,6 +304,7 @@ async function runCompare() {
     state.allRisks = false;
     state.fieldMode = "auto";
     state.toggled = new Set();
+    state.sort = {};
     if (reading.length) {
       // Show the last step with a full bar for a moment before the result replaces it.
       setProgress(`Step ${STEPS.length} of ${STEPS.length}: comparing the two groups…`, 1);
@@ -343,28 +345,16 @@ function renderResult() {
   $("#verdict").textContent = verdict?.text || "";
   $("#verdict").className = `verdict ${verdict?.level || ""}`;
 
-  // One card per area: how many differences, in plain words.
-  const plural = (n, one, many) => (n === 1 ? one : many);
+  // One card per area. Each line is "{number} {words}", with the group's name in its colour.
+  const num = (n) => n.toLocaleString("en-US");
   $("#cards").replaceChildren(...CARD_TABS.map((k) => {
-    // "What's inside" holds permission sets and muted items; the card counts them separately.
-    // The muting permission set itself is not counted (each group's is normally different).
-    const parts = k === "components"
-      ? [[r.counts.componentSets, "Permission sets in one group but not the other"], [r.counts.componentMuted, "Things muting takes away in one group but not the other"]]
-      : [[r.counts[k], ""]];
-    const lines = [];
-    let diffs = 0;
-    for (const [c, label] of parts) {
-      const d = c.onlyA + c.onlyB + c.differ;
-      diffs += d;
-      // The group name says who has it; the sub-label says what is being counted.
-      if (d && label) lines.push(el("div", { class: "card-kind", text: label }));
-      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), el("span", { text: nameOf("a") })));
-      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), el("span", { text: nameOf("b") })));
-      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), el("span", { text: "set up differently" })));
-    }
-    if (!diffs) lines.push(el("div", { class: "same", text: r.counts[k].total ? "✓ Same in both" : "Neither group has any" }));
-    return el("button", { class: `card${diffs ? "" : " ok"}`, onclick: () => openTab(k, true) },
-      el("div", { class: "card-title", text: SECTION_TITLES[k] }), ...lines);
+    const { lines, same } = cardLines(r, k);
+    const rows = lines.map((l) => el("div", { class: "card-line" },
+      el("b", { text: num(l.n) }),
+      el("span", {}, l.before, l.side ? [" ", el("span", { class: `who-${l.side}`, text: nameOf(l.side) })] : null, l.after ? ` ${l.after}` : "")));
+    if (same) rows.push(el("div", { class: "same", text: "✓ Same in both" }));
+    return el("button", { class: `card${same ? " ok" : ""}`, onclick: () => openTab(k, true) },
+      el("div", { class: "card-title", text: SECTION_TITLES[k] }), ...rows);
   }));
 
   renderRisks();
@@ -382,7 +372,7 @@ function renderResult() {
 function renderRisks() {
   const risks = state.result.highlights.filter((h) => h.kind === "risk");
   $("#riskPanel").hidden = !risks.length;
-  // General permissions first; the object lines (at most one per group) are always shown.
+  // System permissions first; the object lines (at most one per group) are always shown.
   const general = risks.filter((h) => h.area === "general");
   const rest = risks.filter((h) => h.area !== "general");
   const shown = state.allRisks ? general : general.slice(0, RISKS_SHOWN);
@@ -391,7 +381,7 @@ function renderRisks() {
   const hidden = general.length - RISKS_SHOWN;
   const more = $("#moreRisks");
   more.hidden = hidden <= 0;
-  more.textContent = state.allRisks ? "Show fewer" : `Show ${hidden} more general ${hidden === 1 ? "permission" : "permissions"}`;
+  more.textContent = state.allRisks ? "Show fewer" : `Show ${hidden} more system ${hidden === 1 ? "permission" : "permissions"}`;
 }
 
 $("#moreRisks").addEventListener("click", () => { state.allRisks = !state.allRisks; renderRisks(); });
@@ -438,7 +428,7 @@ function itemCell(r) {
   return el("td", { class: "item" },
     el("span", { text: r.label }),
     r.highRisk ? el("span", { class: "risk-tag", text: "Powerful" }) : null,
-    state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
+    state.showApi && r.key ? el("div", { class: "api", text: r.key }) : null);
 }
 
 /** One value cell. `sub` is secondary text such as "Salesforce licence". */
@@ -463,36 +453,64 @@ function diffCell(r) {
 const diffTd = (r) => el("td", { class: "diff" }, statusChip(r));
 const blank = (v) => (v === "" || v === null || v === undefined ? "—" : String(v));
 
-/** Column heads and a row builder for the list on screen. `part` is "sets" or "muted" for What's inside. */
+/** Column heads ({ id, node }; no id = not sortable) and a row builder for the list on screen. `part` is "sets" or "muted" for What's inside. */
 function columns(part) {
   const A = nameOf("a");
   const B = nameOf("b");
-  const headA = el("span", {}, el("span", { class: "dot a" }), A);
-  const headB = el("span", {}, el("span", { class: "dot b" }), B);
+  const h = (id, node) => ({ id, node });
+  const dotA = () => el("span", {}, el("span", { class: "dot a" }), A);
+  const dotB = () => el("span", {}, el("span", { class: "dot b" }), B);
+  const headA = h("a", dotA());
+  const headB = h("b", dotB());
+  const diff = h("diff", "Difference");
   const legacy = state.result.mutedLegacy;
   switch (state.tab) {
     case "overview":
-      return { head: ["", headA, headB], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: blank(r.a) }), el("td", { text: blank(r.b) })] };
+      return { head: [h(null, ""), h(null, dotA()), h(null, dotB())], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: blank(r.a) }), el("td", { text: blank(r.b) })] };
     case "objectPermissions":
-      return { head: ["Object", headA, headB, "Difference"], row: (r) => [itemCell(r), access(r.a), access(r.b), diffCell(r)] };
+      return { head: [h("item", "Object"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffCell(r)] };
     case "fieldPermissions": // grouped under object headers, so no Object column
-      return { head: ["Field", headA, headB, "Difference"], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
+      return { head: [h("item", "Field"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
     case "setupAccess":
-      return { head: ["Type", "Name", headA, headB, "Difference"], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a), access(r.b), diffTd(r)] };
+      return { head: [h("type", "Type"), h("item", "Name"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a), access(r.b), diffTd(r)] };
     case "components":
       if (part === "muted") {
         const may = (side) => (legacy[side] ? "may not have been given" : "");
-        return { head: ["Kind of item", "Name", headA, headB, "Difference"], row: (r) => [el("td", { class: "grp", text: r.kind }), itemCell(r), access(r.a, may("a")), access(r.b, may("b")), diffTd(r)] };
+        return { part, head: [h("type", "Kind of item"), h("item", "Name"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.kind }), itemCell(r), access(r.a, may("a")), access(r.b, may("b")), diffTd(r)] };
       }
-      return { head: ["Type", "Permission set", headA, headB, "Difference"], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a, r.aSub), access(r.b, r.bSub), diffTd(r)] };
+      return { part, head: [h("type", "Type"), h("item", "Permission set"), headA, headB, diff], row: (r) => [el("td", { class: "grp", text: r.group }), itemCell(r), access(r.a, r.aSub), access(r.b, r.bSub), diffTd(r)] };
     default:
-      return { head: [state.tab === "tabs" ? "Tab" : "Permission", headA, headB, "Difference"], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
+      return { head: [h("item", state.tab === "tabs" ? "Tab" : "Permission"), headA, headB, diff], row: (r) => [itemCell(r), access(r.a), access(r.b), diffTd(r)] };
   }
+}
+
+/** Header row. Sortable heads are buttons: click for A to Z, click again for Z to A. */
+function headRow(spec) {
+  const cur = state.sort[state.tab];
+  return el("tr", {}, spec.head.map((c) => {
+    if (!c.id) return el("th", {}, c.node);
+    const on = cur && cur.col === c.id;
+    const key = `${spec.part || ""}:${c.id}`;
+    return el("th", { "aria-sort": on ? (cur.dir === "desc" ? "descending" : "ascending") : "none" },
+      el("button", {
+        class: "sorthead", "data-key": key,
+        title: on && cur.dir === "asc" ? "Sorted A to Z. Click to sort Z to A" : "Click to sort A to Z",
+        onclick: () => {
+          state.sort[state.tab] = { col: c.id, dir: on && cur.dir === "asc" ? "desc" : "asc" };
+          renderTable();
+          $$("button.sorthead").find((b) => b.dataset.key === key)?.focus();
+        },
+      }, c.node, on ? el("span", { class: "sortarrow", "aria-hidden": "true", text: cur.dir === "desc" ? "▼" : "▲" }) : null));
+  }));
 }
 
 /** Rows of a list as shown: differences-only and search applied. */
 function visibleRows(rows = state.result.sections[state.tab]) {
-  return filterRows(rows, { section: state.tab, diffOnly: state.diffOnly, search: state.search });
+  const found = filterRows(rows, { section: state.tab, diffOnly: state.diffOnly, search: state.search });
+  const s = state.sort[state.tab];
+  if (!s || state.tab === "overview") return found;
+  const [A, B] = [nameOf("a"), nameOf("b")];
+  return state.tab === "fieldPermissions" ? sortGrouped(found, s.col, s.dir, A, B) : sortRows(found, s.col, s.dir, A, B);
 }
 
 function emptyMessage(total) {
@@ -503,7 +521,7 @@ function emptyMessage(total) {
 
 function plainTable(spec, rows) {
   const body = rows.slice(0, MAX_ROWS).map((r) => el("tr", { class: r.status }, spec.row(r)));
-  const parts = [el("table", {}, el("thead", {}, el("tr", {}, spec.head.map((h) => el("th", {}, h)))), el("tbody", {}, body))];
+  const parts = [el("table", {}, el("thead", {}, headRow(spec)), el("tbody", {}, body))];
   if (rows.length > MAX_ROWS) {
     parts.push(el("div", { class: "more", text: `Showing the first ${MAX_ROWS.toLocaleString("en-US")} of ${rows.length.toLocaleString("en-US")}. Search to narrow the list, or download it to see everything.` }));
   }
@@ -528,7 +546,7 @@ function groupedTable(spec, rows) {
     const diffs = g.rows.filter((x) => x.status !== "same").length;
     const d = `${num(diffs)} ${diffs === 1 ? "difference" : "differences"}`;
     const text = !diffs ? `${g.name} — ${num(g.rows.length)} ${g.rows.length === 1 ? "field" : "fields"}, all the same`
-      : state.diffOnly ? `${g.name} — ${d}` : `${g.name} — ${d} (of ${num(g.rows.length)} fields)`;
+      : state.diffOnly ? `${g.name} — ${d}` : `${g.name} — ${d} (of ${num(g.rows.length)} ${g.rows.length === 1 ? "field" : "fields"})`;
     const head = el("tr", { class: "objhead" }, el("td", { colspan: spec.head.length },
       el("button", {
         class: "grouphead", "aria-expanded": String(open), title: open ? "Collapse" : "Expand",
@@ -539,7 +557,7 @@ function groupedTable(spec, rows) {
     if (open && shown.length < g.rows.length) cut = true;
     return el("tbody", {}, head, shown.map((r) => el("tr", { class: r.status }, spec.row(r))));
   });
-  const parts = [el("table", { class: "grouped" }, el("thead", {}, el("tr", {}, spec.head.map((h) => el("th", {}, h)))), bodies)];
+  const parts = [el("table", { class: "grouped" }, el("thead", {}, headRow(spec)), bodies)];
   if (cut) parts.push(el("div", { class: "more", text: `Showing the first ${num(MAX_ROWS)} rows. Collapse some objects, search, or download the list to see everything.` }));
   return parts;
 }
@@ -612,9 +630,9 @@ function baseName() {
   return `compare_${safe(a.psg.developerName)}_vs_${safe(b.psg.developerName)}_${stamp()}`;
 }
 
-// "This list" is exactly what is on screen (differences-only and search applied; collapsed objects included).
+// "This list" is exactly what is on screen (differences-only, search and sort applied; collapsed objects included).
 $("#csvTab").addEventListener("click", () => download(`${baseName()}_${safe(SECTION_TITLES[state.tab])}.csv`,
-  toCsv(toRows(state.result, state.tab, { diffOnly: state.diffOnly, search: state.search })), "text/csv"));
+  toCsv(toRows(state.result, state.tab, { diffOnly: state.diffOnly, search: state.search, sort: state.sort[state.tab] })), "text/csv"));
 $("#csvDiff").addEventListener("click", () => download(`${baseName()}_differences.csv`, toCsv(toRows(state.result, null, { diffOnly: true })), "text/csv"));
 $("#csvAll").addEventListener("click", () => download(`${baseName()}_everything.csv`, toCsv(toRows(state.result)), "text/csv"));
 for (const side of ["a", "b"]) {
