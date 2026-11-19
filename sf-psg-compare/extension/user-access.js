@@ -4,8 +4,10 @@ import { searchUsers, readUserAccess } from "./lib/useraccess.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
   matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
+  userCardLines, orgParts,
 } from "./lib/usercompare.js";
 import { startLiveReload } from "./lib/livereload.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
@@ -66,20 +68,10 @@ function setProgress(text) {
 
 // ---------- connecting ----------
 
-function orgKind(o) {
-  if (o.isSandbox) return ["Sandbox", "sbx"];
-  if (/developer|trial/i.test(o.edition || "")) return [o.edition, "sbx"]; // e.g. "Developer Edition"
-  return ["Production", "prod"];
-}
-
 function showOrg(o, host, via) {
-  const [kind, cls] = orgKind(o);
-  $("#org").replaceChildren(
-    el("strong", { text: o.name || o.id }), " ",
-    el("span", { class: `badge ${cls}`, text: kind }),
-    via ? el("span", { class: "badge demo", text: via }) : null,
-    el("span", { class: "host", text: host })
-  );
+  // Built from orgParts() so a missing value is left out: replaceChildren(null) would print "null".
+  const parts = orgParts(o, host, via).map((p) => el(p.tag, { class: p.cls, text: p.text }));
+  $("#org").replaceChildren(...parts.flatMap((n, i) => (i ? [" ", n] : [n])));
   document.title = `User access summary and comparison – ${o.name || host}`;
 }
 
@@ -338,12 +330,11 @@ function renderCards() {
     if (na) {
       lines.push(el("div", { class: "na", text: "Not available" }));
     } else if (state.result) {
+      for (const l of userCardLines(state.result, k)) {
+        lines.push(el("div", { class: l.cls }, l.segs.map((g) => g.bold ? el("b", { text: g.text }) : g.side ? el("span", { class: `who-${g.side}`, text: g.text }) : g.text)));
+      }
       const c = state.result.counts[k];
-      if (c.onlyA) lines.push(el("div", { class: "ca" }, el("b", { text: c.onlyA }), ` only ${nameOf("a")} has`));
-      if (c.onlyB) lines.push(el("div", { class: "cb" }, el("b", { text: c.onlyB }), ` only ${nameOf("b")} has`));
-      if (c.differ) lines.push(el("div", {}, el("b", { text: c.differ }), " set up differently"));
       ok = !(c.onlyA + c.onlyB + c.differ);
-      if (ok) lines.push(el("div", { class: "same", text: c.total ? "✓ Same in both" : "Neither has any" }));
     } else {
       const rows = singleRows(state.sides.a.access, k);
       if (k === "profile" || k === "role") lines.push(el("div", { class: "one", text: rows[0]?.label || `No ${s.one}` }));
@@ -391,6 +382,7 @@ function renderTabs() {
       SECTION_TITLES[k], k === "overview" ? null : el("span", { class: `n${n ? "" : " zero"}`, title, text: String(n) }));
   }));
   $("#help").textContent = state.tab === "overview" && !state.result ? "A quick look at each area. Click a tab to see the list." : SECTION_HELP[state.tab] || "";
+  if (state.result && state.tab !== "overview" && state.diffOnly) $("#help").textContent += " The list shows only differences. Choose “Everything” to see all.";
   $(".seg").hidden = state.tab === "overview" || !state.result;
 }
 
@@ -489,6 +481,7 @@ for (const [id, diffOnly] of [["#showDiff", true], ["#showAll", false]]) {
     state.diffOnly = diffOnly;
     $("#showDiff").setAttribute("aria-pressed", String(diffOnly));
     $("#showAll").setAttribute("aria-pressed", String(!diffOnly));
+    renderTabs();
     renderTable();
   });
 }
@@ -527,3 +520,14 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) $(".
 
 connect();
 startLiveReload();
+
+// Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.
+{
+  let manifestVersion = "";
+  try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* dev server */ }
+  const version = versionText(manifestVersion, navigator);
+  const link = (text, kind) => el("a", {
+    href: issueUrl({ kind, tool: FEEDBACK_TOOLS.access, version }), target: "_blank", rel: "noopener noreferrer", text,
+  });
+  $("#feedback").replaceChildren(link("Report a bug", "bug"), " · ", link("Suggest an improvement", "enhancement"));
+}

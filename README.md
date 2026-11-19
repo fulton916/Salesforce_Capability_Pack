@@ -53,6 +53,15 @@ Reference documentation (no code, nothing to run):
 | [sf-psg-compare](sf-psg-compare/) | Chrome extension | The "Salesforce Capability Pack" extension: a toolbar menu with four tools. **Compare permission set groups** compares two permission set groups side by side (contents, muting, system permissions, object and field access, Apex/pages/apps/custom permissions and tabs) with a plain-language summary, CSV export and saved group files for sandbox-vs-production compares. **User access summary and comparison** searches a user and shows their profile and user license, role, permission set groups, permission sets (direct or through a group), permission set licenses, public groups, queues and territories, or compares two users side by side, with CSV export. **Territory & role hierarchy** shows the whole territory or role tree fully expanded, narrows it to one branch with a search, and exports what is shown to Excel (.csv) with the tree in the cells (Level columns, API name, Path). **Why can a user see this record?** works on the record open in the tab: it explains how a user can see it (owner, role hierarchy, sharing rule, team, territory, manual share, org-wide default, View All) and, for two users, why one sees it and the other doesn't, checked against Salesforce's own answer. Uses your browser login; read-only. |
 | [sf-user-access-teardown](sf-user-access-teardown/) | CLI | For a list of user IDs, queries and (only with `--execute` plus a confirmation) bulk-removes permission set groups, permission sets, licences, territories, groups, queues and role. Query-only by default; keeps CSV results. |
 
+## Report a bug or suggest an improvement
+
+Use these forms for any tool in the pack (you need a GitHub account with access to this private repository):
+
+- [Report a bug](https://github.com/fulton916/Salesforce_Capability_Pack/issues/new?template=bug.yml)
+- [Suggest an improvement](https://github.com/fulton916/Salesforce_Capability_Pack/issues/new?template=enhancement.yml)
+
+The Chrome extension has the same two links built in. Describe problems with made-up names. Do not paste usernames, record data, org IDs, session IDs or screenshots that show org data.
+
 ## Safety
 
 These tools can change production metadata and user access. Every package that writes defaults to read-only or dry run, and says in its README which step writes to the org. Rehearse in a sandbox first. None of the code has been run against your org; check the "not tested" notes in each README.
@@ -68,5 +77,5 @@ These tools can change production metadata and user access. Every package that w
 - Tools that touch an org are read-only by default. Anything that writes needs a dry run (a preview that changes nothing), an explicit flag and a confirmation.
 - Run the package's offline tests before committing, from the package folder: `python tests/run_tests.py` (needs `openpyxl`), or `node tests/run_tests.mjs` for `sf-psg-compare`.
 - CI (an automatic test check, set up in `.github/workflows/tests.yml`) runs on GitHub's own servers, not on your PC, each time someone pushes a change or opens a pull request in this repository. It uses made-up data, never connects to a Salesforce org and needs no passwords or secrets. It is only for people changing this repository: you do not need it to use the tools, and it is not part of a package folder you copy or download.
-- Changes are made with AI assistant roles: a project manager plans the work, a developer makes the change, a tester checks it separately, and the project manager reviews it before anything is saved to the repo (committed). Nothing is pushed unless the owner asks. See [CLAUDE.md](CLAUDE.md) for the full guide and [.claude/agents/](.claude/agents/) for the agent definitions.
+- Changes are made with AI assistant roles: a project manager plans the work, a developer makes the change, a tester checks it separately, and the project manager reviews it before anything is saved to the repo (committed). Nothing lands on main unless the owner merges it. See [CLAUDE.md](CLAUDE.md) for the full guide and [.claude/agents/](.claude/agents/) for the agent definitions.
 - `sf-user-password-reset` is a local one-off tool. It is not part of the pack and is never committed.

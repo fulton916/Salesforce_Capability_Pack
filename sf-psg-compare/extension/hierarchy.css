@@ -20,6 +20,12 @@
 .treenotes li { margin: 2px 0; }
 .toolbar { margin-top: 10px; }
 .toolbar .primary { margin-left: auto; }
+.usersctl { display: inline-flex; align-items: center; gap: 6px 10px; flex-wrap: wrap; }
+.usersctl label { font-weight: 600; }
+.usersctl label.check { font-weight: 400; }
+.usersctl select { font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; }
+.usersmsg { margin: 8px 0 0; color: var(--muted); font-size: 14px; }
+.usersmsg.bad { color: var(--b); }
 
 /* ---- the tree: flat rows, indented by depth, with a guide line for every level above ---- */
 .treewrap { overflow-x: auto; border-top: 1px solid var(--line); padding-top: 6px; --step: 22px; }
@@ -36,12 +42,18 @@
 .tree .fold, .tree .spacer { flex: none; width: var(--step); }
 .tree button.fold { min-height: 30px; padding: 0; border: 0; border-radius: 4px; background: none; color: var(--muted); font-size: 13px; line-height: 1; }
 .tree button.fold:hover:not(:disabled) { color: var(--accent); }
+.tree .body { flex: 1; min-width: 0; }
 .tree .node { display: flex; align-items: baseline; gap: 2px 8px; flex-wrap: wrap; padding: 5px 8px 5px 4px; min-width: 0; }
 .tree .nm { font-weight: 500; overflow-wrap: anywhere; }
 .tree .below { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .tree .api { display: none; font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
 .tree.show-api .api { display: inline; }
 .tree .flag { color: var(--b); background: var(--b-bg); font-size: 11px; font-weight: 700; padding: 0 7px; border-radius: 9px; white-space: nowrap; }
+.tree .people { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 8px; padding: 0 8px 5px 4px; font-size: 13px; color: var(--muted); }
+.tree .people[hidden] { display: none; }
+.tree .people .ucount { font-weight: 600; white-space: nowrap; }
+.tree .people .ulist { overflow-wrap: anywhere; }
+.tree .people button.link { font-size: 13px; min-height: 0; padding: 0; }
 .tree li.top > .node .nm { font-weight: 700; }
 
 @media (max-width: 480px) {

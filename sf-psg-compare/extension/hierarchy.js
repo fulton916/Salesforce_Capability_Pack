@@ -1,10 +1,12 @@
 import { SfApi, findSession } from "./lib/sfconn.js";
 import { readOrg } from "./lib/snapshot.js";
-import { readTerritoryModels, readTerritories, readRoles } from "./lib/hierarchyread.js";
+import { readTerritoryModels, readTerritories, readRoles, readRoleUsers, readTerritoryUsers } from "./lib/hierarchyread.js";
 import {
-  NOUNS, buildTree, flatten, statsOf, summaryText, treeNotes, defaultModel, searchNodes, exportRows, exportFileName, toCsv, PATH_SEP,
+  NOUNS, USER_FIELDS, buildTree, flatten, statsOf, summaryText, treeNotes, defaultModel, searchNodes, exportRows, exportFileName, toCsv, PATH_SEP,
+  attachUsers, listUsers, countUsers, usersSummary,
 } from "./lib/hierarchy.js";
 import { startLiveReload } from "./lib/livereload.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
@@ -42,8 +44,13 @@ const state = {
   tech: [], // raw messages for Notes
   branch: null, // the node chosen in the search box, or null for the whole hierarchy
   tree: null, // the tree on screen
-  rows: [], // one entry per drawn row: {li, btn, size, folded}
+  rows: [], // one entry per drawn row: {li, btn, node, people, size, folded, expanded, list}
+  items: [], // what is on screen: [{node, depth}]
+  show: "none", // "none" | "name" | "username" | "email" | "id": what to show for each user
+  inactive: false, // include inactive users
+  userData: new WeakMap(), // tree -> {status: "loading" | "ok" | "error", byNode, unmatched, error, promise}; in memory only
 };
+const FIRST_USERS = 10; // users listed on a node before "Show all"
 
 // ---------- where the data comes from: the org, or the made-up samples in demo mode ----------
 
@@ -68,6 +75,21 @@ const source = {
     if (!DEMO) return readRoles(state.api);
     const d = await sample("hierarchy_roles.json");
     return { roles: d.roles, portalCount: d.portalCount, warnings: [] };
+  },
+  async roleUsers() {
+    if (!DEMO) return readRoleUsers(state.api);
+    const d = await sample("hierarchy_roles.json");
+    // Same shape as the live read: people in roles that are not on screen are counted, not returned.
+    const ids = new Set(d.roles.map((r) => r.id));
+    const users = d.users || [];
+    const out = users.filter((u) => ids.has(u.nodeId));
+    const portal = users.filter((u) => !ids.has(u.nodeId));
+    return { users: out, portalUsers: { active: portal.filter((u) => u.active).length, all: portal.length }, warnings: [] };
+  },
+  async territoryUsers(modelId) {
+    if (!DEMO) return readTerritoryUsers(state.api, modelId);
+    const d = await sample("hierarchy_territories.json");
+    return { users: d.models.find((m) => m.id === modelId)?.users || [], warnings: [] };
   },
 };
 
@@ -220,6 +242,7 @@ async function show(kind) {
   if (failure) { state.failed = true; showError(failure.message, failure.raw); }
   state.tree = tree;
   render();
+  if (tree && state.show !== "none") applyUsers();
 }
 
 // ---------- drawing ----------
@@ -262,16 +285,25 @@ function render() {
     $("#summary").textContent = "";
     $("#treeNotes").replaceChildren();
     $("#branchBar").hidden = true;
+    $("#usersMsg").hidden = true;
     return;
   }
   renderBranchBar();
   renderTree();
-  renderNotes(tree, k);
+  refreshUsers();
 }
 
+/** Notes under the summary. In a branch, only what applies to the nodes on screen. */
 function renderNotes(tree, k) {
-  const notes = treeNotes(tree, k);
-  if (k === "roles" && state.roles.portalCount) {
+  const notes = treeNotes(tree, k, state.branch ? state.items : null);
+  const e = shownUsers();
+  if (e && !state.branch) {
+    const n = k === "roles"
+      ? (e.portalUsers ? (state.inactive ? e.portalUsers.all : e.portalUsers.active) : 0)
+      : e.unmatched.filter((u) => u.active || state.inactive).length;
+    if (n) notes.push(`${n.toLocaleString("en-US")} ${n === 1 ? "user is" : "users are"} ${k === "roles" ? "in roles that are not shown (portal and community roles)" : "assigned to territories that are not shown"}.`);
+  }
+  if (k === "roles" && !state.branch && state.roles.portalCount) {
     const n = state.roles.portalCount;
     notes.push(`${n.toLocaleString("en-US")} portal and community ${n === 1 ? "role is" : "roles are"} not shown.`);
   }
@@ -300,6 +332,7 @@ function renderTree() {
   const tree = state.tree;
   const k = state.kind;
   const items = state.branch ? flatten([state.branch]) : flatten(tree.roots);
+  state.items = items;
   const frag = document.createDocumentFragment();
   const rows = [];
   items.forEach(({ node, depth }, i) => {
@@ -309,29 +342,137 @@ function renderTree() {
     const lead = size
       ? el("button", { class: "fold", type: "button", "aria-expanded": "true", "aria-label": `Collapse ${node.name}`, "data-i": String(i), text: "▾" })
       : el("span", { class: "spacer" });
+    const people = el("div", { class: "people", hidden: true });
     li.append(
       el("span", { class: "indent", "aria-hidden": "true" }),
       lead,
-      el("span", { class: "node" },
-        el("span", { class: "nm", text: node.name }),
-        size ? el("span", { class: "below", text: `${size.toLocaleString("en-US")} below` }) : null,
-        node.orphan ? el("span", { class: "flag", text: "Parent not found" }) : null,
-        node.inLoop ? el("span", { class: "flag", text: node.loopCut ? "Parent loop, cut here" : "Parent loop" }) : null,
-        node.apiName ? el("span", { class: "api", text: node.apiName }) : null)
+      el("div", { class: "body" },
+        el("span", { class: "node" },
+          el("span", { class: "nm", text: node.name }),
+          size ? el("span", { class: "below", text: `${size.toLocaleString("en-US")} below` }) : null,
+          node.orphan ? el("span", { class: "flag", text: "Parent not found" }) : null,
+          node.inLoop ? el("span", { class: "flag", text: node.loopCut ? "Parent loop, cut here" : "Parent loop" }) : null,
+          node.apiName ? el("span", { class: "api", text: node.apiName }) : null),
+        people)
     );
     frag.append(li);
-    rows.push({ li, btn: size ? lead : null, name: node.name, size, folded: false });
+    rows.push({ li, btn: size ? lead : null, name: node.name, node, people, size, folded: false, expanded: false, list: null });
   });
   state.rows = rows;
   $("#tree").replaceChildren(frag);
+  renderSummary();
+}
 
-  const stats = statsOf(items);
-  const text = summaryText(stats, k);
+function renderSummary() {
+  const k = state.kind;
+  const text = summaryText(statsOf(state.items), k);
   const model = k === "territories" ? currentModel() : null;
+  const e = shownUsers();
   setKids($("#summary"),
     state.branch ? `${state.branch.name} and everything below it: ${text}` : text,
+    e ? el("span", { class: "sub", text: `  ·  ${usersSummary(countUsers(e.byNode, state.items), state.inactive, k)}` }) : null,
     model ? el("span", { class: "sub", text: `  ·  Model: ${model.name}${model.state ? ` (${model.state})` : ""}` }) : null
   );
+}
+
+// ---------- users in each role / territory ----------
+
+/** The loaded users for the tree on screen, when they are switched on and were read; else null. */
+function shownUsers() {
+  const e = state.tree && state.userData.get(state.tree);
+  return state.show !== "none" && e?.status === "ok" ? e : null;
+}
+
+/** Read the users for a tree once (roles: all users that have a role; territories: the model's assignments).
+ *  Never throws: a failure is kept on the entry and gives a message about the users only. */
+function loadUsers(tree) {
+  let e = state.userData.get(tree);
+  if (e && e.status !== "error") return e.promise;
+  const kind = state.kind;
+  const modelId = state.territories.modelId;
+  e = { status: "loading", byNode: null, unmatched: [], portalUsers: null, error: "", promise: null };
+  e.promise = (async () => {
+    try {
+      const res = kind === "territories" ? await source.territoryUsers(modelId) : await source.roleUsers();
+      const a = attachUsers(tree, res.users);
+      e.byNode = a.byNode;
+      e.unmatched = a.unmatched;
+      e.portalUsers = res.portalUsers || null;
+      e.status = "ok";
+      for (const w of res.warnings || []) state.tech.push(`Users: ${w}`);
+    } catch (err) {
+      e.status = "error";
+      e.error = plainError(err, "The users could not be read. Your user may not be allowed to see them.");
+      state.tech.push(`Users: ${rawOf(err)}`);
+    }
+    return e;
+  })();
+  state.userData.set(tree, e);
+  return e.promise;
+}
+
+/** Called when "Show users" or "Include inactive users" changes, or a view with users on opens. */
+async function applyUsers() {
+  const tree = state.tree;
+  $("#inactiveLabel").hidden = state.show === "none";
+  if (!tree) return;
+  if (state.show !== "none") {
+    const e = state.userData.get(tree);
+    if (!e || e.status !== "ok") {
+      setProgress("Reading users…");
+      await loadUsers(tree);
+      renderTech();
+      if (state.tree === tree) setProgress("");
+      if (state.tree !== tree) return;
+    }
+  }
+  refreshUsers();
+}
+
+/** Redraw the people under each row, the summary, the notes and the hint. Nothing is read here. */
+function refreshUsers() {
+  const tree = state.tree;
+  if (!tree) return;
+  const e = shownUsers();
+  const entry = state.userData.get(tree);
+  const msg = $("#usersMsg");
+  if (state.show !== "none" && entry?.status === "error") {
+    msg.hidden = false;
+    msg.className = "usersmsg bad";
+    msg.textContent = `${entry.error} The ${NOUNS[state.kind].many} are shown without users.`;
+  } else if (e) {
+    msg.hidden = false;
+    msg.className = "usersmsg";
+    msg.textContent = `Download for Excel adds each person's ${USER_FIELDS[state.show].short} in the same row as their ${NOUNS[state.kind].one}, one column per person.`;
+  } else {
+    msg.hidden = true;
+  }
+  for (const row of state.rows) { row.list = null; renderPeople(row, e); }
+  renderSummary();
+  renderNotes(tree, state.kind);
+}
+
+/** The count and the users of one row. The first few are listed; "Show all" opens the rest. */
+function renderPeople(row, e) {
+  const box = row.people;
+  if (!e) { box.hidden = true; box.replaceChildren(); return; }
+  row.list ??= listUsers(e.byNode, row.node, state.show, state.inactive);
+  const list = row.list;
+  const n = list.length;
+  box.hidden = false;
+  if (!n) { setKids(box, el("span", { class: "ucount", text: "No users" })); return; }
+  const open = row.expanded || n <= FIRST_USERS;
+  const shown = open ? list : list.slice(0, FIRST_USERS);
+  const bits = [el("span", { class: "ucount", text: `${n.toLocaleString("en-US")} ${n === 1 ? "user" : "users"}` })];
+  bits.push(el("span", { class: "ulist" }, shown.map((u, i) => el("span", { class: "u" }, i ? el("span", { class: "sep", text: "; " }) : null, u.display))));
+  if (n > FIRST_USERS) {
+    bits.push(el("button", {
+      class: "link", type: "button", "aria-expanded": String(open),
+      text: open ? "Show fewer" : `Show all ${n.toLocaleString("en-US")}`,
+      onclick: () => { row.expanded = !row.expanded; renderPeople(row, shownUsers()); },
+    }));
+  }
+  setKids(box, bits);
 }
 
 function setFolded(row, folded) {
@@ -367,6 +508,8 @@ $("#tree").addEventListener("click", (e) => {
 });
 $("#expandAll").addEventListener("click", expandAll);
 $("#collapseAll").addEventListener("click", collapseAll);
+$("#showUsers").addEventListener("change", (e) => { state.show = e.target.value; applyUsers(); });
+$("#inactive").addEventListener("change", (e) => { state.inactive = e.target.checked; if (shownUsers()) refreshUsers(); });
 $("#showApi").addEventListener("change", (e) => $("#tree").classList.toggle("show-api", e.target.checked));
 $("#kindTerritories").addEventListener("click", () => { if (state.kind !== "territories") show("territories"); });
 $("#kindRoles").addEventListener("click", () => { if (state.kind !== "roles") show("roles"); });
@@ -448,7 +591,9 @@ const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
 
 $("#download").addEventListener("click", () => {
   if (!state.tree) return;
-  const csv = toCsv(exportRows(state.tree, state.branch));
+  const e = shownUsers();
+  const users = e ? { byNode: e.byNode, field: state.show, includeInactive: state.inactive } : null;
+  const csv = toCsv(exportRows(state.tree, state.branch, users));
   const name = exportFileName({
     kind: NOUNS[state.kind].title,
     model: state.kind === "territories" ? currentModel()?.name : "",
@@ -476,3 +621,14 @@ async function start() {
 
 start();
 startLiveReload();
+
+// Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.
+{
+  let manifestVersion = "";
+  try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* dev server */ }
+  const version = versionText(manifestVersion, navigator);
+  const link = (text, kind) => el("a", {
+    href: issueUrl({ kind, tool: FEEDBACK_TOOLS.hierarchy, version }), target: "_blank", rel: "noopener noreferrer", text,
+  });
+  $("#feedback").replaceChildren(link("Report a bug", "bug"), " · ", link("Suggest an improvement", "enhancement"));
+}
