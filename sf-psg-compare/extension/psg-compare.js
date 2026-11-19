@@ -1,6 +1,6 @@
 import { SfApi, findSession } from "./lib/sfconn.js";
 import { listPsgs, readOrg, takeSnapshot, validateSnapshot } from "./lib/snapshot.js";
-import { compareSnapshots, toRows, toCsv, filterRows, cardLines, sortRows, sortGrouped, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
+import { compareSnapshots, toRows, toCsv, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./lib/compare.js";
 import { matchPsgs } from "./lib/pick.js";
 import { startLiveReload } from "./lib/livereload.js";
 
@@ -39,7 +39,7 @@ const state = {
   diffOnly: true,
   showApi: false,
   search: "",
-  allRisks: false,
+  allRisks: { a: false, b: false }, // per group: all system permission lines shown?
   fieldMode: "auto", // grouped Fields list: auto (by length), all open, all closed
   toggled: new Set(), // objects the user flipped from that default
   sort: {}, // per list: { col, dir } where dir is "asc" or "desc"; no entry = the default order
@@ -301,7 +301,7 @@ async function runCompare() {
     }));
     state.result = compareSnapshots(state.sides.a.snapshot, state.sides.b.snapshot);
     state.tab = "overview";
-    state.allRisks = false;
+    state.allRisks = { a: false, b: false };
     state.fieldMode = "auto";
     state.toggled = new Set();
     state.sort = {};
@@ -372,19 +372,32 @@ function renderResult() {
 function renderRisks() {
   const risks = state.result.highlights.filter((h) => h.kind === "risk");
   $("#riskPanel").hidden = !risks.length;
-  // System permissions first; the object lines (at most one per group) are always shown.
-  const general = risks.filter((h) => h.area === "general");
-  const rest = risks.filter((h) => h.area !== "general");
-  const shown = state.allRisks ? general : general.slice(0, RISKS_SHOWN);
-  $("#risks").replaceChildren(...shown.map((h) => el("li", { text: h.text })));
-  $("#riskObjects").replaceChildren(...rest.map((h) => el("li", { text: h.text })));
-  const hidden = general.length - RISKS_SHOWN;
-  const more = $("#moreRisks");
-  more.hidden = hidden <= 0;
-  more.textContent = state.allRisks ? "Show fewer" : `Show ${hidden} more system ${hidden === 1 ? "permission" : "permissions"}`;
+  // One block per group: a heading, its system permissions, its object line, then its own
+  // "Show more / Show fewer" link as the last thing in the block.
+  const blocks = ["a", "b"].map((side) => {
+    const mine = risks.filter((h) => h.side === side);
+    if (!mine.length) return null;
+    const general = mine.filter((h) => h.area === "general");
+    const rest = mine.filter((h) => h.area !== "general");
+    const open = state.allRisks[side];
+    const shown = open ? general : general.slice(0, RISKS_SHOWN);
+    const hidden = general.length - RISKS_SHOWN;
+    const items = [...shown, ...rest].map((h) => el("li", { text: h.short }));
+    return el("section", { class: "risk-group" },
+      el("h3", { class: `risk-head who-${side}`, text: `Only ${nameOf(side)} has:` }),
+      el("ul", { class: "risks" }, ...items),
+      hidden > 0 ? el("button", {
+        class: "link more-risks", "data-side": side,
+        text: open ? "Show fewer" : `Show ${hidden} more system ${hidden === 1 ? "permission" : "permissions"}`,
+        onclick: () => {
+          state.allRisks[side] = !open;
+          renderRisks();
+          $$("button.more-risks").find((b) => b.dataset.side === side)?.focus();
+        },
+      }) : null);
+  });
+  $("#riskGroups").replaceChildren(...blocks.filter(Boolean));
 }
-
-$("#moreRisks").addEventListener("click", () => { state.allRisks = !state.allRisks; renderRisks(); });
 
 function openTab(k, scroll = false) {
   state.tab = k;
@@ -400,13 +413,12 @@ function openTab(k, scroll = false) {
 function renderTabs() {
   const r = state.result;
   $("#tabs").replaceChildren(...TAB_ORDER.map((k) => {
-    const c = r.counts[k];
-    const diffs = c.onlyA + c.onlyB + c.differ;
+    const diffs = k === "overview" ? 0 : tabDiffCount(r, k);
     const word = `${diffs.toLocaleString("en-US")} ${diffs === 1 ? "difference" : "differences"}`;
     return el("button", { role: "tab", "aria-selected": String(state.tab === k), "aria-label": k === "overview" ? null : `${SECTION_TITLES[k]}, ${word}`, onclick: () => openTab(k) },
       SECTION_TITLES[k], k === "overview" ? null : el("span", { class: `n${diffs ? "" : " zero"}`, title: word, text: String(diffs) }));
   }));
-  $("#help").textContent = (SECTION_HELP[state.tab] || "") + (state.tab === "overview" ? "" : " The number on each tab is how many differences it has.");
+  $("#help").textContent = (SECTION_HELP[state.tab] || "") + (state.tab === "overview" ? "" : " The number on each tab is the same as its card: things only one group has, plus things set up differently.");
   $(".seg").hidden = state.tab === "overview";
 }
 
@@ -500,7 +512,11 @@ function headRow(spec) {
           renderTable();
           $$("button.sorthead").find((b) => b.dataset.key === key)?.focus();
         },
-      }, c.node, on ? el("span", { class: "sortarrow", "aria-hidden": "true", text: cur.dir === "desc" ? "▼" : "▲" }) : null));
+      }, c.node, on
+        ? el("span", { class: "sortarrow", "aria-hidden": "true", text: cur.dir === "desc" ? "▼" : "▲" })
+        // Not sorted yet: always show small up and down triangles so the heading looks sortable.
+        : el("span", { class: "sortarrow neutral", "aria-hidden": "true" },
+          el("span", { text: "▲" }), el("span", { text: "▼" }))));
   }));
 }
 

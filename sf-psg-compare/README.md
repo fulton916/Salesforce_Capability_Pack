@@ -36,10 +36,13 @@ app/page/code item or tab that only that group gives, or gives more of.) Under t
   "A has" counts everything A has, whether B has it too or not. When a card has nothing that only
   one group has and nothing different, it shows just the two totals and "✓ Same in both". Click a
   card to open its list.
-- **Worth a closer look:** powerful system permissions only one group gives (first), then at most
-  one line per group for View All / Modify All on objects, such as "Sales Manager has View All or
-  Modify All on 938 objects where Sales Rep has less, including Account, Case and Opportunity. See
-  Objects." (Where the other group also has View All and this one adds Modify All, that counts too.)
+- **Worth a closer look:** one block per group that has something, group A first. Each block has a
+  heading in that group's colour, "Only {group} has:", then its powerful system permissions (just
+  the permission name), then at most one line for View All / Modify All on objects, such as "View
+  All or Modify All on 938 objects where Sales Rep has less, including Account, Case and
+  Opportunity. See Objects." (Where the other group also has View All and this one adds Modify All,
+  that counts too.) If a group has more than 5 system permissions, its own "Show N more system
+  permissions" / "Show fewer" link is the last thing in its block.
 - **Technical notes** (folded away): anything the tool could not read, with what to do.
 
 | List | Shows |
@@ -53,14 +56,17 @@ app/page/code item or tab that only that group gives, or gives more of.) Under t
 | What's inside | two parts: "Permission sets in each group" (with licence, and the muting permission set too), and "Taken away by the muting permission set" (what muting removes, by kind: Object, Field, System permission, Tab, App/page/code) |
 
 Each list shows only the differences until you choose "Everything". Click a column heading to sort
-by it (A to Z; click again for Z to A; a small arrow shows the sort). Text sorts without regard to
-case and numbers by value ("Item 2" before "Item 10"); empty cells ("—") always come last. In Fields
+by it (A to Z; click again for Z to A; each heading shows small up and down arrows, and after a click one arrow shows the direction). Text sorts without regard to
+case and numbers by value ("Item 2" before "Item 10"); empty text cells ("—") always come last.
+Columns that show access sort by how much access there is: a tick column puts ✓ first, then —;
+the Objects, Fields and Tabs columns go from least to most access (click again for most first), and
+items with the same access are in name order. In Fields
 the rows sort inside each object, and the Field heading also orders the objects; What's inside keeps
 its two parts. The sort stays while you switch between "Only differences" and "Everything" or
 search, is remembered per list, and is used by "This list, as shown". Without a click the lists
 keep their usual order. The search ignores
-punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is how
-many differences it has. While reading big groups the page shows "Step n of 5".
+punctuation ("Account › Annual" finds Account's Annual Revenue). The number on each tab is the same
+as its card: things only one group has, plus things set up differently. While reading big groups the page shows "Step n of 5".
 
 **Download** saves a CSV that opens in Excel: "This list, as shown" (the differences-only choice,
 the search and the sort are applied; collapsed objects are still included), the whole comparison with
