@@ -6,6 +6,7 @@ import {
   matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf,
 } from "./lib/usercompare.js";
 import { startLiveReload } from "./lib/livereload.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
@@ -519,3 +520,14 @@ document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) $(".
 
 connect();
 startLiveReload();
+
+// Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.
+{
+  let manifestVersion = "";
+  try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* dev server */ }
+  const version = versionText(manifestVersion, navigator);
+  const link = (text, kind) => el("a", {
+    href: issueUrl({ kind, tool: FEEDBACK_TOOLS.access, version }), target: "_blank", rel: "noopener noreferrer", text,
+  });
+  $("#feedback").replaceChildren(link("Report a bug", "bug"), " · ", link("Suggest an improvement", "enhancement"));
+}

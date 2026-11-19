@@ -1,0 +1,45 @@
+name: Suggest an improvement
+description: An idea for something to add or make easier.
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste usernames, record data, org IDs, session IDs or screenshots showing org data. Use made-up names in any examples.
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool?
+      options:
+        - PSG Compare (extension)
+        - User access (extension)
+        - Extension menu / other
+        - sf-country-state-codes
+        - sf-safe-translation-push
+        - sf-territory-export
+        - sf-translation-defect-repair
+        - sf-translation-deploy-triage
+        - sf-translation-field-notes
+        - sf-translation-reconcile
+        - sf-translation-toolkit
+        - sf-user-access-teardown
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version (optional)
+      placeholder: "Extension 0.2.0, Chrome 131"
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like it to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What job are you trying to get done?
+      description: Knowing the goal helps us find the simplest way to help.

@@ -1,4 +1,5 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
+import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
 const TOOLS = [
@@ -53,4 +54,16 @@ for (const tool of TOOLS) {
     });
   }
   menu.append(btn);
+}
+
+// Report a bug / suggest an improvement. Works without a Salesforce tab. Only the tool name,
+// extension version and browser go into the link; the person submits on GitHub themselves.
+let manifestVersion = "";
+try { manifestVersion = chrome.runtime.getManifest().version; } catch { /* not an extension */ }
+for (const [id, kind] of [["report-bug", "bug"], ["suggest", "enhancement"]]) {
+  document.getElementById(id).addEventListener("click", async () => {
+    const url = issueUrl({ kind, tool: FEEDBACK_TOOLS.menu, version: versionText(manifestVersion, navigator) });
+    try { await chrome.tabs.create({ url }); } catch { window.open(url, "_blank", "noopener,noreferrer"); }
+    window.close();
+  });
 }

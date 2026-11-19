@@ -11,6 +11,9 @@
   #menu button { width: 100%; text-align: left; padding: 8px 10px; }
   #menu .tool-title { display: block; font-weight: 600; }
   #menu .tool-desc { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .feedback { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .feedback .row { display: flex; gap: 8px; margin-top: 6px; }
+  .feedback button { padding: 3px 10px; font-size: 12px; }
 </style>
 </head>
 <body>
@@ -18,6 +21,13 @@
   <div id="state">Looking for a Salesforce tab…</div>
   <div class="host" id="host"></div>
   <div id="menu"></div>
+  <div class="feedback">
+    Found a problem or have an idea?
+    <div class="row">
+      <button type="button" id="report-bug">Report a bug</button>
+      <button type="button" id="suggest">Suggest an improvement</button>
+    </div>
+  </div>
   <script type="module" src="popup.js"></script>
 </body>
 </html>

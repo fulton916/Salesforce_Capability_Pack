@@ -13,6 +13,7 @@ browser session and never writes to the org.
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
+- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on both pages.
 - `extension/psg-compare.js` — the page. Builds DOM with `textContent` only.
 
 ## User access (second tool)
@@ -62,7 +63,7 @@ it links `psg-compare.css` and adds a little in `user-access.css`.
 
 ## Guardrails
 
-- No telemetry, no remote code (MV3 forbids it), no requests to any host but the org.
+- No telemetry, no remote code (MV3 forbids it), no requests to any host but the org. The one other thing allowed is opening a github.com new-issue tab (`feedback.js`) that the user submits themselves; no org data in it (no host, org name, user names or page URL), no GitHub API calls, no tokens.
 - Do not store the session id (no `chrome.storage`, no `localStorage`).
 - Do not commit snapshots taken from a real org. `.gitignore` ignores `snapshots/` and
   `psg_*.json` outside `extension/samples/`.
