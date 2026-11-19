@@ -33,9 +33,10 @@ Every package has `README.md` (for people) and `CLAUDE.md` (for you). Beyond tha
 ## Workflow
 
 The main session is the project-manager agent (`.claude/settings.json`). Definitions are in
-`.claude/agents/`. The manager plans and writes task briefs; a developer agent codes; a tester
-agent checks independently and reports PASS/FAIL with evidence; the manager reads the diff and
-approves, commits only with passing tests, and pushes only when the user says so. Developers never
+`.claude/agents/`. The manager plans and writes task briefs; a developer agent codes; a tester agent
+checks independently and reports PASS/FAIL with evidence; the manager reads the diff and approves,
+and commits only with passing tests. Work goes in through a pull request that the user merges (or
+asks the manager to merge); direct pushes to main happen only when the user asks. Developers never
 commit or push; testers never edit. Briefs for anything people see or use name a bar (the best
 available alternative to compare against, not just the thing being replaced). Small fixes have no
 bar. The tester, who is not given the developer's self-assessment, picks ours or the bar and names
