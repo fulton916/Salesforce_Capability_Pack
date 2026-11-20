@@ -22,17 +22,18 @@ Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and deve
 ## Look up user access (second tool)
 
 A read-only page, `extension/user-access.html`, that shows one user's access (profile and license,
-role, permission set groups, permission sets with "directly / through group", permission set
-licenses, public groups, queues, territories) and compares two users. Same look as the compare page:
+role, call center, permission set groups, permission sets with "directly / through group", permission set
+licenses, public groups, queues, territories, and hierarchy custom settings whose value for the user differs from the org default) and compares two users. Same look as the compare page:
 it links `psg-compare.css` and adds a little in `user-access.css`.
 
 - `extension/lib/useraccess.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with
   `soqlString` / `soqlLike`, LIMIT 50) and `readUserAccess(api, userId)` →
   `{schema: "sf-user-access/1", user, sections, unavailable, warnings}`. Reads `User`,
   `PermissionSetAssignment`, `PermissionSetGroup(Component)`, `PermissionSet`, `MutingPermissionSet`,
-  `PermissionSetLicenseAssign`, `GroupMember`, `UserTerritory2Association`. Only the user read may
+  `PermissionSetLicenseAssign`, `GroupMember`, `UserTerritory2Association`, `CallCenter` (own query, `SELECT CallCenter.Name ... FROM User`), `EntityDefinition`, `Organization`, describe + read per hierarchy custom setting. Only the user read may
   throw; every other area fails softly into `unavailable` (plain words) and `warnings` (raw).
-- `extension/lib/usercompare.js` — pure: rows, `compareUsers(a, b)`, verdict, CSV.
+- `extension/lib/usercompare.js` — pure: rows, `compareUsers(a, b)`, verdict, CSV. Custom settings: `resolveHierarchy` (user, then profile, then org default, per field, first non-null wins; checkbox false counts), `settingItems` (only fields differing from the org default; item key `Setting__c.Field__c`), `customSettingsLine`, `customSettingsSkippedNote`, `customSettingsFailedNote`. `access.customSettingsInfo = {found, examined, hierarchy, failed, failedSettings, skippedFields, capped}`; older files without `callCenter` / `customSettings` still load as empty.
+  Custom settings are found with `EntityDefinition WHERE IsCustomSetting = true`; hierarchy vs list is told by `describe` (has `SetupOwnerId`), 6 at a time, cap 300 settings (reported on the page), then one read per hierarchy setting. Custom fields of special types (encrypted, address, location, base64, anyType, complexvalue) are not read; they are counted in `skippedFields` and the page says so once, and a setting whose fields are all skipped is not counted in "N of M". A setting that fails goes to `warnings` and `customSettingsInfo.failedSettings`; the rest is kept and the page shows a note ("2 settings could not be read"). Only when every setting fails (or the list itself cannot be read) is `unavailable.customSettings` set ("Not available"). In a compare, rows of a setting that could not be read for one user get status `unreadA`/`unreadB` ("Could not be read for <name>"), counted as `unread`, never as a difference. The CSV has "Note" rows in the custom settings area (count line with the cap notice, skipped fields, could not be read). The wider "no such field" match (INVALID_FIELD, No such column) applies to the call center only; territories keep their original wording.
 - `extension/user-access.js` — the page. `?host=`, `?dev=1`, `?demo=1` work as in `psg-compare.js`.
   Demo: `http://127.0.0.1:8765/user-access.html?demo=1`.
 - Tests: `tests/user_access_tests.mjs`, run from `tests/run_tests.mjs`.

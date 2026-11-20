@@ -26,4 +26,12 @@ same change.
 
 ## Open items
 
-None.
+### Root README: mention call center and custom settings in the user access tool
+- Date: 2026-11-20
+- File(s): README.md (the sf-psg-compare row in "Org administration packages")
+- Change: in the user access tool's description, add that it also shows the user's call center and any
+  hierarchy custom settings (such as bypass flags) whose value for the user or their profile differs from
+  the org default, and compares both for two users.
+- Deferred because: the "Page details for a ticket" branch (claude/issue-snapshot) edits the same row
+- Belongs to: claude/user-access-settings
+- Added by: project manager

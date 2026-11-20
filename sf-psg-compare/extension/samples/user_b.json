@@ -108,8 +108,56 @@
         "label": "Lead Triage"
       }
     ],
-    "territories": []
+    "territories": [],
+    "callCenter": [],
+    "customSettings": [
+      {
+        "key": "Automation_Settings__c.Bypass_Validation_Rules__c",
+        "label": "Automation Settings: Bypass validation rules",
+        "setting": {
+          "api": "Automation_Settings__c",
+          "label": "Automation Settings"
+        },
+        "field": {
+          "api": "Bypass_Validation_Rules__c",
+          "label": "Bypass validation rules"
+        },
+        "type": "boolean",
+        "value": true,
+        "valueText": "Checked",
+        "source": "profile",
+        "sourceText": "Their profile",
+        "orgDefault": false,
+        "orgDefaultText": "Not checked"
+      },
+      {
+        "key": "Automation_Settings__c.Bypass_Flows__c",
+        "label": "Automation Settings: Bypass flows",
+        "setting": {
+          "api": "Automation_Settings__c",
+          "label": "Automation Settings"
+        },
+        "field": {
+          "api": "Bypass_Flows__c",
+          "label": "Bypass flows"
+        },
+        "type": "boolean",
+        "value": true,
+        "valueText": "Checked",
+        "source": "profile",
+        "sourceText": "Their profile",
+        "orgDefault": false,
+        "orgDefaultText": "Not checked"
+      }
+    ]
   },
   "unavailable": {},
-  "warnings": []
+  "warnings": [],
+  "customSettingsInfo": {
+    "found": 4,
+    "examined": 4,
+    "hierarchy": 2,
+    "failed": 0,
+    "capped": false
+  }
 }

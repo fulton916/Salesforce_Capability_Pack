@@ -12,13 +12,20 @@ export const ACCESS_SCHEMA = "sf-user-access/1";
 export const SECTIONS = [
   { key: "profile", title: "Profile", one: "profile", noun: "profiles", help: "The profile gives the user their base access and decides which user license they have." },
   { key: "role", title: "Role", one: "role", noun: "roles", help: "The role decides which records the user can see through the role hierarchy (for example, records owned by people below them)." },
+  { key: "callCenter", title: "Call center", one: "call center", noun: "call centers", help: "The call center the user is assigned to (for example for a phone system built into Salesforce). Most orgs do not use call centers." },
   { key: "permissionSetGroups", title: "Permission set groups", one: "permission set group", noun: "permission set groups", help: "Groups of permission sets assigned to the user. If a group has a muting permission set, that set removes some access and is listed beside the group." },
   { key: "permissionSets", title: "Permission sets", one: "permission set", noun: "permission sets", help: "Permission sets the user has, assigned directly or through a group. Sets that come built into a profile are not shown." },
   { key: "permissionSetLicenses", title: "Permission set licenses", one: "license", noun: "licenses", help: "Licenses that some permission sets need before they work for this user." },
   { key: "publicGroups", title: "Public groups", one: "public group", noun: "public groups", help: "Only groups the user was added to directly. Groups they get through a role or another group are not shown." },
   { key: "queues", title: "Queues", one: "queue", noun: "queues", help: "Only queues the user was added to directly. Queues they get through a role or a group are not shown." },
   { key: "territories", title: "Territories", one: "territory", noun: "territories", help: "Sales territories the user is assigned to." },
+  { key: "customSettings", title: "Custom settings", one: "custom setting value", noun: "custom setting values", help: "Custom settings can switch things on or off for one user or one profile, for example a “bypass validation rules” box. This list shows only the values that are different from the org default for this user, including values they get from their profile. Settings that are the same for everyone are not shown." },
 ];
+
+/** Areas that hold a single value (shown as the name, or "no ..."), not a list. */
+export const SINGLE_VALUE_KEYS = ["profile", "role", "callCenter"];
+/** Areas that older files may not have; they load as empty. */
+const OPTIONAL_KEYS = ["callCenter", "customSettings"];
 /** "1 queue", "3 queues". `one` and `many` are the singular and plural nouns. */
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -35,6 +42,98 @@ export const SECTION_HELP = {
   ...Object.fromEntries(SECTIONS.map((s) => [s.key, s.help])),
 };
 
+// ---------- hierarchy custom settings ----------
+
+const id15 = (v) => (v ? String(v).slice(0, 15) : "");
+export const SOURCE_TEXT = { user: "This user", profile: "Their profile", org: "Org default" };
+
+/** A custom setting value in words. A checkbox is never "not set"; an empty value is "Not set". */
+export function valueText(type, v) {
+  if (type === "boolean") return v === true ? "Checked" : "Not checked";
+  if (v === null || v === undefined || v === "") return "Not set";
+  return String(v);
+}
+
+const normValue = (type, v) => {
+  if (type === "boolean") return v === true; // an unset checkbox is the same as unchecked
+  return v === null || v === undefined || v === "" ? null : v;
+};
+/** True when two values of one field mean the same thing. */
+export const sameValue = (type, x, y) => normValue(type, x) === normValue(type, y);
+
+/**
+ * Salesforce's hierarchy rule, field by field: the lowest level where the field is not null wins
+ * (this user, then their profile, then the org default). `rows` are the setting's rows whose
+ * SetupOwnerId is one of the three. A checkbox row always has a value (false counts), so a user
+ * row with false beats a profile row with true.
+ * Returns one entry per field: {name, label, type, value, source: "user"|"profile"|"org"|null, orgDefault}.
+ */
+export function resolveHierarchy(fields, rows, { userId, profileId, orgId }) {
+  const rowFor = (id) => (id ? rows.find((r) => id15(r.SetupOwnerId) === id15(id)) || null : null);
+  const levels = [["user", rowFor(userId)], ["profile", rowFor(profileId)], ["org", rowFor(orgId)]];
+  const orgRow = levels[2][1];
+  return fields.map((f) => {
+    let value = null;
+    let source = null;
+    for (const [level, row] of levels) {
+      const v = row ? row[f.name] : null;
+      if (v !== null && v !== undefined) { value = v; source = level; break; }
+    }
+    const orgDefault = orgRow && orgRow[f.name] !== undefined ? orgRow[f.name] : null;
+    return { name: f.name, label: f.label || f.name, type: f.type, value, source, orgDefault };
+  });
+}
+
+/** The fields of one setting whose effective value differs from the org default, as list items. */
+export function settingItems(setting, fields, rows, ids) {
+  return resolveHierarchy(fields, rows, ids)
+    .filter((r) => !sameValue(r.type, r.value, r.orgDefault))
+    .map((r) => ({
+      key: `${setting.api}.${r.name}`,
+      label: `${setting.label}: ${r.label}`,
+      setting: { api: setting.api, label: setting.label },
+      field: { api: r.name, label: r.label },
+      type: r.type,
+      value: r.value,
+      valueText: valueText(r.type, r.value),
+      source: r.source,
+      sourceText: SOURCE_TEXT[r.source] || "",
+      orgDefault: r.orgDefault,
+      orgDefaultText: valueText(r.type, r.orgDefault),
+    }));
+}
+
+/** Count line for the custom settings area of one user. "" when the file has no such information. */
+export function customSettingsLine(access) {
+  const info = access?.customSettingsInfo;
+  if (!info) return "";
+  if (!info.hierarchy) {
+    return `This org has no custom settings that can differ by user or profile.${info.capped ? ` (Only the first ${info.examined} of ${info.found} custom settings were checked.)` : ""}`;
+  }
+  const n = new Set(itemsOf(access, "customSettings").map((i) => i.setting?.api)).size;
+  const verb = info.hierarchy === 1 ? "has" : "have";
+  let line = `${n} of ${plural(info.hierarchy, "custom setting", "custom settings")} ${verb} a value for this user or their profile that differs from the org default.`;
+  if (info.capped) line += ` Only the first ${info.examined} of ${info.found} custom settings were checked; the rest are not shown.`;
+  return line;
+}
+
+/** Plain note: some fields of special types are never shown. "" when there are none. */
+export function customSettingsSkippedNote(...accesses) {
+  const n = Math.max(0, ...accesses.map((a) => a?.customSettingsInfo?.skippedFields || 0));
+  if (!n) return "";
+  return `${plural(n, "field", "fields")} of ${n === 1 ? "a special type is" : "special types are"} not shown.`;
+}
+
+/** Plain note: some custom settings could not be read for this user. "" when all could. */
+export function customSettingsFailedNote(access) {
+  const n = access?.customSettingsInfo?.failed || 0;
+  return n ? `${plural(n, "setting", "settings")} could not be read.` : "";
+}
+
+/** True when a custom setting's values could not be read for this user (the whole area, or just this setting). */
+const settingUnread = (access, api) =>
+  !!access?.unavailable?.customSettings || (access?.customSettingsInfo?.failedSettings || []).includes(api);
+
 /** Check the shape of an access object (a sample file, or what readUserAccess returned). */
 export function validateAccess(obj) {
   if (!obj || typeof obj !== "object") throw new Error("Not a user access file.");
@@ -42,6 +141,7 @@ export function validateAccess(obj) {
   if (!obj.user || !obj.user.name) throw new Error("The file has no user.");
   if (!obj.sections || typeof obj.sections !== "object") throw new Error("The file has no sections.");
   for (const k of SECTION_KEYS) {
+    if (obj.sections[k] === undefined && OPTIONAL_KEYS.includes(k)) obj.sections[k] = [];
     if (!Array.isArray(obj.sections[k])) throw new Error(`Section ${k} is missing.`);
     for (const it of obj.sections[k]) if (!it || !it.key) throw new Error(`An item in ${k} has no name.`);
   }
@@ -62,10 +162,15 @@ export function howText(item) {
 }
 
 /** Extra words shown next to an item (how it was given, licence, muting). */
-export function detailText(sectionKey, item) {
-  if (!item) return "";
+export function detailText(sectionKey, item, other = null) {
+  if (!item) {
+    // A custom setting the other user does not have set differently is at the org default.
+    return sectionKey === "customSettings" && other ? `Same as the org default: ${other.orgDefaultText}` : "";
+  }
   const parts = [];
-  if (sectionKey === "permissionSets") {
+  if (sectionKey === "customSettings") {
+    parts.push(`Value: ${item.valueText}`, `Comes from: ${(item.sourceText || "").toLowerCase()}`, `Org default: ${item.orgDefaultText}`);
+  } else if (sectionKey === "permissionSets") {
     parts.push(howText(item));
     if (item.licence) parts.push(`Needs license: ${item.licence}`);
   } else if (sectionKey === "permissionSetGroups") {
@@ -113,7 +218,10 @@ export function displayNames(a, b) {
 }
 
 export function statusText(status, nameA = "A", nameB = "B") {
-  return { same: "Same", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Different" }[status] || status;
+  return {
+    same: "Same", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Different",
+    unreadA: `Could not be read for ${nameA}`, unreadB: `Could not be read for ${nameB}`,
+  }[status] || status;
 }
 
 /** Compare two users. Rows are matched by API name, so users from different orgs compare cleanly. */
@@ -130,15 +238,22 @@ export function compareUsers(a, b) {
       const ia = ma.get(key) || null;
       const ib = mb.get(key) || null;
       let status = "same";
-      if (ia && !ib) status = "onlyA";
+      if (k === "customSettings" && ia && !ib && settingUnread(b, ia.setting?.api)) status = "unreadB";
+      else if (k === "customSettings" && !ia && ib && settingUnread(a, ib.setting?.api)) status = "unreadA";
+      else if (ia && !ib) status = "onlyA";
       else if (!ia && ib) status = "onlyB";
       else if (k === "permissionSets" && howText(ia) !== howText(ib)) status = "differ";
-      rows.push({ key, label: (ia || ib).label || key, a: ia, b: ib, status, detailA: detailText(k, ia), detailB: detailText(k, ib) });
+      else if (k === "customSettings" && !sameValue(ia.type, ia.value, ib.value)) status = "differ";
+      let detailA = detailText(k, ia, ib);
+      let detailB = detailText(k, ib, ia);
+      if (status === "unreadA") detailA = `Could not be read for ${names.a}`;
+      if (status === "unreadB") detailB = `Could not be read for ${names.b}`;
+      rows.push({ key, label: (ia || ib).label || key, a: ia, b: ib, status, detailA, detailB });
     }
     rows.sort((x, y) => x.label.localeCompare(y.label));
     sections[k] = rows;
     const n = (s) => rows.filter((r) => r.status === s).length;
-    counts[k] = { onlyA: n("onlyA"), onlyB: n("onlyB"), same: n("same"), differ: n("differ"), total: rows.length, totalA: ma.size, totalB: mb.size };
+    counts[k] = { onlyA: n("onlyA"), onlyB: n("onlyB"), same: n("same"), differ: n("differ"), unread: n("unreadA") + n("unreadB"), total: rows.length, totalA: ma.size, totalB: mb.size };
     const ua = a.unavailable?.[k] || null;
     const ub = b.unavailable?.[k] || null;
     if (ua || ub) unavailable[k] = { a: ua, b: ub };
@@ -161,22 +276,27 @@ export function userCardLines(result, key) {
   const B = result.names.b;
   const line = (cls, ...segs) => ({ cls, segs });
   const T = (text) => ({ text });
-  if (key === "profile" || key === "role") {
+  if (SINGLE_VALUE_KEYS.includes(key)) {
     const va = itemsOf(result.a, key)[0]?.label || "None";
     const vb = itemsOf(result.b, key)[0]?.label || "None";
     if (va === vb) return [line("same", T(`✓ Same in both: ${va === "None" ? `no ${sec.one}` : va}`))];
     const show = (v) => (v === "None" ? `no ${sec.one}` : v);
     return [line("", { text: A, side: "a" }, T(`: ${show(va)}`)), line("", { text: B, side: "b" }, T(`: ${show(vb)}`))];
   }
-  if (!c.totalA && !c.totalB) return [line("same", T("Neither has any"))];
+  const failed = key !== "customSettings" ? [] : [["a", A, result.a], ["b", B, result.b]]
+    .filter(([, , acc]) => customSettingsFailedNote(acc))
+    .map(([side, name, acc]) => line("", { text: name, side }, T(`: ${customSettingsFailedNote(acc)}`)));
+  if (!c.totalA && !c.totalB) return [line("same", T("Neither has any")), ...failed];
   const lines = [
     line("", { text: fmt(c.same + c.differ), bold: true }, T(` ${c.same + c.differ === 1 ? sec.one : sec.noun} both have`)),
     line("", { text: fmt(c.onlyA), bold: true }, T(" only "), { text: A, side: "a" }, T(" has")),
     line("", { text: fmt(c.onlyB), bold: true }, T(" only "), { text: B, side: "b" }, T(" has")),
   ];
   if (key === "permissionSets") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those assigned differently (directly or through a group)")));
-  if (!c.onlyA && !c.onlyB && !c.differ) lines.push(line("same", T("✓ Same in both")));
-  return lines;
+  if (key === "customSettings") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those with a different value for each")));
+  if (c.unread) lines.push(line("", { text: fmt(c.unread), bold: true }, T(` not compared (a setting could not be read for one user)`)));
+  if (!c.onlyA && !c.onlyB && !c.differ && !c.unread) lines.push(line("same", T("✓ Same in both")));
+  return [...lines, ...failed];
 }
 
 /** Header parts for the connected org: [{cls, text}]. Missing values are left out (never "null"). */
@@ -208,6 +328,8 @@ function notesOf(a, b, names) {
   for (const [side, acc] of [["a", a], ["b", b]]) {
     for (const [k, msg] of Object.entries(acc.unavailable || {})) notes.push(`${names[side]}: ${SECTION_TITLES[k]}: ${msg}`);
     for (const w of acc.warnings || []) notes.push(`${names[side]}: ${w}`);
+    const failed = customSettingsFailedNote(acc);
+    if (failed) notes.push(`${names[side]}: Custom settings: ${failed}`);
   }
   return notes;
 }
@@ -223,8 +345,15 @@ export function toRows(result, onlySection = null) {
   const rows = [["Area", "Item", "API name", "Difference", A, B]];
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
+    if (k === "customSettings") {
+      const t = SECTION_TITLES[k];
+      const line = (x, y) => (x || y) && rows.push([t, "Note", "", "", x, y]);
+      line(customSettingsLine(result.a), customSettingsLine(result.b));
+      line(customSettingsSkippedNote(result.a, result.b), "");
+      line(customSettingsFailedNote(result.a), customSettingsFailedNote(result.b));
+    }
     for (const r of result.sections[k]) {
-      rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : "No", r.b ? oneLine(r.detailB) || "Yes" : "No"]);
+      rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : oneLine(r.detailA) || "No", r.b ? oneLine(r.detailB) || "Yes" : oneLine(r.detailB) || "No"]);
     }
   }
   return rows;
@@ -235,6 +364,11 @@ export function toRowsSingle(access, onlySection = null) {
   const rows = [["User", "Username", "Area", "Item", "API name", "Details"]];
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
+    if (k === "customSettings") {
+      for (const note of [customSettingsLine(access), customSettingsSkippedNote(access), customSettingsFailedNote(access)]) {
+        if (note) rows.push([access.user.name, access.user.username, SECTION_TITLES[k], "Note", "", note]);
+      }
+    }
     for (const r of singleRows(access, k)) rows.push([access.user.name, access.user.username, SECTION_TITLES[k], r.label, r.key, oneLine(r.detail)]);
   }
   return rows;
