@@ -102,8 +102,82 @@
         "key": "Northeast_Region",
         "label": "Northeast Region"
       }
+    ],
+    "callCenter": [
+      {
+        "key": "Demo_Sales_Line_East",
+        "label": "Demo Sales Line East"
+      }
+    ],
+    "customSettings": [
+      {
+        "key": "Automation_Settings__c.Bypass_Validation_Rules__c",
+        "label": "Automation Settings: Bypass validation rules",
+        "setting": {
+          "api": "Automation_Settings__c",
+          "label": "Automation Settings"
+        },
+        "field": {
+          "api": "Bypass_Validation_Rules__c",
+          "label": "Bypass validation rules"
+        },
+        "type": "boolean",
+        "value": true,
+        "valueText": "Checked",
+        "source": "user",
+        "sourceText": "This user",
+        "orgDefault": false,
+        "orgDefaultText": "Not checked"
+      },
+      {
+        "key": "Integration_Settings__c.Batch_Size__c",
+        "label": "Integration Settings: Batch size",
+        "setting": {
+          "api": "Integration_Settings__c",
+          "label": "Integration Settings"
+        },
+        "field": {
+          "api": "Batch_Size__c",
+          "label": "Batch size"
+        },
+        "type": "double",
+        "value": 200,
+        "valueText": "200",
+        "source": "user",
+        "sourceText": "This user",
+        "orgDefault": 50,
+        "orgDefaultText": "50"
+      },
+      {
+        "key": "Integration_Settings__c.Api_Token__c",
+        "label": "Integration Settings: Api Token",
+        "setting": {
+          "api": "Integration_Settings__c",
+          "label": "Integration Settings"
+        },
+        "field": {
+          "api": "Api_Token__c",
+          "label": "Api Token"
+        },
+        "type": "string",
+        "hidden": true,
+        "value": null,
+        "valueId": "demo-a-1",
+        "valueText": "Hidden (looks like a key)",
+        "source": "user",
+        "sourceText": "This user",
+        "orgDefault": null,
+        "orgDefaultText": "Hidden (looks like a key)"
+      }
     ]
   },
   "unavailable": {},
-  "warnings": []
+  "warnings": [],
+  "customSettingsInfo": {
+    "found": 4,
+    "examined": 4,
+    "hierarchy": 2,
+    "failed": 0,
+    "capped": false
+  }
 }

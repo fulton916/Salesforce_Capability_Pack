@@ -5,7 +5,7 @@
 // because it holds a user name and username.
 
 import { chunk, soqlString, soqlLike } from "./sfconn.js";
-import { ACCESS_SCHEMA } from "./usercompare.js";
+import { ACCESS_SCHEMA, settingItems, plural } from "./usercompare.js";
 
 export { ACCESS_SCHEMA };
 
@@ -29,10 +29,14 @@ export async function searchUsers(api, text, limit = 50) {
   return { users, more: records.length > limit };
 }
 
+const OFF_PATTERN = /INVALID_TYPE|not supported|sObject type/i;
+// A missing User.CallCenterId shows up as an unknown field or column, so it also matches these.
+const CALL_CENTER_OFF_PATTERN = /INVALID_TYPE|INVALID_FIELD|not supported|sObject type|No such column/i;
+
 /** Plain-words message for an area that could not be read. The raw error goes to the warnings. */
-function plainMessage(e, what, offText) {
+function plainMessage(e, what, offText, offPattern = OFF_PATTERN) {
   const raw = `${e?.errorCode || ""} ${e?.message || ""}`;
-  if (offText && (e?.territoriesOff || /INVALID_TYPE|not supported|sObject type/i.test(raw))) return offText;
+  if (offText && (e?.territoriesOff || (!e?.noOff && offPattern.test(raw)))) return offText;
   return `${what} could not be read. Your user may not have permission to see this. Ask an admin to check.`;
 }
 
@@ -181,6 +185,101 @@ async function readTerritories(api, userId) {
   return records.filter((r) => r.Territory2).map((r) => ({ key: r.Territory2.DeveloperName, label: r.Territory2.Name || r.Territory2.DeveloperName })).sort(byLabel);
 }
 
+/** The user's call center. User.CallCenterId has no relationship name, so it is read on its own (a path such as
+ * CallCenter.Name fails in a real org), and then the CallCenter row by Id. No call center is a normal result (empty
+ * list). A missing CallCenterId field is the "not available" case; a failure on the CallCenter read is not (noOff). */
+async function readCallCenter(api, userId) {
+  const { records } = await api.query(`SELECT CallCenterId FROM User WHERE Id = ${soqlString(userId)}`);
+  const id = records[0]?.CallCenterId;
+  if (!id) return [];
+  let cc;
+  try {
+    // cached per call center: two users of a compare in the same center cost one read
+    const r = await api.cached(`call-center:${id}`, () => api.query(`SELECT Id, Name, InternalName FROM CallCenter WHERE Id = ${soqlString(id)}`));
+    cc = r.records[0];
+  } catch (e) {
+    e.noOff = true;
+    throw e;
+  }
+  return cc ? [{ key: cc.InternalName || cc.Name, label: cc.Name || cc.InternalName }] : [];
+}
+
+// ---------- custom settings ----------
+// How hierarchy settings are told from list settings: one describe call per custom setting (cached on
+// the api object, so a second user costs none). Only a hierarchy setting has a SetupOwnerId field.
+// The describe also gives each field's label and type. Then one read per hierarchy setting (more only if
+// it has over FIELDS_PER_QUERY fields). EntityDefinition does not say hierarchy or list.
+const MAX_SETTINGS = 300; // custom settings examined; more are left out and the page says so
+const SETTING_CONCURRENCY = 6;
+const FIELDS_PER_QUERY = 80;
+// Types with no plain value to show (or that must not be shown).
+const SKIP_TYPES = new Set(["address", "location", "base64", "encryptedstring", "anyType", "complexvalue"]);
+
+async function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) { const i = next++; out[i] = await fn(items[i], i); }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
+async function readCustomSettings(api, { userId, profileId }, warnings, unavailable, progress) {
+  const { records } = await api.query("SELECT QualifiedApiName, Label FROM EntityDefinition WHERE IsCustomSetting = true ORDER BY Label");
+  const found = records.length;
+  const list = records.slice(0, MAX_SETTINGS).map((r) => ({ api: r.QualifiedApiName, label: r.Label || r.QualifiedApiName }));
+  const info = { found, examined: list.length, hierarchy: 0, failed: 0, failedSettings: [], skippedFields: 0, capped: found > list.length };
+  if (!list.length) return { items: [], info };
+
+  const org = await api.cached("organization-id", () => api.query("SELECT Id FROM Organization LIMIT 1"));
+  const orgId = org.records[0]?.Id || null;
+  const ids = { userId, profileId, orgId };
+  const failedNames = [];
+  const failedApis = [];
+  const fail = (setting, e) => { failedNames.push(setting.label); failedApis.push(setting.api); warnings.push(`Custom setting ${setting.label} (${setting.api}): ${e.message}`); };
+
+  let done = 0;
+  const described = await mapLimit(list, SETTING_CONCURRENCY, async (setting) => {
+    progress(`Checking custom settings (${++done} of ${list.length})`);
+    try {
+      const d = await api.describe(setting.api);
+      const fields = d.fields || [];
+      if (!fields.some((f) => f.name === "SetupOwnerId")) return null; // a list setting: the same for everyone
+      const mine = fields.filter((f) => f.custom && f.name !== "SetupOwnerId");
+      const skipped = mine.filter((f) => SKIP_TYPES.has(f.type)).length; // fields of special types
+      return { setting, skipped, fields: mine.filter((f) => !SKIP_TYPES.has(f.type)).map((f) => ({ name: f.name, label: f.label, type: f.type })) };
+    } catch (e) { fail(setting, e); return null; }
+  });
+  const withFields = described.filter(Boolean);
+  info.skippedFields = withFields.reduce((n, d) => n + d.skipped, 0);
+  // A setting whose fields are all skipped has nothing to show, so it is left out of "N of M".
+  const hierarchy = withFields.filter((d) => d.fields.length);
+  info.hierarchy = hierarchy.length;
+
+  const owners = [userId, profileId, orgId].filter(Boolean).map(soqlString).join(", ");
+  done = 0;
+  const items = [];
+  await mapLimit(hierarchy, SETTING_CONCURRENCY, async ({ setting, fields }) => {
+    progress(`Reading custom setting values (${++done} of ${hierarchy.length})`);
+    try {
+      const byOwner = new Map();
+      for (const part of chunk(fields, FIELDS_PER_QUERY)) {
+        const { records: rows } = await api.query(`SELECT SetupOwnerId, ${part.map((f) => f.name).join(", ")} FROM ${setting.api} WHERE SetupOwnerId IN (${owners})`);
+        for (const r of rows) byOwner.set(String(r.SetupOwnerId).slice(0, 15), { ...byOwner.get(String(r.SetupOwnerId).slice(0, 15)), ...r });
+      }
+      items.push(...settingItems(setting, fields, [...byOwner.values()], ids));
+    } catch (e) { fail(setting, e); }
+  });
+  info.failed = failedNames.length;
+  info.failedSettings = failedApis;
+  // Only a total failure makes the whole area "not available"; a partial one is a note beside the list.
+  if (failedNames.length && failedNames.length >= info.examined) {
+    unavailable.customSettings = "The custom settings could not be read. Your user may not have permission to see them. Ask an admin to check.";
+  }
+  return { items: items.sort(byLabel), info };
+}
+
 /** Read one user's access. Only the user itself is required; every other area fails softly:
  * its list stays empty, `unavailable[area]` gets a plain message and `warnings` gets the raw error. */
 export async function readUserAccess(api, userId, { progress = () => {} } = {}) {
@@ -189,21 +288,22 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
 
   progress("Reading the user");
   const { records } = await api.query(
-    "SELECT Id, Name, Username, IsActive, Profile.Name, Profile.UserLicense.Name, UserRole.Name, UserRole.DeveloperName " +
+    "SELECT Id, Name, Username, IsActive, ProfileId, Profile.Name, Profile.UserLicense.Name, UserRole.Name, UserRole.DeveloperName " +
     `FROM User WHERE Id = ${soqlString(userId)}`
   );
   const u = records[0];
   if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
 
-  const sections = { profile: [], role: [], permissionSetGroups: [], permissionSets: [], permissionSetLicenses: [], publicGroups: [], queues: [], territories: [] };
+  const sections = { profile: [], role: [], callCenter: [], permissionSetGroups: [], permissionSets: [], permissionSetLicenses: [], publicGroups: [], queues: [], territories: [], customSettings: [] };
+  let customSettingsInfo;
   if (u.Profile) sections.profile.push({ key: u.Profile.Name, label: u.Profile.Name, licence: u.Profile.UserLicense?.Name || null });
   if (u.UserRole) sections.role.push({ key: u.UserRole.DeveloperName || u.UserRole.Name, label: u.UserRole.Name });
 
-  const soft = async (keys, what, fn, offText) => {
+  const soft = async (keys, what, fn, offText, offPattern) => {
     try {
       Object.assign(sections, await fn());
     } catch (e) {
-      const msg = plainMessage(e, what, offText);
+      const msg = plainMessage(e, what, offText, offPattern);
       for (const k of keys) unavailable[k] = msg;
       if (!e.territoriesOff) warnings.push(`${what}: ${e.message}`); // a feature that is off is not a problem
     }
@@ -215,6 +315,12 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     soft(["permissionSetLicenses"], "Permission set licenses", async () => ({ permissionSetLicenses: await readLicences(api, userId) })),
     soft(["publicGroups", "queues"], "Public groups and queues", () => readMemberships(api, userId)),
     soft(["territories"], "Territories", async () => ({ territories: await readTerritories(api, userId) }), "Territories are not turned on in this org."),
+    soft(["callCenter"], "Call center", async () => ({ callCenter: await readCallCenter(api, userId) }), "Call centers are not available in this org.", CALL_CENTER_OFF_PATTERN),
+    soft(["customSettings"], "Custom settings", async () => {
+      const r = await readCustomSettings(api, { userId, profileId: u.ProfileId || null }, warnings, unavailable, progress);
+      customSettingsInfo = r.info;
+      return { customSettings: r.items };
+    }),
   ]);
 
   return {
@@ -222,6 +328,7 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     takenAt: new Date().toISOString(),
     user: { id: u.Id, name: u.Name, username: u.Username, isActive: u.IsActive === true },
     sections,
+    ...(customSettingsInfo ? { customSettingsInfo } : {}),
     unavailable,
     warnings,
   };

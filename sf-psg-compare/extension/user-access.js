@@ -4,7 +4,7 @@ import { searchUsers, readUserAccess } from "./lib/useraccess.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
   matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
-  userCardLines, orgParts,
+  userCardLines, orgParts, SINGLE_VALUE_KEYS, customSettingsLine, customSettingsSkippedNote, customSettingsFailedNote, customSettingsHiddenNote,
 } from "./lib/usercompare.js";
 import { startLiveReload } from "./lib/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
@@ -334,10 +334,10 @@ function renderCards() {
         lines.push(el("div", { class: l.cls }, l.segs.map((g) => g.bold ? el("b", { text: g.text }) : g.side ? el("span", { class: `who-${g.side}`, text: g.text }) : g.text)));
       }
       const c = state.result.counts[k];
-      ok = !(c.onlyA + c.onlyB + c.differ);
+      ok = !(c.onlyA + c.onlyB + c.differ + (c.unread || 0));
     } else {
       const rows = singleRows(state.sides.a.access, k);
-      if (k === "profile" || k === "role") lines.push(el("div", { class: "one", text: rows[0]?.label || `No ${s.one}` }));
+      if (SINGLE_VALUE_KEYS.includes(k)) lines.push(el("div", { class: "one", text: rows[0]?.label || `No ${s.one}` }));
       else lines.push(el("div", {}, el("b", { text: rows.length }), ` ${rows.length === 1 ? s.one : s.noun}`));
     }
     return el("button", { class: `card${ok ? " ok" : ""}`, onclick: () => openTab(k, true) }, el("div", { class: "card-title", text: s.title }), ...lines);
@@ -393,7 +393,7 @@ const NO = "—";
 
 function statusChip(r) {
   if (r.status === "same") return el("span", { class: "chip same", text: "Same" });
-  const cls = { onlyA: "a", onlyB: "b", differ: "d" }[r.status];
+  const cls = { onlyA: "a", onlyB: "b", differ: "d", unreadA: "u", unreadB: "u" }[r.status];
   return el("span", { class: `chip ${cls}`, text: statusText(r.status, nameOf("a"), nameOf("b")) });
 }
 
@@ -402,7 +402,7 @@ function itemCell(r) {
 }
 
 function presence(item, detail) {
-  if (!item) return el("td", { class: "no", text: NO });
+  if (!item) return detail ? el("td", { class: "no" }, el("div", { class: "how", text: detail })) : el("td", { class: "no", text: NO });
   return el("td", {}, el("span", { class: "yes", text: YES }), detail ? el("div", { class: "how", text: detail }) : null);
 }
 
@@ -411,7 +411,22 @@ function overviewValue(access, k) {
   const na = access.unavailable?.[k];
   if (na) return "Not available";
   const items = itemsOf(access, k);
-  return k === "profile" || k === "role" ? items[0]?.label || `No ${k}` : String(items.length);
+  if (SINGLE_VALUE_KEYS.includes(k)) return items[0]?.label || `No ${SECTIONS.find((s) => s.key === k).one}`;
+  const failed = k === "customSettings" ? customSettingsFailedNote(access) : "";
+  return failed ? `${items.length} (${failed.replace(/\.$/, "")})` : String(items.length);
+}
+
+/** A custom setting value cell: the value first, then where it comes from. A user without the row is at the org default. */
+function settingCell(item, detail) {
+  if (!item) return el("td", { class: "no" }, el("div", { class: "how", text: detail || NO }));
+  return el("td", {}, el("b", { text: item.valueText }), el("div", { class: "how", text: `${item.sourceText}\nOrg default: ${item.orgDefaultText}` }));
+}
+
+/** Setting label and field label, with the API names under them when "Show API names" is on. */
+function settingNameCell(r, part) {
+  const it = r.a || r.b || r.item;
+  const x = it[part];
+  return el("td", { class: "item" }, el("span", { text: x.label }), state.showApi ? el("div", { class: "api", text: x.api }) : null);
 }
 
 function currentRows() {
@@ -431,6 +446,11 @@ function columns() {
     return cmp
       ? { head: ["", headA, headB], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: r.a }), el("td", { text: r.b })] }
       : { head: ["", "Access"], row: (r) => [el("td", { class: "item", text: r.label }), el("td", { text: r.a })] };
+  }
+  if (state.tab === "customSettings") {
+    return cmp
+      ? { head: ["Setting", "Field", headA, headB, "Difference"], row: (r) => [settingNameCell(r, "setting"), settingNameCell(r, "field"), settingCell(r.a, r.detailA), settingCell(r.b, r.detailB), el("td", {}, statusChip(r))] }
+      : { head: ["Setting", "Field", "Value for this user", "Comes from", "Org default"], row: (r) => [settingNameCell(r, "setting"), settingNameCell(r, "field"), el("td", {}, el("b", { text: r.item.valueText })), el("td", { text: r.item.sourceText }), el("td", { text: r.item.orgDefaultText })] };
   }
   if (cmp) {
     return { head: [SECTION_TITLES[state.tab], headA, headB, "Difference"], row: (r) => [itemCell(r), presence(r.a, r.detailA), presence(r.b, r.detailB), el("td", {}, statusChip(r))] };
@@ -458,9 +478,19 @@ function renderTable() {
   const parts = [];
   const na = state.tab === "overview" ? null : unavailableMsg(state.tab);
   if (na) parts.push(el("div", { class: "unavail", text: na }));
+  if (state.tab === "customSettings") {
+    const sides = state.result ? ["a", "b"] : ["a"];
+    const who = (s) => (state.result ? el("b", { text: `${nameOf(s)}: ` }) : null);
+    const lines = sides.flatMap((s) => [customSettingsLine(state.sides[s].access), customSettingsFailedNote(state.sides[s].access)]
+      .map((text) => (text ? el("div", {}, who(s), text) : null)))
+      .concat(customSettingsSkippedNote(...sides.map((s) => state.sides[s].access)) || null)
+      .concat(customSettingsHiddenNote(...sides.map((s) => state.sides[s].access)) || null)
+      .filter(Boolean).map((n) => (n instanceof Node ? n : el("div", { text: n })));
+    if (lines.length) parts.push(el("div", { class: "cs-count" }, lines));
+  }
   if (!rows.length) {
     const total = currentRows().length;
-    let msg = na ? "" : "Nothing here.";
+    let msg = na ? "" : state.tab === "customSettings" && !state.result ? "No custom setting has a value for this user or their profile that differs from the org default." : "Nothing here.";
     if (!na && state.search) msg = "Nothing matches your search.";
     else if (!na && total && state.diffOnly && state.result) msg = `No differences: ${total === 1 ? "the 1 item is" : `all ${total} items are`} the same for both users. Choose “Everything” to see them.`;
     wrap.replaceChildren(...parts, msg ? el("div", { class: "empty", text: msg }) : "");
