@@ -606,16 +606,16 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs; Salesforce hosts only) |
 | `menu.html`, `menu.js` | The toolbar menu: a menu of tools. Detects the org in the current tab and opens the chosen page |
 | `tools/compare-groups/compare-groups.*` | The Compare permission set groups page |
-| `tools/user-access/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `shared/pack.css`) |
-| `tools/user-access/user-access-read.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
+| `tools/user-access/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
+| `tools/user-access/user-access-read.js` | Reads one user's access from the org (`readUserAccess`) |
 | `tools/user-access/user-access-logic.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
 | `tools/page-details/page-details.*` | The Page details for a ticket page (html, js, extra css) |
-| `tools/page-details/page-details-logic.js`, `page-details-read.js` | The ticket text, address cleaning and page kinds (pure), and the org reads (`SELECT`/describe/GET only) |
+| `tools/page-details/page-details-logic.js`, `page-details-read.js` | The ticket text and page kinds (pure; address cleaning is `cleanUrl` in `shared/pageurl.js`), and the org reads (`SELECT`/describe/GET only) |
 | `tools/hierarchy/hierarchy.*` | The Territory & role hierarchy page (html, js, and extra css on top of `shared/pack.css`) |
 | `tools/hierarchy/hierarchy-logic.js` | Builds, searches and exports a hierarchy (tree, branch, Excel layout). Pure, no browser APIs |
-| `tools/hierarchy/hierarchy-read.js` | Reads territory models, territories and roles from the org (`SELECT` only) |
-| `tools/record-access/record-access.*` | The Why can a user see this record? page (html, js, and extra css on top of `shared/pack.css` and `tools/user-access/user-access.css`) |
-| `tools/record-access/record-access-logic.js` | `recordIdFromUrl`, the route reasoning, the two-user difference, the verdict and the plain-text export. Pure, no browser APIs |
+| `tools/hierarchy/hierarchy-read.js` | Reads territory models and territories from the org (`SELECT` only; roles come from `shared/roles-read.js`) |
+| `tools/record-access/record-access.*` | The Why can a user see this record? page (html, js, and extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
+| `tools/record-access/record-access-logic.js` | The route reasoning, the two-user difference, the verdict and the plain-text export. Pure, no browser APIs |
 | `tools/record-access/record-access-read.js` | Reads the facts for it from the org (`SELECT`, `COUNT()` and describe only; each area fails softly into notes) |
 | `tools/flow-usage/flow-usage.*` | The Where is it used in flows? page (html, js, and extra css on top of `shared/pack.css`) |
 | `tools/flow-usage/flow-usage-scan.js` | Looks inside one flow version for a field, text or an Id; also lists each record element's object and operation (get, create, update, delete), the trigger and how the flow starts (`startInfo`). Pure, no browser APIs |
@@ -629,6 +629,12 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/compare-groups/compare-groups-read.js` | Reads one group into a snapshot |
 | `tools/compare-groups/compare-groups-logic.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
 | `shared/feedback.js` | Builds the GitHub new-issue link (tool, version, browser only). Pure, no browser APIs |
+| `shared/roles-read.js` | `readRoles`: the role list (portal roles left out), used by the hierarchy and record-access pages |
+| `shared/users-read.js` | `searchUsers`: the user search used by the user-access and record-access pages |
+| `shared/users-logic.js` | `matchUsers`: the user search for the demos. Pure |
+| `shared/recordid.js` | `recordIdFromUrl`, `looksLikeId`: find a record Id in an address or pasted text. Pure |
+| `shared/pageurl.js` | `cleanUrl`: keeps only the path and list view name of a page address. Pure |
+| `shared/user-picker.css` | The user list, inactive tag and error details styles used by the user-access and record-access pages |
 | `shared/pick.js` | Matching for the group search box |
 | `shared/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `dev/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |

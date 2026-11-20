@@ -10,7 +10,8 @@ import {
   buildTree, flatten, pathOf, branchOf, searchNodes, exportRows, exportFileName, summaryText, treeNotes, statsOf, defaultModel, toCsv,
   attachUsers, listUsers, countUsers, usersSummary,
 } from "../tools/hierarchy/hierarchy-logic.js";
-import { readTerritoryModels, readTerritories, readRoles, readRoleUsers, readTerritoryUsers } from "../tools/hierarchy/hierarchy-read.js";
+import { readRoles } from "../shared/roles-read.js";
+import { readTerritoryModels, readTerritories, readRoleUsers, readTerritoryUsers } from "../tools/hierarchy/hierarchy-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);

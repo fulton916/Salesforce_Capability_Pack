@@ -16,7 +16,9 @@ People "Load unpacked" this folder: `manifest.json` sits directly inside it.
 
 ```
 manifest.json, menu.html, menu.js    the toolbar menu
-shared/        sfconn.js, sfread.js (readOrg), csv.js (toCsv), feedback.js, pick.js, urlcontext.js, livereload.js, pack.css
+shared/        sfconn.js, sfread.js (readOrg), roles-read.js (readRoles), users-read.js (searchUsers), users-logic.js (matchUsers),
+               recordid.js (recordIdFromUrl, looksLikeId), pageurl.js (cleanUrl), csv.js (toCsv), feedback.js, pick.js,
+               urlcontext.js, livereload.js, pack.css, user-picker.css (user list and error box styles for user-access and record-access)
 tools/<tool>/  one folder per tool: compare-groups, user-access, hierarchy, record-access, flow-usage, page-details
 icons/, samples/, tests/, dev/dev_server.py
 ```
@@ -26,10 +28,9 @@ Naming rule: the folder is the tool's short name. `<tool>.html`, `<tool>.js` and
 `<tool>-<part>.js` (flow-usage has `-scan` and `-object`). Compare-groups has no css of its own: `shared/pack.css`
 is the common stylesheet every page loads first.
 
-A tool does not import from another tool's folder. Code several tools need lives in `shared/`.
-Known exceptions, because the tool builds on another one: `record-access` imports `readRoles` (hierarchy-read),
-`searchUsers` (user-access-read) and `matchUsers` (user-access-logic) and links `user-access.css`; `menu.js`
-imports `recordIdFromUrl` (record-access-logic) and `cleanUrl` (page-details-logic). Do not add more.
+A tool does not import from or link to another tool's folder, and `menu.js` imports nothing from `tools/`. Code
+several tools need lives in `shared/` (a layout test checks this). Shared reads are named `<what>-read.js`, pure helpers
+`<what>-logic.js` or by what they do (`recordid.js`, `pageurl.js`), and styles used by more than one page `<what>.css`.
 
 Chrome refuses to load an unpacked extension that contains any file or folder whose name starts with `_`
 (for example `__pycache__`). A test fails if one exists; delete it before loading.
@@ -56,10 +57,10 @@ Earlier names, for old notes: `extension/lib/snapshot.js` = compare-groups-read,
 A read-only page, `tools/user-access/user-access.html`, that shows one user's access (profile and license,
 role, call center, permission set groups, permission sets with "directly / through group", permission set
 licenses, public groups, queues, territories, and hierarchy custom settings whose value for the user differs from the org default) and compares two users. Same look as the compare page:
-it links `shared/pack.css` and adds a little in `user-access.css`.
+it links `shared/pack.css` and `shared/user-picker.css` and adds a little in `user-access.css`.
 
-- `tools/user-access/user-access-read.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with
-  `soqlString` / `soqlLike`, LIMIT 50) and `readUserAccess(api, userId)` →
+- `shared/users-read.js` — `searchUsers(api, text)` (LIKE search in the org, escaped with `soqlLike`, LIMIT 50); `shared/users-logic.js` — `matchUsers` (demo search). Used by user-access and record-access.
+- `tools/user-access/user-access-read.js` — `readUserAccess(api, userId)` →
   `{schema: "sf-user-access/1", user, sections, unavailable, warnings}`. Reads `User`,
   `PermissionSetAssignment`, `PermissionSetGroup(Component)`, `PermissionSet`, `MutingPermissionSet`,
   `PermissionSetLicenseAssign`, `GroupMember`, `UserTerritory2Association`, `CallCenter` (`SELECT CallCenterId FROM User`, then `SELECT Id, Name, InternalName FROM CallCenter WHERE Id = ...`, cached per Id; a path such as `CallCenter.Name` fails in a real org because the field has no relationship name), `EntityDefinition`, `Organization`, describe + read per hierarchy custom setting. Only the user read may
@@ -86,9 +87,11 @@ CSV export with the tree in the cells. Links `shared/pack.css` and adds `hierarc
   `treeNotes` (with a branch's items it counts only the nodes on screen), and the user helpers `attachUsers`,
   `listUsers`, `countUsers`, `usersSummary`, `USER_FIELDS`; `exportRows(tree, top, users)` adds "Users" and
   "User 1..N" columns when `users` is `{byNode, field, includeInactive}`. Re-exports `toCsv` from `shared/csv.js` (which guards cells starting with = + - @ tab CR).
+- `shared/roles-read.js` — `readRoles(api)` (roles except portal and community roles, counted with `COUNT()`; returns
+  `{roles, portalCount, warnings}`). Used by hierarchy and record-access.
 - `tools/hierarchy/hierarchy-read.js` — `readTerritoryModels` (`{on: false}` when the org has no
   territories: the `Territory2Model` query fails with INVALID_TYPE; no describeGlobal call, it was slow), `readTerritories(api,
-  modelId)`, `readRoles` (portal roles left out, counted with `COUNT()`), and the user reads (SELECT only,
+  modelId)`, and the user reads (SELECT only,
   only when "Show users" is turned on): `readRoleUsers` (`User WHERE UserRoleId != null AND UserRole.PortalType = 'None'`, active and inactive,
   filtered in memory so the tick box needs no new read; portal and community users are not read, only counted
   with two `COUNT()`s, all and `IsActive = true`, each with `UserRoleId != null` because `!= 'None'` alone also matches
@@ -117,12 +120,12 @@ CSV export with the tree in the cells. Links `shared/pack.css` and adds `hierarc
 
 A read-only page, `tools/record-access/record-access.html`, that explains how one user can see the record open
 in the current Salesforce tab, and with two users why one sees it and the other doesn't. Links
-`shared/pack.css` and `user-access.css`, and adds `record-access.css`. The popup button reads the active
-tab's address with `recordIdFromUrl` and opens `record-access.html?host=<host>&record=<id>`; with no
+`shared/pack.css` and `shared/user-picker.css`, and adds `record-access.css`. The popup button reads the active
+tab's address with `recordIdFromUrl` (`shared/recordid.js`) and opens `record-access.html?host=<host>&record=<id>`; with no
 record in the address the button stays enabled and the page opens with an empty record box (a box
 takes a pasted link or Id, which is also how the dev server is used).
 
-- `tools/record-access/record-access-logic.js` — pure, tested: `recordIdFromUrl`, `to18`, `explain(facts, userIds)`
+- `tools/record-access/record-access-logic.js` — pure, tested: `to18`, `explain(facts, userIds)`
   (routes per user as chains of plain steps, `mismatch`, `difference`, `verdict`, `notes`),
   `toPlainText`, `owdText`, `causeInfo`. Facts shape: schema `sf-record-access/1` (see the demo file).
 - `tools/record-access/record-access-read.js` — `readRecordContext(api, id)` (record, owner, parent, org-wide
@@ -324,8 +327,9 @@ A read-only page, `tools/page-details/page-details.html`, that shows who the per
 record they were on, and copies it (clipboard or .txt) for a support ticket. Links `shared/pack.css` and
 adds `page-details.css`. "Snapshot" is the file/code name only; the visible title is "Page details for a ticket".
 
-- `tools/page-details/page-details-logic.js` — pure, tested: `cleanUrl` (path plus `filterName` only; drops every other
-  parameter, the hash and `;params`), `parsePageUrl` (record / list / setup / home / other; classic `/<Id>`
+- `shared/pageurl.js` — `cleanUrl` (path plus `filterName` only; drops every other parameter, the hash and `;params`).
+  `page-details-logic.js` imports it; `menu.js` and `page-details.js` use it too.
+- `tools/page-details/page-details-logic.js` — pure, tested: `parsePageUrl` (record / list / setup / home / other; classic `/<Id>`
   has no object; Experience Cloud `/s/` is other), `snapshotText` (the ticket text; note first; missing areas
   worded plainly), `scrub` (last guard against session-like strings), `whenText`, `fileName`, `sandboxNameFromHost`.
 - `tools/page-details/page-details-read.js` — `readOrgDetails` (`Organization`), `readCurrentUser`, `readPageDetails`
@@ -338,7 +342,7 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
 - Sample: `samples/issue_snapshot_demo.json` (made-up; a test checks it stays synthetic).
 - Tests: `tests/issue_snapshot_tests.mjs` (includes the no-innerHTML, no-storage guard).
 - Rules that matter: reads only; never the session id, cookies or page body; no values beyond name, record type,
-  owner and dates; the popup passes `cleanUrl(tab.url)` only; the page says to paste only into the company's own
+  owner and dates; the popup passes `cleanUrl(tab.url)` (`shared/pageurl.js`) only; the page says to paste only into the company's own
   ticket system. A hash-based address (old `/one/one.app#/...`) loses its record because the hash is dropped;
   `parsePageUrl` sets `hashAddress` (kind "other" and cleaned path `/one/one.app`) and the Page area says to open the record again.
 - The note is cleaned only by `scrubNote` (`00D…!…` session ids, long `Bearer` tokens, `sid=` / `access_token=` /

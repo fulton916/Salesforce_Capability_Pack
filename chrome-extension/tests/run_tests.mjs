@@ -1057,5 +1057,23 @@ await test("layout: no page or script loads remote code, or writes org data as H
   }
 });
 
+await test("layout: no tool imports or links a file from another tool's folder, and menu.js imports nothing from tools/", () => {
+  const files = walk(extRoot).filter((e) => !e.dir && /^tools\/[^/]+\/.+\.(js|html|css)$/.test(e.path));
+  assert.ok(files.length >= 30, `only ${files.length} tool files scanned`);
+  const refs = (text) => [...text.matchAll(/(?:\bfrom\s*|\bimport\s*\(?\s*|\bsrc=|\bhref=|@import\s+(?:url\()?\s*)["']([^"']+)["']/g)].map((m) => m[1]);
+  for (const f of files) {
+    const own = f.path.split("/")[1];
+    const dir = path.posix.dirname(f.path);
+    for (const r of refs(readFileSync(path.join(extRoot, f.path), "utf-8"))) {
+      if (/^https?:/.test(r) || r.startsWith("data:")) continue;
+      const target = path.posix.normalize(path.posix.join(dir, r));
+      const m = /^tools\/([^/]+)\//.exec(target);
+      assert.ok(!m || m[1] === own, `${f.path} reaches into tools/${m && m[1]}: ${r}`);
+    }
+  }
+  const menu = readFileSync(path.join(extRoot, "menu.js"), "utf-8");
+  assert.deepEqual(refs(menu).filter((r) => /(^|\/)tools\//.test(r)), [], "menu.js imports from tools/");
+});
+
 console.log(failures.length ? `\n${failures.length} FAILED, ${passed} passed` : `\nAll ${passed} checks passed.`);
 process.exit(failures.length ? 1 : 0);

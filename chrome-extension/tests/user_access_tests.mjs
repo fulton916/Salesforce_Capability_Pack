@@ -6,9 +6,11 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { SfApi, soqlLike } from "../shared/sfconn.js";
-import { searchUsers, readUserAccess } from "../tools/user-access/user-access-read.js";
+import { searchUsers } from "../shared/users-read.js";
+import { matchUsers } from "../shared/users-logic.js";
+import { readUserAccess } from "../tools/user-access/user-access-read.js";
 import {
-  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
+  compareUsers, validateAccess, toRows, toRowsSingle, toCsv, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
   resolveHierarchy, settingItems, customSettingsLine, valueText, customSettingsSkippedNote, customSettingsFailedNote,
   isSecretLike, customSettingsHiddenNote, HIDDEN_TEXT, HIDDEN_NOTE,
 } from "../tools/user-access/user-access-logic.js";

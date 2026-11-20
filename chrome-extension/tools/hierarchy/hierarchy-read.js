@@ -5,7 +5,6 @@ import { soqlString } from "../../shared/sfconn.js";
 import { sortModels } from "./hierarchy-logic.js";
 
 const territoryRecord = (r) => ({ id: r.Id, parentId: r.ParentTerritory2Id || null, name: r.Name || r.DeveloperName, apiName: r.DeveloperName || "" });
-const roleRecord = (r) => ({ id: r.Id, parentId: r.ParentRoleId || null, name: r.Name || r.DeveloperName, apiName: r.DeveloperName || "" });
 
 /** Territory models of the org. {on: false} when the territory feature is not turned on: the query
  *  fails with INVALID_TYPE / "sObject type ... is not supported". There is no describeGlobal call
@@ -27,20 +26,6 @@ export async function readTerritories(api, modelId) {
     `SELECT Id, Name, DeveloperName, ParentTerritory2Id FROM Territory2 WHERE Territory2ModelId = ${soqlString(modelId)}`
   );
   return records.map(territoryRecord);
-}
-
-/** Roles of the org except portal and community roles. {roles, portalCount, warnings}.
- *  `portalCount` is null when the count could not be read (the reason is in `warnings`). */
-export async function readRoles(api) {
-  const warnings = [];
-  const { records } = await api.query("SELECT Id, Name, DeveloperName, ParentRoleId FROM UserRole WHERE PortalType = 'None'");
-  let portalCount = null;
-  try {
-    portalCount = await api.count("SELECT COUNT() FROM UserRole WHERE PortalType != 'None'");
-  } catch (e) {
-    warnings.push(`Could not count portal roles (${e.message}).`);
-  }
-  return { roles: records.map(roleRecord), portalCount, warnings };
 }
 
 const userRecord = (u, nodeId, extra = {}) => ({

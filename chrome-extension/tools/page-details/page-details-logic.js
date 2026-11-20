@@ -5,25 +5,12 @@
 // never carries a session id, a token or anything read from the page body; scrub() is a last
 // guard over the finished text.
 
+import { cleanUrl } from "../../shared/pageurl.js";
+
 const ID_RE = /^[a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?$/;
-const BASE = "https://example.invalid";
-const MAX_PATH = 300;
 const NONE = "Not available";
 
 export const looksLikeId = (s) => typeof s === "string" && ID_RE.test(s);
-
-/** Path plus the filterName parameter of an address (full URL or path). Everything else is dropped:
- * other query parameters (sid, token, access_token, code, frontdoor...), the hash and `;params`.
- * "" when there is nothing usable. */
-export function cleanUrl(input) {
-  if (typeof input !== "string" || !input.trim()) return "";
-  let u;
-  try { u = new URL(input.trim(), BASE); } catch { return ""; }
-  let path = u.pathname.replace(/;[^/]*/g, "");
-  if (path.length > MAX_PATH) path = path.slice(0, MAX_PATH);
-  const filter = u.searchParams.get("filterName");
-  return path + (filter && /^[\w.-]{1,80}$/.test(filter) ? `?filterName=${filter}` : "");
-}
 
 const OBJECT_RE = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
 
