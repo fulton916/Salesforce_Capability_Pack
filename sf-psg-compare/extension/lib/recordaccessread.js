@@ -29,8 +29,9 @@ async function soft(out, what, fn, fallback, { quietIfOff = false } = {}) {
   try {
     return await fn();
   } catch (e) {
-    out.warnings.push(`${what}: ${e?.message || e}`);
-    if (!(quietIfOff && isOff(e))) out.notes.push(`${what} could not be read, so it was not checked. Your user may not have permission to see it.`);
+    const w = typeof what === "function" ? what() : what;
+    out.warnings.push(`${w}: ${e?.message || e}`);
+    if (!(quietIfOff && isOff(e))) out.notes.push(`${w} could not be read, so it was not checked. Your user may not have permission to see it.`);
     return fallback;
   }
 }
@@ -67,6 +68,59 @@ export function withRetry(api, { delays = [300, 1000], sleep = (ms) => new Promi
     }
   };
   return wrapped;
+}
+
+// ---------- how many reads run at once, and what is kept for the page session ----------
+
+/** How many requests may be in flight at once. Enough to overlap the waiting, few enough not to flood the org or the browser. */
+export const MAX_IN_FLIGHT = 6;
+
+/** The same api, but at most `max` GETs are on their way at once; the rest wait their turn (first come, first served).
+ *  Only a single GET holds a place, never a whole query or chain, so waiting cannot deadlock. The caller's api object is left
+ *  as it is. An api that is already limited is returned as it is. */
+export function withLimit(api, max = MAX_IN_FLIGHT) {
+  if (api.__limited) return api;
+  const wrapped = Object.create(api);
+  wrapped.__limited = true;
+  const waiting = [];
+  let active = 0;
+  const release = () => { active--; const next = waiting.shift(); if (next) { active++; next(); } };
+  wrapped.get = async (...args) => {
+    if (active >= max) await new Promise((r) => waiting.push(r));
+    else active++;
+    try {
+      return await api.get(...args);
+    } finally {
+      release();
+    }
+  };
+  return wrapped;
+}
+
+/** What the page keeps between two Explains (in page memory only; nothing is stored anywhere). `org` holds the org-wide
+ *  lists (roles, territories); `rec` holds the facts of one record and is emptied when another record is explained.
+ *  Only reads that worked are kept: a failed read is forgotten at once, so the next Explain tries it again. */
+export function createReadCache() {
+  return { org: new Map(), rec: new Map(), recId: null, recAt: null, hits: 0 };
+}
+
+/** Clear the facts of the record (the org-wide lists stay). */
+export function clearRecordFacts(cache) {
+  cache.rec.clear();
+  cache.recId = null;
+  cache.recAt = null;
+}
+
+/** Run `load` once per key; later asks get the same answer (a copy, so a caller cannot change what is kept). */
+async function remembered(cache, scope, key, load) {
+  const store = cache[scope];
+  if (!store.has(key)) {
+    if (scope === "rec" && cache.recAt === null) cache.recAt = Date.now(); // when this record's facts were first read
+    const p = (async () => load())(); // starts at once, so it takes its place in the queue in the order the caller started it
+    p.catch(() => { if (store.get(key) === p) store.delete(key); }); // never keep a failure
+    store.set(key, p);
+  } else cache.hits++;
+  return structuredClone(await store.get(key));
 }
 
 // ---------- the record ----------
@@ -487,179 +541,280 @@ async function readChildCounts(api, recordId, userId) {
 /** The account behind a Case or Opportunity: its sharing rows with the level they give to the account's cases (or
  *  opportunities), and its owner with the level their role gives account owners. null when the record has no
  *  account or the object is neither. Rows that give "None" are left out (they give nothing). One share query,
- *  one account query, one role query. */
-async function readAccountAccess(api, rec, objectApi, out) {
+ *  one account query, one role query; the share query and the owner query run together. `memo(key, load)` runs a
+ *  read once per record (the page keeps what it read). */
+async function readAccountAccess(api, rec, objectApi, out, memo) {
   const lv = ACCOUNT_CHILD_LEVEL[objectApi];
   if (!lv || !rec.accountId) return null;
   const acc = { id: rec.accountId, name: rec.accountName || "", rows: [], truncated: false, owner: null };
-  await soft(out, "The account's sharing rows", async () => {
-    const { records } = await api.query(
-      `SELECT UserOrGroupId, RowCause, ${lv.share} FROM AccountShare WHERE AccountId = ${soqlString(rec.accountId)} LIMIT ${MAX_SHARE_ROWS}`
-    );
-    acc.truncated = records.length >= MAX_SHARE_ROWS;
-    const rows = records.map((r) => ({ who: r.UserOrGroupId, level: r[lv.share], cause: r.RowCause }));
-    acc.ownerRowLevel = rows.find((r) => r.cause === "Owner")?.level || null;
-    acc.rows = rows.filter((r) => r.cause !== "Owner" && r.level && r.level !== "None");
-  }, null);
-  await soft(out, "The account owner", async () => {
-    const { records } = await api.query(`SELECT OwnerId, Owner.Name, Owner.UserRoleId FROM Account WHERE Id = ${soqlString(rec.accountId)}`);
-    const a = records[0];
-    if (!a?.OwnerId) return;
-    acc.owner = { id: a.OwnerId, name: a.Owner?.Name || "", roleId: a.Owner?.UserRoleId || null, level: null };
-    if (acc.owner.roleId) {
-      const { records: r } = await api.query(`SELECT ${lv.role} FROM UserRole WHERE Id = ${soqlString(acc.owner.roleId)}`);
-      acc.owner.level = r[0]?.[lv.role] || null;
-    }
-    // The account's Owner sharing row, when it was read, is what Salesforce worked out from the role setting.
-    if (acc.ownerRowLevel) acc.owner.level = acc.ownerRowLevel;
-  }, null, { quietIfOff: true });
-  delete acc.ownerRowLevel;
+  const outRows = blank();
+  const outOwner = blank();
+  let ownerRowLevel = null;
+  await Promise.all([
+    soft(outRows, "The account's sharing rows", async () => {
+      const r = await memo("acctRows", async () => {
+        const { records } = await api.query(
+          `SELECT UserOrGroupId, RowCause, ${lv.share} FROM AccountShare WHERE AccountId = ${soqlString(rec.accountId)} LIMIT ${MAX_SHARE_ROWS}`
+        );
+        return { truncated: records.length >= MAX_SHARE_ROWS, rows: records.map((x) => ({ who: x.UserOrGroupId, level: x[lv.share], cause: x.RowCause })) };
+      });
+      acc.truncated = r.truncated;
+      ownerRowLevel = r.rows.find((x) => x.cause === "Owner")?.level || null;
+      acc.rows = r.rows.filter((x) => x.cause !== "Owner" && x.level && x.level !== "None");
+    }, null),
+    soft(outOwner, "The account owner", async () => {
+      const a = await memo("acctOwner", async () => {
+        const { records } = await api.query(`SELECT OwnerId, Owner.Name, Owner.UserRoleId FROM Account WHERE Id = ${soqlString(rec.accountId)}`);
+        return records[0] || null;
+      });
+      if (!a?.OwnerId) return;
+      acc.owner = { id: a.OwnerId, name: a.Owner?.Name || "", roleId: a.Owner?.UserRoleId || null, level: null };
+      if (acc.owner.roleId) {
+        acc.owner.level = await memo(`acctOwnerRole:${acc.owner.roleId}`, async () => {
+          const { records: r } = await api.query(`SELECT ${lv.role} FROM UserRole WHERE Id = ${soqlString(acc.owner.roleId)}`);
+          return r[0]?.[lv.role] || null;
+        });
+      }
+    }, null, { quietIfOff: true }),
+  ]);
+  // The account's Owner sharing row, when it was read, is what Salesforce worked out from the role setting.
+  if (acc.owner && ownerRowLevel) acc.owner.level = ownerRowLevel;
+  out.notes.push(...outRows.notes, ...outOwner.notes);
+  out.warnings.push(...outRows.warnings, ...outOwner.warnings);
   return acc;
 }
 
 // ---------- everything ----------
 
-/** Read the facts for one or two users. `users` are {id, name} picks from searchUsers. */
-export async function readRecordAccess(api, ctx, users, { progress = () => {} } = {}) {
-  const out = blank();
-  out.notes.push(...ctx.notes);
-  out.warnings.push(...ctx.warnings);
+/** Read the facts for one or two users. `users` are {id, name} picks from searchUsers.
+ *
+ *  Reads that do not need each other run together (at most MAX_IN_FLIGHT requests at a time): the roles, the territories,
+ *  the record's sharing rows, the account's sharing, the permission count and each user's own reads, for both users at once.
+ *  Only what truly needs something else waits for it (group names need the sharing rows; the members of manager groups need
+ *  the groups, the roles and the territories; a user's group walk needs their role and territories). Notes and warnings are
+ *  put together in a fixed order, so the answer does not depend on which read finished first.
+ *
+ *  `cache` (from createReadCache) keeps the org-wide lists and the record's own facts between two Explains; with none given,
+ *  nothing is kept. `progress(text)` is told "Reading… (n of m)" each time one of the m parts is done. */
+export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}, cache = createReadCache() } = {}) {
+  const api = withLimit(rawApi);
   const rec = ctx.record;
   const objectApi = ctx.object.api;
   const isAccount = objectApi === "Account";
+  if (cache.recId !== rec.id) { cache.rec.clear(); cache.recId = rec.id; cache.recAt = null; }
+  let keptUsed = false; // true when any of the record's facts came from an earlier Explain
+  const orgWide = (key, load) => remembered(cache, "org", key, load);
+  const ofRecord = (key, load) => { if (cache.rec.has(key)) keptUsed = true; return remembered(cache, "rec", key, load); };
 
-  progress("Reading roles and territories");
-  const rolesRes = await soft(out, "Roles", () => readRoles(api), { roles: [] });
-  const roles = rolesRes.roles.map((r) => ({ id: r.id, parentId: r.parentId, name: r.name }));
-  const roleParent = new Map(roles.map((r) => [r.id, r.parentId]));
+  const total = 7 + users.length;
+  let done = 0;
+  const tick = (p) => p.then((v) => { done++; progress(`Reading… (${done} of ${total})`); return v; });
+  progress(`Reading… (0 of ${total})`);
 
-  let territories = { on: false, items: [], record: [] };
-  await soft(out, "Territories", async () => {
-    const { records } = await api.query("SELECT Id, Name, ParentTerritory2Id FROM Territory2 WHERE Territory2Model.State = 'Active'");
-    territories = { on: true, items: records.map((t) => ({ id: t.Id, parentId: t.ParentTerritory2Id || null, name: t.Name })), record: [] };
-    if (isAccount) {
-      const { records: ot } = await api.query(`SELECT Territory2Id, AssociationCause FROM ObjectTerritory2Association WHERE ObjectId = ${soqlString(rec.id)}`);
-      territories.record = ot.map((t) => ({ id: t.Territory2Id, cause: t.AssociationCause || "" }));
+  // Org-wide lists.
+  const rolesU = tick((async () => {
+    const o = blank();
+    const res = await soft(o, "Roles", () => orgWide("roles", () => readRoles(api)), { roles: [] });
+    const roles = res.roles.map((r) => ({ id: r.id, parentId: r.parentId, name: r.name }));
+    return { o, roles, roleParent: new Map(roles.map((r) => [r.id, r.parentId])) };
+  })());
+  const terrU = tick((async () => {
+    const o = blank();
+    let territories = { on: false, items: [], record: [] };
+    await soft(o, "Territories", async () => {
+      const items = await orgWide("territories", async () => {
+        const { records } = await api.query("SELECT Id, Name, ParentTerritory2Id FROM Territory2 WHERE Territory2Model.State = 'Active'");
+        return records.map((t) => ({ id: t.Id, parentId: t.ParentTerritory2Id || null, name: t.Name }));
+      });
+      territories = { on: true, items, record: [] };
+      if (isAccount) {
+        territories.record = await ofRecord("recordTerritories", async () => {
+          const { records: ot } = await api.query(`SELECT Territory2Id, AssociationCause FROM ObjectTerritory2Association WHERE ObjectId = ${soqlString(rec.id)}`);
+          return ot.map((t) => ({ id: t.Territory2Id, cause: t.AssociationCause || "" }));
+        });
+      }
+    }, null, { quietIfOff: true });
+    return { o, territories, terrParent: new Map(territories.items.map((t) => [t.id, t.parentId])), activeTerr: new Set(territories.items.map((t) => t.id)) };
+  })());
+
+  // The record's own sharing rows.
+  const sharesU = tick((async () => {
+    const o = blank();
+    const shares = { available: false, rows: [], truncated: false };
+    const sm = await shareMeta(api, objectApi);
+    if (!sm) {
+      o.notes.push(`${ctx.object.plural} have no sharing table (this is normal when everyone already has access, or when the parent record decides), so there are no manual shares, sharing rules or teams to show.`);
+    } else {
+      await soft(o, "The record's sharing rows", async () => {
+        const r = await ofRecord("shareRows", async () => {
+          const { records } = await api.query(
+            `SELECT UserOrGroupId, ${sm.accessField}, RowCause FROM ${sm.name} WHERE ${sm.parentField} = ${soqlString(rec.id)} LIMIT ${MAX_SHARE_ROWS}`
+          );
+          return { truncated: records.length >= MAX_SHARE_ROWS, rows: records.map((x) => ({ who: x.UserOrGroupId, level: x[sm.accessField], cause: x.RowCause })) };
+        });
+        shares.available = true;
+        shares.truncated = r.truncated;
+        shares.rows = r.rows;
+      }, null);
+      if (shares.truncated) o.notes.push(`The record has more than ${MAX_SHARE_ROWS} sharing rows. Only the first ${MAX_SHARE_ROWS} were read.`);
     }
-  }, null, { quietIfOff: true });
-  const terrParent = new Map(territories.items.map((t) => [t.id, t.parentId]));
-  const activeTerr = new Set(territories.items.map((t) => t.id));
-
-  progress("Reading who the record is shared with");
-  const shares = { available: false, rows: [], truncated: false };
-  const sm = await shareMeta(api, objectApi);
-  if (!sm) {
-    out.notes.push(`${ctx.object.plural} have no sharing table (this is normal when everyone already has access, or when the parent record decides), so there are no manual shares, sharing rules or teams to show.`);
-  } else {
-    await soft(out, "The record's sharing rows", async () => {
-      const { records } = await api.query(
-        `SELECT UserOrGroupId, ${sm.accessField}, RowCause FROM ${sm.name} WHERE ${sm.parentField} = ${soqlString(rec.id)} LIMIT ${MAX_SHARE_ROWS}`
-      );
-      shares.available = true;
-      shares.truncated = records.length >= MAX_SHARE_ROWS;
-      shares.rows = records.map((r) => ({ who: r.UserOrGroupId, level: r[sm.accessField], cause: r.RowCause }));
-    }, null);
-    if (shares.truncated) out.notes.push(`The record has more than ${MAX_SHARE_ROWS} sharing rows. Only the first ${MAX_SHARE_ROWS} were read.`);
-  }
+    return { o, shares };
+  })());
 
   // Cases and Opportunities: what the parent account's own sharing gives to its cases or opportunities.
-  const account = await readAccountAccess(api, rec, objectApi, out);
-  if (account?.truncated) out.notes.push(`The account has more than ${MAX_SHARE_ROWS} sharing rows. Only the first ${MAX_SHARE_ROWS} were read.`);
-
-  // Names of the groups and users the record is shared with.
-  const groups = new Map();
-  const shareUsers = [];
-  const allRows = [...shares.rows, ...(account?.rows || [])];
-  const groupIds = uniq([...allRows.map((r) => r.who).filter((w) => w.startsWith("00G")), rec.ownerKind === "queue" ? rec.ownerId : null]);
-  const userIds = uniq(allRows.map((r) => r.who).filter((w) => w.startsWith("005")));
-  await soft(out, "The groups the record is shared with", async () => {
-    for (const part of chunk(groupIds, ID_CHUNK)) {
-      const { records } = await api.query(`SELECT ${GROUP_FIELDS} FROM Group WHERE Id IN (${list(part)})`);
-      for (const g of records) groups.set(g.Id, toGroup(g));
-    }
-  }, null);
-  await soft(out, "The users the record is shared with", async () => {
-    for (const part of chunk(userIds, ID_CHUNK)) {
-      const { records } = await api.query(`SELECT Id, Name, UserRoleId FROM User WHERE Id IN (${list(part)})`);
-      for (const u of records) shareUsers.push({ id: u.Id, name: u.Name, roleId: u.UserRoleId || null });
-    }
-  }, null);
-
-  // Groups that give access to managers, and a queue that owns the record: which roles their members have.
-  const memberRoles = {};
-  const isTerrGroup = (g) => /^Territory/.test(g.type) && g.relatedId && g.includeBosses;
-  const bossTargets = uniq([
-    ...[...groups.values()].filter((g) => (g.type === "Regular" || isTerrGroup(g)) && g.includeBosses && allRows.some((r) => r.who === g.id)).map((g) => g.id),
-    rec.ownerKind === "queue" ? rec.ownerId : null,
-  ]);
-  const targetInfo = new Map([...groups.values()].filter(isTerrGroup).map((g) => [g.id, { type: g.type, relatedId: g.relatedId }]));
-  if (bossTargets.length && roles.length) {
-    progress("Reading the members of groups that give access to managers");
-    const found = await soft(out, "The members of the groups that give access to managers", () => readMemberRoles(api, bossTargets, roleParent, terrParent, targetInfo), null);
-    if (found) Object.assign(memberRoles, found);
-  }
+  const accountU = tick((async () => {
+    const o = blank();
+    const account = await readAccountAccess(api, rec, objectApi, o, ofRecord);
+    if (account?.truncated) o.notes.push(`The account has more than ${MAX_SHARE_ROWS} sharing rows. Only the first ${MAX_SHARE_ROWS} were read.`);
+    return { o, account };
+  })());
 
   // Do object permissions exist for this kind of record at all? (Task and Event have none.)
-  let permissionsApply = null;
-  await soft(out, "Whether object permissions apply", async () => {
-    permissionsApply = (await api.count(`SELECT COUNT() FROM ObjectPermissions WHERE SobjectType = ${soqlString(objectApi)}`)) > 0;
-  }, null);
+  const permU = tick((async () => {
+    const o = blank();
+    let permissionsApply = null;
+    await soft(o, "Whether object permissions apply", async () => {
+      permissionsApply = await ofRecord(`permissionsApply:${objectApi}`, async () => (await api.count(`SELECT COUNT() FROM ObjectPermissions WHERE SobjectType = ${soqlString(objectApi)}`)) > 0);
+    }, null);
+    return { o, permissionsApply };
+  })());
 
-  const outUsers = [];
-  for (const pick of users) {
-    progress(`Reading ${pick.name}`);
+  // Names of the groups and users the record is shared with (they need the sharing rows).
+  const namesU = tick((async () => {
+    const [{ shares }, { account }] = await Promise.all([sharesU, accountU]);
+    const o1 = blank();
+    const o2 = blank();
+    const groups = new Map();
+    const shareUsers = [];
+    const allRows = [...shares.rows, ...(account?.rows || [])];
+    const groupIds = uniq([...allRows.map((r) => r.who).filter((w) => w.startsWith("00G")), rec.ownerKind === "queue" ? rec.ownerId : null]);
+    const userIds = uniq(allRows.map((r) => r.who).filter((w) => w.startsWith("005")));
+    await Promise.all([
+      soft(o1, "The groups the record is shared with", async () => {
+        const found = await ofRecord(`groupNames:${groupIds.join(",")}`, async () => {
+          const all = [];
+          for (const part of chunk(groupIds, ID_CHUNK)) {
+            const { records } = await api.query(`SELECT ${GROUP_FIELDS} FROM Group WHERE Id IN (${list(part)})`);
+            all.push(...records.map(toGroup));
+          }
+          return all;
+        });
+        for (const g of found) groups.set(g.id, g);
+      }, null),
+      soft(o2, "The users the record is shared with", async () => {
+        const found = await ofRecord(`shareUsers:${userIds.join(",")}`, async () => {
+          const all = [];
+          for (const part of chunk(userIds, ID_CHUNK)) {
+            const { records } = await api.query(`SELECT Id, Name, UserRoleId FROM User WHERE Id IN (${list(part)})`);
+            for (const u of records) all.push({ id: u.Id, name: u.Name, roleId: u.UserRoleId || null });
+          }
+          return all;
+        });
+        shareUsers.push(...found);
+      }, null),
+    ]);
+    return { o: { notes: [...o1.notes, ...o2.notes], warnings: [...o1.warnings, ...o2.warnings] }, groups, shareUsers, allRows };
+  })());
+
+  // Groups that give access to managers, and a queue that owns the record: which roles their members have.
+  const membersU = tick((async () => {
+    const [{ groups, allRows }, { roles, roleParent }, { terrParent, territories }] = await Promise.all([namesU, rolesU, terrU]);
+    const o = blank();
+    const memberRoles = {};
+    const isTerrGroup = (g) => /^Territory/.test(g.type) && g.relatedId && g.includeBosses;
+    const bossTargets = uniq([
+      ...[...groups.values()].filter((g) => (g.type === "Regular" || isTerrGroup(g)) && g.includeBosses && allRows.some((r) => r.who === g.id)).map((g) => g.id),
+      rec.ownerKind === "queue" ? rec.ownerId : null,
+    ]);
+    const targetInfo = new Map([...groups.values()].filter(isTerrGroup).map((g) => [g.id, { type: g.type, relatedId: g.relatedId }]));
+    if (bossTargets.length && roles.length) {
+      const found = await soft(o, "The members of the groups that give access to managers", () =>
+        ofRecord(`members:${bossTargets.join(",")}:${roles.length}:${territories.items.length}`, () => readMemberRoles(api, bossTargets, roleParent, terrParent, targetInfo)), null);
+      if (found) Object.assign(memberRoles, found);
+    }
+    return { o, memberRoles };
+  })());
+
+  // One user. Their own reads start at once; only the group walk waits for their role and territories.
+  async function readUser(pick) {
     const uo = blank();
-    const { records } = await api.query(
+    const soft2 = (what, fn, fb, o) => soft(uo, () => `${pick.name}: ${what}`, fn, fb, o);
+    const userP = api.query(
       `SELECT Id, Name, Username, IsActive, UserType, Profile.Name, UserRoleId, UserRole.Name FROM User WHERE Id = ${soqlString(pick.id)}`
-    );
-    const u = records[0];
-    if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
-    const label = u.Name;
-    const soft2 = (what, fn, fb, o) => soft(uo, `${label}: ${what}`, fn, fb, o);
+    ).then((r) => r.records[0]);
+    userP.catch(() => {}); // the failure is raised below; do not report it twice
     const user = {
-      id: u.Id, name: u.Name, username: u.Username, isActive: u.IsActive === true, userType: u.UserType || "Standard",
-      profile: u.Profile?.Name || "", roleId: u.UserRoleId || null, roleName: u.UserRole?.Name || "",
+      id: pick.id, name: pick.name, username: "", isActive: false, userType: "Standard",
+      profile: "", roleId: null, roleName: "",
       sf: null, parentSf: null, whoSf: null, object: null, memberOf: [], territoryIds: [], teamRole: null, accountTeamRole: null, childCounts: null,
     };
-    const roleChain = user.roleId ? chainAbove(roleParent, user.roleId) : [];
-    const terrIds = territories.on
-      ? await soft2("Territory assignments", async () => {
-          const { records: a } = await api.query(`SELECT Territory2Id FROM UserTerritory2Association WHERE UserId = ${soqlString(u.Id)}`);
-          return a.map((x) => x.Territory2Id).filter((id) => activeTerr.has(id));
-        }, [], { quietIfOff: true })
-      : [];
-    user.territoryIds = terrIds;
-    const terrChain = uniq(terrIds.flatMap((t) => chainAbove(terrParent, t)));
-
-    await Promise.all([
-      soft2("Salesforce's own access answer", async () => { user.sf = await readSf(api, u.Id, rec.id); }, null),
+    const upGroups = new Map();
+    // The assignments are asked for while the territory list is still coming in (the answer is only used when territories are on).
+    const assignedQ = api.query(`SELECT Territory2Id FROM UserTerritory2Association WHERE UserId = ${soqlString(pick.id)}`);
+    assignedQ.catch(() => {}); // an org without territories fails this on purpose; it is looked at only when territories are on
+    const terrAssignP = soft2("Territory assignments", async () => {
+      const { territories, activeTerr } = await terrU;
+      if (!territories.on) return [];
+      const { records: a } = await assignedQ;
+      return a.map((x) => x.Territory2Id).filter((id) => activeTerr.has(id));
+    }, [], { quietIfOff: true });
+    const hasAccount = !!(ACCOUNT_CHILD_LEVEL[objectApi] && rec.accountId);
+    const parts = [
+      soft2("Salesforce's own access answer", async () => { user.sf = await readSf(api, pick.id, rec.id); }, null),
       rec.parentId && ctx.owd.internal === "ControlledByParent"
-        ? soft2("Access on the parent record", async () => { user.parentSf = await readSf(api, u.Id, rec.parentId); }, null)
+        ? soft2("Access on the parent record", async () => { user.parentSf = await readSf(api, pick.id, rec.parentId); }, null)
         : null,
       rec.whoId && ctx.owd.internal === "ControlledByParent"
-        ? soft2("Access on the person the record is about", async () => { user.whoSf = await readSf(api, u.Id, rec.whoId); }, null)
+        ? soft2("Access on the person the record is about", async () => { user.whoSf = await readSf(api, pick.id, rec.whoId); }, null)
         : null,
-      soft2("Object access (profile and permission sets)", async () => { user.object = await readObjectSets(api, u.Id, objectApi); }, null),
+      soft2("Object access (profile and permission sets)", async () => { user.object = await readObjectSets(api, pick.id, objectApi); }, null),
       soft2("Groups and queues", async () => {
-        const up = await readGroupsAbove(api, u.Id, roleChain, terrChain);
+        const [u, { roleParent }, ids, { terrParent }] = await Promise.all([userP, rolesU, terrAssignP, terrU]);
+        if (!u) return; // reported as "not found" below
+        const roleChain = u.UserRoleId ? chainAbove(roleParent, u.UserRoleId) : [];
+        const terrChain = uniq(ids.flatMap((t) => chainAbove(terrParent, t)));
+        const up = await readGroupsAbove(api, pick.id, roleChain, terrChain);
         user.memberOf = up.edges;
-        for (const [id, g] of up.groups) if (!groups.has(id)) groups.set(id, g);
+        for (const [id, g] of up.groups) upGroups.set(id, g);
       }, null),
-      soft2("Team membership", async () => { user.teamRole = await readTeamRole(api, objectApi, rec.id, u.Id); }, null, { quietIfOff: true }),
-      account ? soft2("Account team membership", async () => { user.accountTeamRole = await readTeamRole(api, "Account", account.id, u.Id); }, null, { quietIfOff: true }) : null,
-      isAccount ? soft2("Child records", async () => { user.childCounts = await readChildCounts(api, rec.id, u.Id); }, null) : null,
-    ].filter(Boolean));
-    out.notes.push(...uo.notes);
-    out.warnings.push(...uo.warnings);
-    outUsers.push(user);
+      soft2("Team membership", async () => { user.teamRole = await readTeamRole(api, objectApi, rec.id, pick.id); }, null, { quietIfOff: true }),
+      hasAccount ? soft2("Account team membership", async () => { user.accountTeamRole = await readTeamRole(api, "Account", rec.accountId, pick.id); }, null, { quietIfOff: true }) : null,
+      isAccount ? soft2("Child records", async () => { user.childCounts = await readChildCounts(api, rec.id, pick.id); }, null) : null,
+    ].filter(Boolean);
+    const [u, terrIds] = await Promise.all([userP, terrAssignP]);
+    await Promise.all(parts);
+    if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
+    if (u.Name !== pick.name) { // notes were worded with the picked name; use the name Salesforce holds
+      const fix = (t) => (t.startsWith(`${pick.name}: `) ? `${u.Name}: ${t.slice(pick.name.length + 2)}` : t);
+      uo.notes = uo.notes.map(fix);
+      uo.warnings = uo.warnings.map(fix);
+    }
+    Object.assign(user, {
+      id: u.Id, name: u.Name, username: u.Username, isActive: u.IsActive === true, userType: u.UserType || "Standard",
+      profile: u.Profile?.Name || "", roleId: u.UserRoleId || null, roleName: u.UserRole?.Name || "", territoryIds: terrIds,
+    });
+    return { user, uo, upGroups };
   }
+  const userUs = users.map((pick) => tick(readUser(pick)));
 
-  // Role and territory groups of the share list that no chosen user reaches still need their names.
-  const object = { ...ctx.object, grantByHierarchy: null, permissionsApply: permissionsApply === false ? false : true };
+  // Everything is under way. Gather it, always in the same order, so the notes read the same way every time.
+  const [R, T, S, A, N, M, P, ...U] = await Promise.all([rolesU, terrU, sharesU, accountU, namesU, membersU, permU, ...userUs]);
+  const out = blank();
+  out.notes.push(...ctx.notes);
+  out.warnings.push(...ctx.warnings);
+  for (const x of [R, T, S, A, N, M, P]) { out.notes.push(...x.o.notes); out.warnings.push(...x.o.warnings); }
+  const groups = N.groups;
+  for (const x of U) {
+    for (const [id, g] of x.upGroups) if (!groups.has(id)) groups.set(id, g);
+    out.notes.push(...x.uo.notes);
+    out.warnings.push(...x.uo.warnings);
+  }
+  const object = { ...ctx.object, grantByHierarchy: null, permissionsApply: P.permissionsApply === false ? false : true };
   return {
     schema: ACCESS_SCHEMA,
     record: rec, owd: ctx.owd, object,
-    roles, territories, shares, account, groups: [...groups.values()], shareUsers, memberRoles,
-    users: outUsers, notes: out.notes, warnings: out.warnings,
+    roles: R.roles, territories: T.territories, shares: S.shares, account: A.account, groups: [...groups.values()], shareUsers: N.shareUsers, memberRoles: M.memberRoles,
+    users: U.map((x) => x.user), notes: out.notes, warnings: out.warnings,
+    ...(keptUsed && cache.recAt !== null ? { kept: { at: cache.recAt } } : {}), // record facts served from an earlier Explain, and when they were first read
   };
 }

@@ -167,6 +167,31 @@ takes a pasted link or Id, which is also how the dev server is used).
   unchanged): GET failures that are a dropped connection or HTTP 500/502/503/504 or errorCode SERVER_UNAVAILABLE (only with a 5xx
   status or none) are retried twice (300 ms, 1 s; delays and sleep are injectable for tests). Any 4xx is never retried,
   whatever its errorCode; nor are query errors.
+- How `readRecordAccess` reads (recordaccessread.js): every area is a promise started at once, chained only where it needs
+  another (group names need the share rows and account rows; manager-group members need group names, roles and territories;
+  a user's group walk needs their role chain and territory chain). Both users run together. `withLimit(api, MAX_IN_FLIGHT = 6)`
+  wraps `get` (one GET holds a place, never a whole chain, so no deadlock); an api already limited is not wrapped again. Each
+  area collects its notes in its own `blank()` and they are merged in a fixed order (roles, territories, shares, account, names,
+  members, permissions, then each user), so notes read the same whatever finished first. Per-user notes are worded with the
+  picked name and renamed to Salesforce's name if it differs. The user's territory assignments are asked for while the territory
+  list is still loading and used only when territories are on. Progress is "Reading… (n of m)", counted per area (7 + users).
+- Page-session cache (`createReadCache()`, `clearRecordFacts(cache)`; the page holds one in `state.cache`): `org` (roles,
+  territories) and `rec` (share rows, record territories, account rows/owner/owner role, group and share-user names, manager-group
+  members, permission count; keyed by record Id and emptied when the record changes, and by `useRecord`). A read that failed is
+  never kept (also not one that makes territories "off": that failing call is made again each time). Cached values are cloned on
+  the way out. Memory only: no chrome.storage, localStorage or files. Pass no cache and nothing is kept.
+- Salesforce's label next to a route (`sfLabelFor(key)` in recordaccess.js; `route.sfLabel`, `difference.items[].sfLabel`; page
+  `sfLabelNode`, class `sf-label`; plain text "Route n (gives X; Salesforce: LABEL):"). Confirmed on the View Sharing Hierarchy page
+  (a sandbox): "Manager of Territory Member" for `shareTerrAbove` and `shareBossTerr` (also `acct:` ones), "Manager of Group Member" for
+  `shareBossGroup`, "Manager of Queue Member" for `ownerQueueBoss`, "Manager of User" for `acct:ownerRole` and for the account route
+  shared with a specific user (`acct:shareBoss:` whose detail has `type "shareBoss"`, `whoId` and `acct`; `sfLabelFor(key, detail)`
+  decides from the detail because both shareBoss variants share a key prefix). Not tagged: `shareBoss` to a role group, the record-level
+  `shareBoss` to a user, the record-level `ownerRole`. Do not add a label that was not seen on that page. To add one: add it to
+  `SF_LABEL_BY_KIND` or `SF_LABEL_BY_KEY` (or the detail test in `sfLabelFor`), plus a test.
+- Kept-facts line: `readRecordAccess` adds `facts.kept = {at}` (ms time of the first read) only when some of the record's own facts came
+  from the cache (`cache.recAt` is set at the first read and reset by `clearRecordFacts` or a new record); otherwise no `kept`. The page
+  (`#kept`, `renderKept`) shows "Who this record is shared with was read at HH:MM ... Read it again"; the button is `readAgain`
+  (clears the record facts, runs Explain again with the same users). Org-wide lists may stay kept; the line is about the record's sharing.
 - A difference item carries `limited` and `effective` like the person's card; `givesText(item)` words it ("Would give
   edit access, limited to view by object permissions"), for the page and the copied text.
 - Tasks and events (WhatId and WhoId): the parent is WhatId and the person is WhoId (`whoId`, user

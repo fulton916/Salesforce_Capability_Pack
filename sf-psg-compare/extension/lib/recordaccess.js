@@ -433,6 +433,30 @@ function acctScope(ctx) {
   return { key: "acct:", many, name, rows: a.rows || [], lead: `The ${ctx.label.toLowerCase()} belongs to account '${name}'` };
 }
 
+/** Salesforce's own word for a reason, as the "View Sharing Hierarchy" page labels it (opened from the record: Sharing, then
+ *  View Sharing Hierarchy). Only labels that were checked there are listed; a route kind that is not in the list shows no tag.
+ *  To add one: check it on that page, then add a line (route key without its "acct:" start, or the whole key for an account
+ *  route that has its own entry). */
+const SF_LABEL_BY_KIND = {
+  shareTerrAbove: "Manager of Territory Member", // assigned to a territory above one the record (or its account) is shared with
+  shareBossTerr: "Manager of Territory Member", // role above someone who gets that territory's access
+  shareBossGroup: "Manager of Group Member", // a share to a public group that also reaches managers; role above a member
+  ownerQueueBoss: "Manager of Queue Member", // role above a member of the owner queue
+};
+const SF_LABEL_BY_KEY = {
+  "acct:ownerRole": "Manager of User", // role above the account owner's role (a case or opportunity)
+};
+
+/** Salesforce's label for a route, or null when none has been checked. Works from the route key; `detail` (the route's
+ *  detail) settles the one kind whose key is shared: "shareBoss" is confirmed only for an account shared with a specific user. */
+export function sfLabelFor(key, detail) {
+  const k0 = String(key || "");
+  if (SF_LABEL_BY_KEY[k0]) return SF_LABEL_BY_KEY[k0];
+  const kind = k0.replace(/^acct:/, "").split(":")[0];
+  if (kind === "shareBoss") return detail && detail.type === "shareBoss" && detail.whoId && detail.acct ? "Manager of User" : null;
+  return SF_LABEL_BY_KIND[kind] || null;
+}
+
 function routesFor(u, name, ctx, sf) {
   const routes = [];
   const notes = [];
@@ -451,7 +475,7 @@ function routesFor(u, name, ctx, sf) {
     const base = known ? raw : "view";
     const effective = lower(base, capLevel);
     const prior = routes.find((x) => x.key === r.key);
-    const route = { ...r, access: known ? raw : null, effective, limited: known && rank(effective) < rank(raw) };
+    const route = { ...r, access: known ? raw : null, effective, limited: known && rank(effective) < rank(raw), sfLabel: sfLabelFor(r.key, r.detail) };
     if (prior) { if (rank(effective) > rank(prior.effective)) routes[routes.indexOf(prior)] = route; return; }
     routes.push(route);
   };
@@ -954,7 +978,7 @@ function difference(x, y, ctx, via) {
       const mine = y.routes.filter((q) => topicOf(q) === topicOf(r)).reduce((m, q) => (rank(q.effective) > rank(m.effective) ? q : m));
       if (rank(mine.effective) >= rank(r.effective)) continue;
       items.push({
-        route: r.summary, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x),
+        route: r.summary, sfLabel: r.sfLabel || null, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x),
         missing: [mine.limited
           ? `${y.name} has this route too, but ${y.name}'s object permissions limit it to ${GIVES[mine.effective] || "no access"}.`
           : `${y.name} has this route too, but it gives only ${GIVES[mine.effective] || "no access"}.`], change: [],
@@ -963,7 +987,7 @@ function difference(x, y, ctx, via) {
     }
     if (hasInFacts(r, y, ctx)) { const v = viaOther(r, x, y, ctx); if (v && via) via.push(v); continue; } // y has it after all (for example it was left out of y's routes): never say they lack it
     const m = missingFor(r, y, y.name, ctx);
-    items.push({ route: r.summary, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x), missing: [m.missing], change: m.change ? [m.change] : [] });
+    items.push({ route: r.summary, sfLabel: r.sfLabel || null, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x), missing: [m.missing], change: m.change ? [m.change] : [] });
   }
   return items;
 }
@@ -1072,7 +1096,7 @@ export function toPlainText(res) {
     if (u.gateText) L.push(`  ${u.gateText}`);
     else if (!u.routes.length) L.push("  No route found that gives access.");
     u.routes.forEach((rt, i) => {
-      L.push(`  Route ${i + 1} (${rt.access ? `${u.inactive ? "would give" : "gives"} ${GIVES[rt.access]}${rt.limited ? `, limited to ${GIVES[rt.effective] || "no access"} by object permissions` : ""}` : "how much access it gives is not known"}):`);
+      L.push(`  Route ${i + 1} (${rt.access ? `${u.inactive ? "would give" : "gives"} ${GIVES[rt.access]}${rt.limited ? `, limited to ${GIVES[rt.effective] || "no access"} by object permissions` : ""}` : "how much access it gives is not known"}${rt.sfLabel ? `; Salesforce: ${rt.sfLabel}` : ""}):`);
       L.push(`    ${rt.steps.join(" -> ")}`);
     });
     if (u.parentLine) L.push(`  ${u.parentLine}`);
@@ -1090,7 +1114,7 @@ export function toPlainText(res) {
     if (d.gate) L.push(`  ${d.gate}`);
     if (d.levelNote) L.push(`  ${d.levelNote}`);
     for (const it of d.items) {
-      L.push(`  - ${it.route}${it.gives ? ` (${givesText(it).replace(/^(\w)/, (c) => c.toLowerCase())})` : ""}`);
+      L.push(`  - ${it.route}${it.gives ? ` (${givesText(it).replace(/^(\w)/, (c) => c.toLowerCase())})` : ""}${it.sfLabel ? ` (Salesforce: ${it.sfLabel})` : ""}`);
       for (const m of it.missing) L.push(`      Missing: ${m}`);
       for (const c of it.change) L.push(`      What would change it: ${c}`);
     }

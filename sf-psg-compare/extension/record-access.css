@@ -30,6 +30,8 @@
 .gives { font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 9px; background: var(--good-bg); color: var(--good); }
 .gives.unknown { background: var(--diff-bg); color: var(--muted); }
 .gives.limited { background: var(--warn-bg); color: var(--b); }
+.kept { font-size: 13px; margin: 0 0 10px; }
+.sf-label { font-size: 12px; font-weight: 400; color: var(--muted); }
 .chain { list-style: none; margin: 8px 0 0; padding: 0; font-size: 14px; }
 .chain li { padding: 2px 0 2px 18px; position: relative; }
 .chain li + li::before { content: "\2192"; position: absolute; left: 0; color: var(--muted); }
