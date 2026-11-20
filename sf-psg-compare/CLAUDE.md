@@ -2,8 +2,8 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with four read-only tools,
-named in the toolbar menu "Compare permission set groups", "Look up user access", "Territory & role hierarchy" and "Where is it used in flows?". It reads the
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with five read-only tools,
+named in the toolbar menu "Compare permission set groups", "User access summary and comparison", "Territory & role hierarchy", "Why can a user see this record?" and "Where is it used in flows?". It reads the
 org through the REST API with the user's existing browser session and never writes to the org.
 Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
 Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
@@ -15,11 +15,11 @@ Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and deve
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all four pages.
+- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all five pages.
 - `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
 - `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
-## Look up user access (second tool)
+## User access summary and comparison (second tool)
 
 A read-only page, `extension/user-access.html`, that shows one user's access (profile and license,
 role, permission set groups, permission sets with "directly / through group", permission set
@@ -80,7 +80,86 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
   usernames or emails, so say so); names that repeat are told apart by path, never by name alone; the tree's
   load does not read users.
 
-## Where is it used in flows? (fourth tool)
+## Why can a user see this record? (fourth tool)
+
+A read-only page, `extension/record-access.html`, that explains how one user can see the record open
+in the current Salesforce tab, and with two users why one sees it and the other doesn't. Links
+`psg-compare.css` and `user-access.css`, and adds `record-access.css`. The popup button reads the active
+tab's address with `recordIdFromUrl` and opens `record-access.html?host=<host>&record=<id>`; with no
+record in the address the button stays enabled and the page opens with an empty record box (a box
+takes a pasted link or Id, which is also how the dev server is used).
+
+- `extension/lib/recordaccess.js` — pure, tested: `recordIdFromUrl`, `to18`, `explain(facts, userIds)`
+  (routes per user as chains of plain steps, `mismatch`, `difference`, `verdict`, `notes`),
+  `toPlainText`, `owdText`, `causeInfo`. Facts shape: schema `sf-record-access/1` (see the demo file).
+- `extension/lib/recordaccessread.js` — `readRecordContext(api, id)` (record, owner, parent, org-wide
+  default; throws plain `Error`s) and `readRecordAccess(api, ctx, users)` (everything else; each area fails
+  softly into `notes` / `warnings`). SELECT, COUNT and describe only.
+- `extension/record-access.js` — the page. `?host=`, `?dev=1`, `?demo=1`, plus `&record=`. Demo:
+  `http://127.0.0.1:8765/record-access.html?demo=1` (`samples/record_access_demo.json`, made up).
+- Tests: `tests/record_access_tests.mjs` (reasoning, mismatches, a faked org, the guard).
+- Rules that matter: **the verdict comes only from `UserRecordAccess`**; routes are explanation. When
+  they do not agree, `mismatch` says so with likely causes, never as fact. Route levels are capped by
+  the user's object permissions. A user with no Read on the object has no routes (`gate`), unless
+  `object.permissionsApply === false` (Task, Event: no ObjectPermissions rows exist, the reader checks
+  with a COUNT) or Salesforce says the user can see the record (safety net, with a note). Group
+  membership is worked out upward with a visited set (loops are safe) and a depth cap. The headline
+  is `sfLevel` (what the user can do); `sfShareLevel` (HasAllAccess counts) is what sharing gives, and a
+  gap is `limitText`. `objectCap` follows Salesforce: Modify All (or Modify All Data) is full, Edit + Delete is
+  full, Edit alone is edit, Read (or View All) is view. Never describe a user with Read, Edit and Delete as
+  limited. No UserRecordAccess row (inactive user) is `inactive`, not a mismatch.
+- Manager routes: `readMemberRoles` (reader, exported for tests) walks DOWN from groups with
+  `DoesIncludeBosses` that the record is shared with, and from an owner queue, through groups, role,
+  role-and-subordinates and territory groups (visited set, MAX_DEPTH, MAX_MEMBER_GROUPS,
+  MAX_MEMBER_USERS, `capped` flag). Facts: `memberRoles[groupId] = {roles: [{roleId, example, count}],
+  users, capped}`. `explain` finds a member whose role is strictly below the user's (`membersBelow`).
+- Access through the account (Cases and Opportunities with an `AccountId`; `recordaccess.js` `acctScope`,
+  `shareRows(rows, scope)`; reader `readAccountAccess`): the record's own share rows and the parent
+  account's share rows go through the same loop, so groups (nested), roles, role-and-subordinates,
+  territories, bosses-groups and role-above are reused. Facts: `facts.account = {id, name, rows:[{who,
+  level, cause}], truncated, owner:{id, name, roleId, level}}`, and `user.accountTeamRole`. The reader
+  selects `UserOrGroupId, RowCause, CaseAccessLevel` (or `OpportunityAccessLevel`) from `AccountShare`
+  for the account (one query, LIMIT 2000) and drops None and Owner rows. The owner's level is the Owner
+  row's level, with `UserRole.CaseAccessForAccountOwner` / `OpportunityAccessForAccountOwner` as
+  fallback. Routes have keys and topics prefixed `acct:` and `detail.acct`, so they take part in topic
+  matching and `hasInFacts`. An account route starts "The case belongs to account 'X'" and says
+  "...which gives <level> access to the account's cases". A None row gives no route. The object-permission
+  cap applies as for other routes. Extra queries: 1 account name, 1 AccountShare, 1 owner, 1 role, plus 1
+  AccountTeamMember per user. Territory routes on the account come only from AccountShare Territory rows.
+  Contacts are not covered.
+- Confirmed live (sandbox, read-only queries): `AccountShare.CaseAccessLevel`, `OpportunityAccessLevel`,
+  `ContactAccessLevel`; `UserRole.*AccessForAccountOwner`; the Owner row equals the role setting; Team,
+  Manual, Rule, Territory and Territory2AssociationManual rows carry their own levels; ImplicitParent
+  rows are None. Consistent with the data but not proven: people above an account holder or the account
+  owner in the role hierarchy get the same level. Not tested: that role-above route for Cases.
+- Still not covered: contacts through the account, "manager of a territory member" and territory groups
+  that include bosses, restriction and scoping rules, Experience Cloud sharing sets, which specific
+  sharing rule. Access through the account is only as complete as the account's first 2000 share rows.
+- Routes may carry a `topic` (same way in reached differently: a territory through a share row or the
+  territory list, one group share as member or as manager, the owner queue as member or as boss, a
+  direct share of the same RowCause). The difference matches by topic and, before printing any
+  "X is not ..." line, `hasInFacts` checks X's own facts. Never print a lack that X's facts disprove. A route
+  whose grantee or member is the other user (a share to them, they own the record, they are in the group)
+  counts as held by them; `viaOther` then says "X is above Y" (`difference.via`) instead of a missing line.
+  Territory names that repeat are shown with their parent ("EM (under EMEA Region)"), never by name alone.
+  A team route that only restates the owner is dropped. "Explain the parent record" passes `a=` and `b=`
+  (user Ids) in the address; `readUserById` puts them back. Not built, and the page must not deny it:
+  "manager of a territory member" routes.
+- Tasks and events (WhatId and WhoId): the parent is WhatId and the person is WhoId (`whoId`, user
+  `whoSf`). The parent route is only added when Salesforce says the user can see the record; otherwise
+  `parentLine` says the parent condition is met but not enough, with the unseen person as the likely
+  reason (seen in a sandbox: related account visible, related contact not, task not visible), or says
+  it could not tell. Do not state "whoever can see the parent can see them" as a general rule.
+- The two-user difference compares by what sharing gives first, lists every route the other user
+  lacks (even when both have routes) and a `levelNote`.
+- Not covered (also in the page's Notes and the README): restriction and scoping rules, Experience
+  Cloud sharing sets, field-level access, which sharing rule (the share row does not name it), shares to
+  manager groups, the custom-object "Grant Access Using Hierarchies" setting (assumed on), members
+  beyond the walk caps. Not verified live: share-table field names,
+  RowCause values, territory association values, how group components appear in
+  `PermissionSetAssignment` (component sets of a group are skipped; the group's own aggregate set is used).
+
+## Where is it used in flows? (fifth tool)
 
 A read-only page, `extension/flow-usage.html`, that finds the flows using a field (object + field), or containing a
 text or record Id, and shows the step in each flow with what it does (sets / checks / uses); and, when only an object
@@ -161,10 +240,11 @@ Account records"). Links `psg-compare.css` and adds `flow-usage.css`.
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
   "is the sandbox PSG the same as production?" → Compare permission set groups.
-- "What can this user access?", "how do these two users differ?" → Look up user access.
+- "What can this user access?", "how do these two users differ?" → User access summary and comparison.
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
 - "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.
+- "Why can (or can't) this user see this record?", "why does A see it and B not?" → the record access page.
 - "Which flows use this field?", "what does each flow do with it?", "which flows mention this record Id?",
   "which flows run when an Account is saved, and in what order?", "which flows change or read Accounts?" → Where is it used in flows?
 

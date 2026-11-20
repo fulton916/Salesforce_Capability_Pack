@@ -72,7 +72,7 @@ function showOrg(o, host, via) {
   // Built from orgParts() so a missing value is left out: replaceChildren(null) would print "null".
   const parts = orgParts(o, host, via).map((p) => el(p.tag, { class: p.cls, text: p.text }));
   $("#org").replaceChildren(...parts.flatMap((n, i) => (i ? [" ", n] : [n])));
-  document.title = `Look up user access – ${o.name || host}`;
+  document.title = `User access summary and comparison – ${o.name || host}`;
 }
 
 async function connect() {

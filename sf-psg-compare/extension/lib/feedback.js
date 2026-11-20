@@ -12,6 +12,7 @@ export const FEEDBACK_TOOLS = {
   psg: "PSG Compare (extension)",
   access: "User access (extension)",
   hierarchy: "Territory & role hierarchy (extension)",
+  record: "Why can a user see this record? (extension)",
   flows: "Where is it used in flows (extension)",
   menu: "Extension menu / other",
 };
