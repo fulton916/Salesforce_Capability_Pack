@@ -1,7 +1,7 @@
 # sf-psg-compare
 
-A Chrome extension with four read-only tools: **Compare permission set groups**, **User access summary and comparison**,
-**Territory & role hierarchy**, and **Why can a user see this record?**
+A Chrome extension with five read-only tools: **Compare permission set groups**, **User access summary and comparison**,
+**Territory & role hierarchy**, **Why can a user see this record?** and **Where is it used in flows?**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -25,6 +25,11 @@ Why can a user see this record?:
 - How can this user see the record I have open: owner, role hierarchy, a sharing rule, a team, a
   territory, a manual share, the org-wide default, View All?
 - Why can one user see it and another can't, and what would change that?
+
+Where is it used in flows?:
+- I am about to change how Account records work. Which flows run when one is created, updated or deleted, in what order, and which other flows change or read Account records?
+- I am about to change a field. Which flows use it, what does each one do with it (set it, check it, or just use it), and can I get the list into Excel?
+- Which flows contain this text, or this record Id?
 
 ## Known limits
 
@@ -94,6 +99,74 @@ the dev server: `?dev=1`. The popup opens it as `hierarchy.html?host=<org host>`
 Not checked against a live org yet: the reads were tested only against faked answers, and the page only
 in the demo.
 
+## Where is it used in flows?
+
+Finds the flows that use an object, a field, a piece of text or a record Id, and shows the step inside each flow.
+
+- One search box. Type an object (label or API name) and pick it: the page at once shows the **object view** (below).
+  Then type a field of that object and pick it to see which flows use that field. Suggestions show the label first and
+  the API name second. To look for a piece of text or a record Id instead, type it and choose "Find this text in flows".
+  A record Id matches in its 15 and 18 character forms.
+- From the toolbar menu the box starts filled in: on a field's page in Setup (Object Manager) the object and field (the
+  field search runs), on a record page, an object's list view or an object's Setup page the object (the object view runs).
+  Ids in a Setup address (01I objects, 00N fields) are turned into names with two small reads.
+- By default it reads the active version of each active flow. "Also look in inactive flows and drafts" adds the latest
+  version of every flow where that is not the active one (it applies to the object view too). Contents are read a few at a
+  time, with "Reading flows: 37 of 212" shown, kept in memory for the page session, and reused for every search: a field
+  search after the object view (or the reverse) reads nothing again.
+
+**Object view** ("I am about to change how Account records work"):
+- **Before the record is saved**, **After the record is saved** and **Before the record is deleted**: the record-triggered
+  flows of that object, in the order Salesforce documents: active flows with a trigger order of 1 to 1000 first (lowest
+  first, each showing "Trigger order 10"), then the flows with no trigger order, then 1001 to 2000. Flows with the same
+  trigger order run in alphabetical order of their API names. Salesforce runs the flows with no trigger order in the order
+  they were activated; that date is not available to the page, so they sit in a marked block, listed by API name in plain
+  character order (capitals before lowercase, as Setup's Flow Trigger Explorer sorts them) and not numbered, with a plain note that their real order is not known. Flows that are
+  not active do not run: they come last in their group, unnumbered, marked "Not active (does not run)", and show when
+  "Also look in inactive flows and drafts" is ticked. Each flow shows its label, when it runs
+  (created, updated, created or updated, deleted), active or not, its entry conditions in words ("Account Status equals
+  Closed"; a formula is "has a formula condition"; none is "No entry conditions") and any scheduled or run-asynchronously
+  paths. **Process Builder processes** on the object have their own part between "before" and "after": they run after the
+  record is saved, before the after-save flows, and Salesforce does not promise an order among them, so they are listed
+  by name and not numbered.
+- **Runs on a schedule over these records**: scheduled flows whose start element names the object.
+- **Other flows that change these records** (create, update or delete steps) and **other flows that only read them** (Get
+  Records), each with its steps. A flow that both reads and changes the records is listed once, under "change", with
+  all its steps; "only read" holds flows that change nothing.
+- The object is matched by API name, never by label (two objects can share a label). The trigger object comes from the
+  flow list's `TriggerObjectOrEvent.QualifiedApiName`, or from the flow's own start element when the list does not say.
+- What the flow list alone says (the triggered flows, their order, when they run) shows first; the entry conditions, the
+  schedules and the other flows fill in as the contents are read. "Download for Excel (.csv)" is available once everything
+  is read: one row per flow step, or one row for a flow with none.
+- No created or activation date is read, so the object view makes no extra call. Give each flow a trigger order in Setup
+  (Flow Trigger Explorer, Edit Order) when the order matters. The CSV has a "Trigger order" column (blank when none) and a
+  "Run order" column ("Runs in this order", "No trigger order: order not known" or "Not active").
+
+**Field view**:
+- Results: a summary ("Used in 7 flows, 5 of them active"), then one entry per flow with its type in plain words, active or
+  not, which version was read, an "Open in Flow Builder" link, and its steps: "Update Records 'Update Account': sets Status__c".
+  **sets** is a value put into the field (create or update records, an assignment), **checks** is a filter, a decision
+  condition or an entry condition, anything else is **uses** (formulas, text, screens, actions). The field is found through
+  `$Record`, `$Record__Prior`, record variables (Process Builder's current and old too), what Get Records stored, loop
+  items (also loops over a related list such as `$Record.Contacts`, typed from the object's describe) and relationship
+  paths such as `$Record.Account.Owner.Email`.
+- **Possible matches** lists steps where a field of that name appears but the flow does not say which object it belongs to
+  (for example a record variable with no type, or a relationship that can point at several objects), and steps that save a
+  whole record from a variable ("saves a whole Account record, so it may set this field"). **Could not look inside**
+  lists the flows whose contents Salesforce did not return, mainly flows from installed packages, so nothing is skipped
+  silently; flows with a version Id have an "Open in Flow Builder" link. Raw error text is folded under "Technical details" and "Notes".
+- "Download for Excel (.csv)": one row per flow step, with "How sure" saying Sure or Possible, and one row for each flow
+  that could not be looked inside.
+- Not covered: Apex, validation rules, workflow rules, page layouts and anything else that is not a flow; Apex-defined types.
+
+Try it: `python tools/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/flow-usage.html?demo=1> (made-up flows). Against an org through the dev server: `?dev=1`.
+The popup opens it as `flow-usage.html?host=<org host>` plus `object=` and `field=` from the open Salesforce page.
+
+Checked against a live sandbox (read-only, through the dev server): the flow list and contents reads and the matching on
+real flows (about 260 readable flows, read in about a minute), and the object view's list of triggered flows for Account.
+Not checked: the toolbar button inside Chrome, opening the CSV in Excel, the "Open in Flow Builder" links, Process Builder (the sandbox has none).
+
 ## Install (unpacked, for your own browser)
 
 1. Copy this folder anywhere.
@@ -118,10 +191,11 @@ push it by policy.
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
-   and four buttons: **Compare permission set groups** ("Find out how two permission set groups
+   and five buttons: **Compare permission set groups** ("Find out how two permission set groups
    differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
-   **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel") and
-   **Why can a user see this record?** ("Explain who can see the record open in this tab, and why").
+   **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
+   **Why can a user see this record?** ("Explain who can see the record open in this tab, and why") and
+   **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id").
    On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
    The record button reads the record Id from the address of the tab. On a Salesforce tab with no
    record open it stays enabled, says "Open a record first", and the page opens with an empty record
@@ -395,7 +469,7 @@ keep the old `licence` spelling so saved files still load. Saved group files use
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.4.0", and all four tool pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.5.0", and all five tool pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -464,6 +538,11 @@ Open <http://127.0.0.1:8765/psg-compare.html?dev=1> or `user-access.html?dev=1`,
 | `extension/record-access.*` | The Why can a user see this record? page (html, js, and extra css on top of `psg-compare.css` and `user-access.css`) |
 | `extension/lib/recordaccess.js` | `recordIdFromUrl`, the route reasoning, the two-user difference, the verdict and the plain-text export. Pure, no browser APIs |
 | `extension/lib/recordaccessread.js` | Reads the facts for it from the org (`SELECT`, `COUNT()` and describe only; each area fails softly into notes) |
+| `extension/flow-usage.*` | The Where is it used in flows? page (html, js, and extra css on top of `psg-compare.css`) |
+| `extension/lib/flowscan.js` | Looks inside one flow version for a field, text or an Id; also lists each record element's object and operation (get, create, update, delete), the trigger and how the flow starts (`startInfo`). Pure, no browser APIs |
+| `extension/lib/flowobject.js` | The object view: groups, run order, entry conditions in words, changes and reads, CSV. Pure, no browser APIs |
+| `extension/lib/flowread.js` | Reads the flow list (`FlowDefinitionView`) and one flow version at a time (Tooling `Flow.Metadata`), `SELECT` only |
+| `extension/lib/urlcontext.js` | Turns a Salesforce page address into an object and field. Pure |
 | `extension/lib/sfconn.js` | Session lookup and REST client (query with paging, describe) |
 | `extension/lib/snapshot.js` | Reads one group into a snapshot |
 | `extension/lib/compare.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
@@ -471,5 +550,5 @@ Open <http://127.0.0.1:8765/psg-compare.html?dev=1> or `user-access.html?dev=1`,
 | `extension/lib/pick.js` | Matching for the group search box |
 | `extension/lib/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `tools/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `extension/samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), for the demos and the tests (the hierarchy samples are written by hand, not by `make_samples.py`) |
+| `extension/samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |
