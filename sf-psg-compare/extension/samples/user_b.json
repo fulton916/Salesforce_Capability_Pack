@@ -148,6 +148,27 @@
         "sourceText": "Their profile",
         "orgDefault": false,
         "orgDefaultText": "Not checked"
+      },
+      {
+        "key": "Integration_Settings__c.Api_Token__c",
+        "label": "Integration Settings: Api Token",
+        "setting": {
+          "api": "Integration_Settings__c",
+          "label": "Integration Settings"
+        },
+        "field": {
+          "api": "Api_Token__c",
+          "label": "Api Token"
+        },
+        "type": "string",
+        "hidden": true,
+        "value": null,
+        "valueId": "demo-b-2",
+        "valueText": "Hidden (looks like a key)",
+        "source": "profile",
+        "sourceText": "Their profile",
+        "orgDefault": null,
+        "orgDefaultText": "Hidden (looks like a key)"
       }
     ]
   },

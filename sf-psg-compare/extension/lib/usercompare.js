@@ -61,6 +61,35 @@ const normValue = (type, v) => {
 /** True when two values of one field mean the same thing. */
 export const sameValue = (type, x, y) => normValue(type, x) === normValue(type, y);
 
+export const HIDDEN_TEXT = "Hidden (looks like a key)";
+export const HIDDEN_NOTE = "Values of fields named like a key, token, secret or password are hidden.";
+const SECRET_WORDS = /key|token|secret|password|passwd|pwd|credential|private/i;
+
+/** True when a field's API name or label looks secret-like. Checkboxes are never hidden. Over-hiding (e.g. "Keyword") is fine. */
+export function isSecretLike(field) {
+  if (!field || field.type === "boolean") return false;
+  return SECRET_WORDS.test(String(field.name || field.api || "")) || SECRET_WORDS.test(String(field.label || ""));
+}
+
+/** A short one-way fingerprint, so two hidden values can be told apart without keeping either one. */
+function fingerprint(v) {
+  if (v === null || v === undefined || v === "") return "";
+  const t = String(v);
+  let h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (let i = 0; i < t.length; i++) {
+    const c = t.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 0x01000193) >>> 0;
+    h2 = Math.imul(h2 + c + i, 0x85ebca6b) >>> 0;
+  }
+  return `${h1.toString(16)}${h2.toString(16)}${t.length}`;
+}
+
+/** True when two items' values are the same. Hidden items are compared by fingerprint (the value itself is not kept). */
+function sameItemValue(x, y) {
+  if (x.hidden || y.hidden) return !!x.hidden === !!y.hidden && (x.valueId || "") === (y.valueId || "");
+  return sameValue(x.type, x.value, y.value);
+}
+
 /**
  * Salesforce's hierarchy rule, field by field: the lowest level where the field is not null wins
  * (this user, then their profile, then the org default). `rows` are the setting's rows whose
@@ -84,11 +113,31 @@ export function resolveHierarchy(fields, rows, { userId, profileId, orgId }) {
   });
 }
 
+/** A list item for a secret-like field: no value is kept, only the hidden text and a fingerprint for comparing. */
+function hiddenItem(setting, r) {
+  return {
+    key: `${setting.api}.${r.name}`,
+    label: `${setting.label}: ${r.label}`,
+    setting: { api: setting.api, label: setting.label },
+    field: { api: r.name, label: r.label },
+    type: r.type,
+    hidden: true,
+    value: null,
+    valueId: fingerprint(r.value),
+    valueText: HIDDEN_TEXT,
+    source: r.source,
+    sourceText: SOURCE_TEXT[r.source] || "",
+    orgDefault: null,
+    orgDefaultText: HIDDEN_TEXT,
+  };
+}
+
 /** The fields of one setting whose effective value differs from the org default, as list items. */
 export function settingItems(setting, fields, rows, ids) {
   return resolveHierarchy(fields, rows, ids)
+    .map((r) => ({ ...r, hidden: isSecretLike(r) }))
     .filter((r) => !sameValue(r.type, r.value, r.orgDefault))
-    .map((r) => ({
+    .map((r) => r.hidden ? hiddenItem(setting, r) : ({
       key: `${setting.api}.${r.name}`,
       label: `${setting.label}: ${r.label}`,
       setting: { api: setting.api, label: setting.label },
@@ -122,6 +171,11 @@ export function customSettingsSkippedNote(...accesses) {
   const n = Math.max(0, ...accesses.map((a) => a?.customSettingsInfo?.skippedFields || 0));
   if (!n) return "";
   return `${plural(n, "field", "fields")} of ${n === 1 ? "a special type is" : "special types are"} not shown.`;
+}
+
+/** The one-sentence reason for hidden values. "" when nothing is hidden in any of the given users. */
+export function customSettingsHiddenNote(...accesses) {
+  return accesses.some((a) => itemsOf(a, "customSettings").some((i) => i.hidden)) ? HIDDEN_NOTE : "";
 }
 
 /** Plain note: some custom settings could not be read for this user. "" when all could. */
@@ -243,7 +297,7 @@ export function compareUsers(a, b) {
       else if (ia && !ib) status = "onlyA";
       else if (!ia && ib) status = "onlyB";
       else if (k === "permissionSets" && howText(ia) !== howText(ib)) status = "differ";
-      else if (k === "customSettings" && !sameValue(ia.type, ia.value, ib.value)) status = "differ";
+      else if (k === "customSettings" && !sameItemValue(ia, ib)) status = "differ";
       let detailA = detailText(k, ia, ib);
       let detailB = detailText(k, ib, ia);
       if (status === "unreadA") detailA = `Could not be read for ${names.a}`;
@@ -351,6 +405,7 @@ export function toRows(result, onlySection = null) {
       line(customSettingsLine(result.a), customSettingsLine(result.b));
       line(customSettingsSkippedNote(result.a, result.b), "");
       line(customSettingsFailedNote(result.a), customSettingsFailedNote(result.b));
+      line(customSettingsHiddenNote(result.a, result.b), "");
     }
     for (const r of result.sections[k]) {
       rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : oneLine(r.detailA) || "No", r.b ? oneLine(r.detailB) || "Yes" : oneLine(r.detailB) || "No"]);
@@ -365,7 +420,7 @@ export function toRowsSingle(access, onlySection = null) {
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
     if (k === "customSettings") {
-      for (const note of [customSettingsLine(access), customSettingsSkippedNote(access), customSettingsFailedNote(access)]) {
+      for (const note of [customSettingsLine(access), customSettingsSkippedNote(access), customSettingsFailedNote(access), customSettingsHiddenNote(access)]) {
         if (note) rows.push([access.user.name, access.user.username, SECTION_TITLES[k], "Note", "", note]);
       }
     }

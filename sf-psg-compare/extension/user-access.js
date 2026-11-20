@@ -4,7 +4,7 @@ import { searchUsers, readUserAccess } from "./lib/useraccess.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
   matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
-  userCardLines, orgParts, SINGLE_VALUE_KEYS, customSettingsLine, customSettingsSkippedNote, customSettingsFailedNote,
+  userCardLines, orgParts, SINGLE_VALUE_KEYS, customSettingsLine, customSettingsSkippedNote, customSettingsFailedNote, customSettingsHiddenNote,
 } from "./lib/usercompare.js";
 import { startLiveReload } from "./lib/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
@@ -484,6 +484,7 @@ function renderTable() {
     const lines = sides.flatMap((s) => [customSettingsLine(state.sides[s].access), customSettingsFailedNote(state.sides[s].access)]
       .map((text) => (text ? el("div", {}, who(s), text) : null)))
       .concat(customSettingsSkippedNote(...sides.map((s) => state.sides[s].access)) || null)
+      .concat(customSettingsHiddenNote(...sides.map((s) => state.sides[s].access)) || null)
       .filter(Boolean).map((n) => (n instanceof Node ? n : el("div", { text: n })));
     if (lines.length) parts.push(el("div", { class: "cs-count" }, lines));
   }

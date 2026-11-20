@@ -10,6 +10,7 @@ import { searchUsers, readUserAccess } from "../extension/lib/useraccess.js";
 import {
   compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
   resolveHierarchy, settingItems, customSettingsLine, valueText, customSettingsSkippedNote, customSettingsFailedNote,
+  isSecretLike, customSettingsHiddenNote, HIDDEN_TEXT, HIDDEN_NOTE,
 } from "../extension/lib/usercompare.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -461,6 +462,65 @@ export async function run(test) {
     { api, label: api.replace("__c", "") }, [{ name: field, label: field.replace("__c", ""), type }],
     [row(IDS.orgId, { [field]: orgDefault }), row(source === "user" ? IDS.userId : IDS.profileId, { [field]: value })], IDS)[0];
   const withCs = (name, items, info) => ({ ...mk(name, { customSettings: items }), customSettingsInfo: info });
+
+  await test("secret-like custom setting fields: name rule", () => {
+    assert.equal(isSecretLike({ name: "Profile_Key__c", label: "Profile", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Api_Token__c", label: "x", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Client_Secret__c", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Pw__c", label: "Admin PASSWORD", type: "string" }), true, "label match, any case");
+    assert.equal(isSecretLike({ name: "X__c", label: "Private info", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Use_Key__c", label: "Use key", type: "boolean" }), false, "checkbox exempt");
+    assert.equal(isSecretLike({ name: "Batch_Size__c", label: "Batch size", type: "double" }), false);
+  });
+
+  await test("a hidden field that differs is listed with the hidden text everywhere and the raw value never appears", () => {
+    const RAW = "RAWSECRET-0123456789-abcdef";
+    const RAW2 = "OTHERSECRET-9876543210-fedcba";
+    const field = { name: "Profile_Key__c", label: "Profile Key", type: "string" };
+    const mkItems = (userVal, orgVal) => settingItems({ api: "S__c", label: "S" }, [field], [row(IDS.orgId, { Profile_Key__c: orgVal }), row(IDS.userId, { Profile_Key__c: userVal })], IDS);
+    const itemsA = mkItems(RAW, "ORGDEFAULT-RAW-VALUE");
+    assert.equal(itemsA.length, 1, "a hidden field that differs is still listed");
+    assert.equal(itemsA[0].valueText, HIDDEN_TEXT);
+    assert.equal(itemsA[0].orgDefaultText, HIDDEN_TEXT);
+    assert.equal(mkItems("ORGDEFAULT-RAW-VALUE", "ORGDEFAULT-RAW-VALUE").length, 0, "equal to the org default is not listed");
+    const a = withCs("Ann", itemsA, { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const b = withCs("Bob", mkItems(RAW2, "ORGDEFAULT-RAW-VALUE"), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const c = withCs("Cy", mkItems(RAW, "ORGDEFAULT-RAW-VALUE"), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const none = withCs("Dee", [], { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    assert.equal(compareUsers(a, b).sections.customSettings[0].status, "differ", "different hidden values still differ");
+    assert.equal(compareUsers(a, c).sections.customSettings[0].status, "same", "equal hidden values are the same");
+    const r = compareUsers(a, none);
+    assert.equal(r.sections.customSettings[0].detailB, `Same as the org default: ${HIDDEN_TEXT}`);
+    const all = JSON.stringify([singleRows(a, "customSettings"), compareUsers(a, b).sections, r.sections, toRows(compareUsers(a, b)), toRows(r, "customSettings"), toRowsSingle(a), toRowsSingle(a, "customSettings"), toCsv(toRows(compareUsers(a, b))), toCsv(toRowsSingle(a)), itemsA]);
+    for (const raw of [RAW, RAW2, "ORGDEFAULT-RAW-VALUE"]) assert.ok(!all.includes(raw), `${raw} must not appear`);
+    assert.ok(singleRows(a, "customSettings")[0].detail.includes(HIDDEN_TEXT));
+    assert.ok(toCsv(toRowsSingle(a)).includes(HIDDEN_TEXT));
+    assert.ok(toCsv(toRows(compareUsers(a, b))).includes(HIDDEN_TEXT));
+  });
+
+  await test("the hidden-values note appears only when something is hidden", () => {
+    const hid = withCs("Ann", settingItems({ api: "S__c", label: "S" }, [{ name: "Api_Token__c", label: "Api Token", type: "string" }], [row(IDS.userId, { Api_Token__c: "x" })], IDS), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const plain = withCs("Bob", [csItem("Auto__c", "Bypass__c", true, "user", false)], { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    assert.equal(customSettingsHiddenNote(hid), HIDDEN_NOTE);
+    assert.equal(customSettingsHiddenNote(plain), "");
+    assert.equal(customSettingsHiddenNote(plain, hid), HIDDEN_NOTE);
+    const notes = (rows) => rows.filter((r) => r.includes("Note") && r.includes(HIDDEN_NOTE)).length;
+    assert.equal(notes(toRowsSingle(hid)), 1);
+    assert.equal(notes(toRowsSingle(plain)), 0);
+    assert.equal(notes(toRows(compareUsers(hid, plain))), 1);
+    assert.equal(notes(toRows(compareUsers(plain, plain))), 0);
+    assert.equal(notes(toRows(compareUsers(hid, plain), "customSettings")), 1);
+  });
+
+  await test("demo samples show the hidden text for the token field", () => {
+    const a = validateAccess(sample("user_a.json"));
+    const b = validateAccess(sample("user_b.json"));
+    assert.equal(customSettingsHiddenNote(a, b), HIDDEN_NOTE);
+    const r = compareUsers(a, b);
+    const t = r.sections.customSettings.find((x) => x.key === "Integration_Settings__c.Api_Token__c");
+    assert.equal(t.status, "differ");
+    assert.match(t.detailA, /Hidden \(looks like a key\)/);
+  });
 
   await test("compare matches custom setting values by API name and shows who differs", () => {
     const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false), csItem("Integ__c", "Size__c", 200, "user", 50, "double")]);
