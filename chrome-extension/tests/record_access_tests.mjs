@@ -1,0 +1,2081 @@
+// Offline tests for the "Why can a user see this record?" page. Called from run_tests.mjs with its shared `test` function.
+// Synthetic data only.
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
+
+import { SfApi, SalesforceError } from "../shared/sfconn.js";
+import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, sfLabelFor, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
+import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry, withLimit, createReadCache, clearRecordFacts, MAX_IN_FLIGHT } from "../tools/record-access/record-access-read.js";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const ext = (...p) => path.join(here, "..", ...p);
+
+// ---------- synthetic facts ----------
+
+const ID = {
+  rec: "001000000000001AAA",
+  alice: "005000000000001AAA", bob: "005000000000002AAA", maria: "005000000000003AAA", carl: "005000000000004AAA",
+  top: "00E000000000001AAA", mid: "00E000000000002AAA", low: "00E000000000003AAA", other: "00E000000000004AAA",
+  gEmea: "00G000000000001AAA", gUk: "00G000000000002AAA", gRole: "00G000000000003AAA", gQueue: "00G000000000004AAA",
+  gTerr: "00G000000000005AAA", gTerrSub: "00G000000000006AAA", gOrg: "00G000000000007AAA", gBosses: "00G000000000008AAA",
+  t1: "0MI000000000001AAA", t2: "0MI000000000002AAA",
+};
+
+const SF_NONE = { read: false, edit: false, delete: false, transfer: false, all: false, max: "None" };
+const SF_VIEW = { read: true, edit: false, delete: false, transfer: false, all: false, max: "Read" };
+const SF_EDIT = { read: true, edit: true, delete: false, transfer: false, all: false, max: "Edit" };
+const SF_ALL = { read: true, edit: true, delete: true, transfer: true, all: true, max: "All" };
+
+const PROFILE = (over = {}) => ({ kind: "profile", name: "Standard User", read: true, create: true, edit: true, delete: false, viewAll: false, modifyAll: false, viewAllData: false, modifyAllData: false, ...over });
+
+const user = (id, name, over = {}) => ({
+  id, name, username: `${name.split(" ")[0].toLowerCase()}${id.slice(12, 15)}@example.invalid`, isActive: true, userType: "Standard", profile: "Standard User",
+  roleId: null, roleName: "", sf: SF_NONE, parentSf: null, object: { sets: [PROFILE()] }, memberOf: [], territoryIds: [], teamRole: null, childCounts: null, ...over,
+});
+
+const grp = (id, type, name, relatedId = null, includeBosses = false) => ({ id, type, name, relatedId, includeBosses });
+
+/** top > mid > low, and `other` under top. */
+function facts(over = {}) {
+  const base = {
+    schema: "sf-record-access/1",
+    record: { id: ID.rec, object: "Account", name: "Contoso (sample)", ownerId: ID.maria, ownerKind: "user", ownerName: "Maria Keller", ownerRoleId: ID.low, parentId: null, parentObjectLabel: "", parentName: "" },
+    owd: { internal: "Private", external: "Private" },
+    object: { api: "Account", label: "Account", plural: "Accounts", custom: false, grantByHierarchy: null },
+    roles: [
+      { id: ID.top, parentId: null, name: "Sales Director" },
+      { id: ID.mid, parentId: ID.top, name: "UK Manager" },
+      { id: ID.low, parentId: ID.mid, name: "UK Rep" },
+      { id: ID.other, parentId: ID.top, name: "France Rep" },
+    ],
+    territories: { on: false, items: [], record: [] },
+    shares: { available: true, truncated: false, rows: [{ who: ID.maria, level: "All", cause: "Owner" }] },
+    groups: [], shareUsers: [], users: [], notes: [], warnings: [],
+  };
+  return { ...base, ...over };
+}
+
+const only = (res, i = 0) => res.users[i];
+const kinds = (u) => u.routes.map((r) => r.key);
+
+export async function run(test) {
+  // ---------- record Id from an address ----------
+
+  await test("record access: Id from Lightning addresses", () => {
+    const base = "https://acme.lightning.force.com";
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/Account/001000000000001AAA/view`), "001000000000001AAA");
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/Account/001000000000001AAA/edit`), "001000000000001AAA");
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/Account/001000000000001AAA/related/Contacts/view?ws=%2Flightning`), "001000000000001AAA");
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/001000000000001/view`), "001000000000001");
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/My_Thing__c/a0B000000000001AAA/view`), "a0B000000000001AAA");
+    assert.equal(recordIdFromUrl(`${base}/lightning/r/ProductConsumed/a0B000000000001AAA/view`), "a0B000000000001AAA");
+  });
+
+  await test("record access: Id from Classic and console addresses", () => {
+    assert.equal(recordIdFromUrl("https://acme.my.salesforce.com/001000000000001AAA"), "001000000000001AAA");
+    assert.equal(recordIdFromUrl("https://acme.my.salesforce.com/001000000000001?retURL=%2Fhome"), "001000000000001");
+    assert.equal(recordIdFromUrl("https://acme.my.salesforce.com/001000000000001AAA/e"), "001000000000001AAA");
+    assert.equal(recordIdFromUrl("https://na1.salesforce.com/console#%2F001000000000001AAA"), "001000000000001AAA");
+    assert.equal(recordIdFromUrl("https://acme.lightning.force.com/one/one.app#/sObject/001000000000001AAA/view"), "001000000000001AAA");
+    assert.equal(recordIdFromUrl("  001000000000001AAA "), "001000000000001AAA"); // a pasted Id
+  });
+
+  await test("record access: Setup, list and other pages give no Id", () => {
+    const base = "https://acme.lightning.force.com";
+    for (const u of [
+      `${base}/lightning/setup/ObjectManager/Account/Details/view`,
+      `${base}/lightning/setup/PermSetGroups/page?address=%2F0PG000000000001AAA`,
+      `${base}/lightning/o/Account/list?filterName=Recent`,
+      `${base}/lightning/page/home`,
+      `${base}/lightning/r/Account/view`,
+      "https://acme.my.salesforce.com/setup/forcecomHomepage.apexp",
+      "https://acme.my.salesforce.com/001/o",
+      "https://acme.my.salesforce.com/home/home.jsp",
+      "chrome://extensions", "", null, undefined, "not a url",
+    ]) assert.equal(recordIdFromUrl(u), null, String(u));
+  });
+
+  await test("record access: bad Ids are refused", () => {
+    for (const bad of ["001000000000001A", "00100000000000", "001-00000000001AAA", "ProductConsumed", "001000000000001AAAA", "0010000000000 1AAA"]) {
+      assert.equal(looksLikeId(bad), false, bad);
+      assert.equal(recordIdFromUrl(bad), null, bad);
+    }
+    assert.equal(recordIdFromUrl("https://acme.lightning.force.com/lightning/r/Account/00100000000000/view"), null);
+  });
+
+  await test("record access: 15 to 18 character Ids", () => {
+    assert.equal(to18("001000000000001"), "001000000000001AAA");
+    assert.equal(to18("001D000000IqhSL"), "001D000000IqhSLIAZ");
+    assert.equal(to18("001000000000001AAA"), "001000000000001AAA");
+  });
+
+  // ---------- each route ----------
+
+  await test("record access: the owner has a route with full access", () => {
+    const f = facts({ users: [user(ID.maria, "Maria Keller", { sf: SF_ALL })] });
+    const u = only(explain(f));
+    assert.deepEqual(kinds(u), ["owner"]);
+    assert.equal(u.routes[0].access, "full");
+    assert.match(u.routes[0].steps[0], /Maria Keller owns this record/);
+    assert.equal(u.mismatch, null);
+    assert.match(explain(f).verdict, /Maria Keller has full access to this record\./);
+  });
+
+  await test("record access: a queue owner, directly and through a group inside the queue", () => {
+    const rec = { ...facts().record, ownerId: ID.gQueue, ownerKind: "queue", ownerName: "Support Queue", ownerRoleId: null };
+    const groups = [grp(ID.gQueue, "Queue", "Support Queue"), grp(ID.gEmea, "Regular", "Support Team")];
+    const direct = facts({ record: rec, groups, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gQueue, memberId: ID.alice }] })] });
+    let u = only(explain(direct));
+    assert.deepEqual(kinds(u), ["ownerQueue"]);
+    assert.match(u.routes[0].steps.join(" | "), /owned by queue 'Support Queue' \| .*is a direct member of queue 'Support Queue'/);
+    const nested = facts({ record: rec, groups, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }, { groupId: ID.gQueue, memberId: ID.gEmea }] })] });
+    u = only(explain(nested));
+    assert.deepEqual(kinds(u), ["ownerQueue"]);
+    assert.match(u.routes[0].steps.join(" | "), /Queue 'Support Queue' includes public group 'Support Team'/);
+    const outside = facts({ record: rec, groups, users: [user(ID.bob, "Bob Jones", { sf: SF_NONE })] });
+    assert.deepEqual(kinds(only(explain(outside))), []);
+  });
+
+  await test("record access: a role above the owner's role (and not when it is not above, or the hierarchy is off)", () => {
+    const mk = (roleId, extra = {}) => facts({ ...extra, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId, roleName: roleId === ID.mid ? "UK Manager" : "x" })] });
+    let u = only(explain(mk(ID.mid)));
+    assert.deepEqual(kinds(u), ["ownerRole"]);
+    assert.match(u.routes[0].steps.at(-1), /role 'UK Manager' is above 'UK Rep' in the role hierarchy/);
+    assert.deepEqual(kinds(only(explain(mk(ID.other)))), []); // another branch
+    assert.deepEqual(kinds(only(explain(mk(ID.low)))), []); // same level is not above
+    const off = mk(ID.mid, { object: { api: "Thing__c", label: "Thing", plural: "Things", custom: true, grantByHierarchy: false } });
+    assert.deepEqual(kinds(only(explain(off))), []);
+  });
+
+  await test("record access: a manual share to the user, and to someone below them in the hierarchy", () => {
+    const rows = [{ who: ID.alice, level: "Edit", cause: "Manual" }, { who: ID.carl, level: "Read", cause: "Manual" }];
+    const f = facts({
+      shares: { available: true, rows },
+      shareUsers: [{ id: ID.carl, name: "Carl Brown", roleId: ID.low }],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, roleId: ID.mid, roleName: "UK Manager" }),
+      ],
+    });
+    const res = explain(f);
+    const alice = res.users[0];
+    assert.equal(alice.routes[0].steps[0], "Shared manually with Alice Smith");
+    assert.equal(alice.routes[0].access, "edit");
+    const bob = res.users[1];
+    assert.ok(bob.routes.some((r) => r.key.startsWith("shareBoss") && /Carl Brown/.test(r.steps[0]) && /is above 'UK Rep'/.test(r.steps[2])), JSON.stringify(bob.routes.map((r) => r.steps)));
+  });
+
+  await test("record access: a sharing rule to a nested public group, even when the groups include each other", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales"), grp(ID.gUk, "Regular", "UK Sales"), grp(ID.gRole, "RoleAndSubordinates", "", ID.mid)],
+      users: [user(ID.alice, "Alice Smith", {
+        sf: SF_VIEW, roleId: ID.low, roleName: "UK Rep",
+        memberOf: [
+          { groupId: ID.gUk, memberId: ID.gRole }, { groupId: ID.gEmea, memberId: ID.gUk },
+          { groupId: ID.gUk, memberId: ID.gEmea }, // loop
+        ],
+      })],
+    });
+    const u = only(explain(f));
+    assert.deepEqual(kinds(u), [`share:${k15(ID.gEmea)}:Rule`]);
+    assert.deepEqual(u.routes[0].steps, [
+      "Shared by a sharing rule with public group 'EMEA Sales'",
+      "Public group 'EMEA Sales' includes public group 'UK Sales'",
+      "Public group 'UK Sales' includes role 'UK Manager' and the roles below it",
+      "Alice Smith's role 'UK Rep' is below 'UK Manager'",
+    ]);
+    assert.equal(u.routes[0].access, "view");
+    assert.equal(u.mismatch, null);
+  });
+
+  await test("record access: a group the user is directly in, and a loop that never reaches the user", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.gEmea, level: "Edit", cause: "Manual" }] },
+      groups: [grp(ID.gEmea, "Regular", "A"), grp(ID.gUk, "Regular", "B")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, memberOf: [{ groupId: ID.gUk, memberId: ID.gEmea }, { groupId: ID.gEmea, memberId: ID.gUk }] }),
+      ],
+    });
+    const res = explain(f);
+    assert.match(res.users[0].routes[0].steps.at(-1), /Alice Smith is a direct member of public group 'A'/);
+    assert.deepEqual(kinds(res.users[1]), []);
+  });
+
+  await test("record access: role, role-and-subordinates and role-above groups", () => {
+    const groups = [grp(ID.gRole, "Role", "", ID.low), grp(ID.gUk, "RoleAndSubordinates", "", ID.mid), grp(ID.gEmea, "RoleAndSubordinatesInternal", "", ID.low)];
+    const rows = [
+      { who: ID.gRole, level: "Read", cause: "Rule" }, { who: ID.gUk, level: "Edit", cause: "Rule" }, { who: ID.gEmea, level: "Read", cause: "Manual" },
+    ];
+    const f = facts({
+      shares: { available: true, rows }, groups,
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.low, roleName: "UK Rep" }), // in all of them
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" }), // above all of them
+        user(ID.carl, "Carl Brown", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const a = res.users[0];
+    assert.ok(a.routes.some((r) => r.steps.join("|").includes("Shared by a sharing rule with role 'UK Rep'") && /Alice Smith's role is 'UK Rep'/.test(r.steps.at(-1))));
+    assert.ok(a.routes.some((r) => r.steps[0] === "Shared by a sharing rule with role 'UK Manager' and the roles below it" && /is below 'UK Manager'/.test(r.steps.at(-1))));
+    const b = res.users[1];
+    assert.ok(b.routes.length >= 3 && b.routes.every((r) => r.kind === "hierarchy" || r.key.startsWith("shareBoss")), JSON.stringify(b.routes.map((r) => r.key)));
+    assert.match(b.routes[0].steps.at(-1), /is above/);
+    assert.deepEqual(kinds(explain(f, [ID.carl]).users[0]), []);
+  });
+
+  await test("record access: territory and territory-and-subordinates groups, and the record's own territories", () => {
+    const territories = {
+      on: true,
+      items: [{ id: ID.t1, parentId: null, name: "EMEA" }, { id: ID.t2, parentId: ID.t1, name: "UK" }],
+      record: [{ id: ID.t2, cause: "Territory2AssignmentRule" }],
+    };
+    const groups = [grp(ID.gTerr, "Territory", "", ID.t2), grp(ID.gTerrSub, "TerritoryAndSubordinates", "", ID.t1)];
+    const f = facts({
+      territories, groups,
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "TerritoryRule" }, { who: ID.gTerrSub, level: "Read", cause: "Territory2AssociationManual" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t2] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1] }), // assigned above the record's territory
+        user(ID.carl, "Carl Brown", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const a = res.users[0];
+    assert.ok(a.routes.some((r) => r.steps[0] === "Shared through territory assignment with territory 'UK'" && r.steps.at(-1) === "Alice Smith is assigned to territory 'UK'"));
+    assert.ok(a.routes.some((r) => r.steps[0].endsWith("territory 'EMEA' and the territories below it") && /territory 'UK', which is below 'EMEA'/.test(r.steps.at(-1))));
+    // Bob's territory is above the record's, so only the standalone territory route and the subordinates group apply
+    const b = res.users[1];
+    assert.ok(b.routes.some((r) => r.key.startsWith("share:") && /territories below it/.test(r.steps[0])));
+    assert.ok(a.routes.every((r) => !r.key.startsWith("territory:")), "a share row already proves it");
+    // no territory share row at all: the record's territory and the user's assignment give a route
+    const noRows = facts({ territories, shares: { available: true, rows: [] }, users: [user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1] })] });
+    const r = only(explain(noRows)).routes[0];
+    assert.equal(r.key, `territory:${k15(ID.t2)}`);
+    assert.deepEqual(r.steps, ["The record is in territory 'UK' (by an assignment rule)", "Bob Jones is assigned to territory 'EMEA', which is above 'UK'"]);
+    assert.deepEqual(kinds(explain(f, [ID.carl]).users[0]), []);
+  });
+
+  await test("record access: a team share names the team role; implicit child access counts the records", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Team" }, { who: ID.bob, level: "Read", cause: "ImplicitChild" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, teamRole: "Sales Rep" }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, childCounts: { Opportunity: 2, Case: 0, Contact: 1 } }),
+      ],
+    });
+    const res = explain(f);
+    assert.equal(res.users[0].routes[0].steps[0], "Alice Smith is on the account team as 'Sales Rep'");
+    assert.equal(res.users[1].routes[0].steps[0], "Bob Jones owns 2 opportunities, 1 contact on this account, so Salesforce gives Bob Jones implicit access to it");
+    // no share row but child records: a route of its own
+    const g = facts({ shares: { available: true, rows: [] }, users: [user(ID.bob, "Bob Jones", { sf: SF_VIEW, childCounts: { Opportunity: 1, Case: 0, Contact: 0 } })] });
+    assert.deepEqual(kinds(only(explain(g))), ["implicitChild"]);
+  });
+
+  await test("record access: causes in plain words, Apex reasons and unknown codes", () => {
+    assert.match(causeInfo("Rule", "Account").phrase, /sharing rule/);
+    assert.match(causeInfo("Manual", "Account").phrase, /manually/);
+    assert.match(causeInfo("Team", "Opportunity").phrase, /opportunity team/);
+    assert.match(causeInfo("Team", "Case").phrase, /case team/);
+    assert.equal(causeInfo("Territory2AssociationManual", "Account").kind, "territory");
+    assert.equal(causeInfo("ImplicitParent", "Contact").kind, "implicit");
+    assert.equal(causeInfo("Partner_Access__c", "Thing__c").phrase, "Shared by the Apex sharing reason 'Partner Access'");
+    assert.equal(causeInfo("Weird", "Account").phrase, "Shared (reason code 'Weird')");
+  });
+
+  await test("record access: public org-wide default, internal and external", () => {
+    const f = facts({
+      owd: { internal: "Read", external: "Private" },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW }), user(ID.bob, "Bob Jones", { sf: SF_NONE, userType: "PowerPartner" })],
+    });
+    const res = explain(f);
+    assert.deepEqual(kinds(res.users[0]), ["owd"]);
+    assert.equal(res.users[0].routes[0].access, "view");
+    assert.match(res.users[0].routes[0].steps[0], /Accounts are Public Read Only/);
+    assert.deepEqual(kinds(res.users[1]), []);
+    assert.match(owdText("Private", "Accounts"), /^Accounts are Private: only the owner, people above them/);
+    assert.match(owdText("ReadWrite", "Accounts"), /Public Read\/Write/);
+    const rw = explain(facts({ owd: { internal: "ReadWrite", external: "Private" }, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT })] }));
+    assert.equal(rw.users[0].routes[0].access, "edit");
+  });
+
+  await test("record access: controlled by parent names the parent and uses the user's access on it", () => {
+    const f = facts({
+      owd: { internal: "ControlledByParent", external: "ControlledByParent" },
+      object: { api: "Contact", label: "Contact", plural: "Contacts", custom: false },
+      record: { ...facts().record, ownerId: null, ownerKind: null, ownerName: "", parentId: ID.rec, parentObjectLabel: "Account", parentName: "Contoso (sample)" },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, parentSf: SF_EDIT }), user(ID.bob, "Bob Jones", { sf: SF_NONE, parentSf: SF_NONE })],
+    });
+    const res = explain(f);
+    assert.equal(res.record.parentId, ID.rec);
+    assert.equal(res.record.parentName, "Contoso (sample)");
+    assert.deepEqual(kinds(res.users[0]), ["parent"]);
+    assert.equal(res.users[0].routes[0].access, "edit");
+    assert.match(res.users[0].routes[0].steps.join(" "), /Contacts depend on the record they belong to: Account 'Contoso \(sample\)'/);
+    assert.match(res.users[1].parentLine, /Bob Jones can't see it/);
+    assert.deepEqual(kinds(res.users[1]), []);
+    assert.match(res.record.owdText, /get their access from the record they belong to/);
+    assert.doesNotMatch(res.record.owdText, /whoever can see the parent can see them/);
+  });
+
+  await test("record access: the difference never says a user lacks a territory route they have (second user assigned to the record's territory)", () => {
+    const territories = {
+      on: true,
+      items: [{ id: ID.t1, parentId: null, name: "Traffic" }, { id: ID.t2, parentId: ID.t1, name: "69 - Rep" }],
+      record: [{ id: ID.t2, cause: "Territory2AssignmentRule" }],
+    };
+    const f = facts({
+      territories, groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [
+        user(ID.alice, "Scott Above", { sf: SF_ALL, territoryIds: [ID.t1] }), // above the record's territory: no territory share group reaches him
+        user(ID.bob, "April Own", { sf: SF_VIEW, territoryIds: [ID.t2], object: { sets: [PROFILE({ edit: false })] } }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const [a, b] = res.users;
+    assert.ok(a.routes.some((r) => r.key.startsWith("shareTerrAbove:")), "the user above gets a route through the territory share row");
+    assert.ok(a.routes.every((r) => !r.key.startsWith("territory:")), "the share-row route already covers the territory, so it is not listed twice");
+    assert.ok(b.routes.some((r) => r.key.startsWith("share:")), "the assigned user gets the share-row route");
+    assert.doesNotMatch(toPlainText(res), /April Own is not assigned to territory/);
+    const terrItem = res.difference.items.find((i) => /territory/.test(i.route));
+    assert.match(terrItem.missing[0], /April Own has this route too, but April Own's object permissions limit it to view access/);
+    // the other user's route is the one capped by object permissions, and the note says so
+    assert.match(res.difference.levelNote, /April Own has a route that would give edit access, but April Own's object permissions on Accounts hold April Own to view access/);
+  });
+
+  await test("record access: object permissions cap sharing like Salesforce (Read / Edit / Delete, Modify All)", () => {
+    const run = (setOver, sf) => only(explain(facts({ users: [user(ID.maria, "Maria Keller", { sf, object: { sets: [PROFILE(setOver)] } })] })));
+    // Read + Edit + Delete and full sharing: not limited
+    const full = run({ delete: true }, SF_ALL);
+    assert.equal(full.cap, "full");
+    assert.equal(full.routes[0].limited, false);
+    assert.equal(full.limitText, null);
+    assert.equal(full.mismatch, null);
+    // Delete from a second permission set counts too
+    const f2 = facts({ users: [user(ID.maria, "Maria Keller", { sf: SF_ALL, object: { sets: [PROFILE(), PROFILE({ kind: "permissionSet", name: "Deleter", read: false, edit: false, delete: true })] } })] });
+    assert.equal(only(explain(f2)).routes[0].limited, false);
+    // No Delete: limited to edit
+    const noDel = run({ delete: false }, SF_EDIT);
+    assert.equal(noDel.cap, "edit");
+    assert.equal(noDel.routes[0].limited, true);
+    assert.equal(noDel.routes[0].effective, "edit");
+    // Read only: limited to view
+    const ro = run({ edit: false, delete: false }, SF_VIEW);
+    assert.equal(ro.cap, "view");
+    assert.equal(ro.routes[0].effective, "view");
+    // Modify All needs no Delete flag
+    assert.equal(run({ edit: false, modifyAll: true }, SF_ALL).cap, "full");
+    // Sharing is full (HasAllAccess) but Read only on the object: the wording names what is held back
+    const res = explain(facts({ users: [user(ID.maria, "Maria Keller", { sf: { read: true, edit: false, delete: false, transfer: false, all: true }, object: { sets: [PROFILE({ edit: false })] } })] }));
+    assert.match(res.users[0].limitText, /only allow viewing/);
+  });
+
+  await test("record access: full access needs delete too (all + edit, no delete is edit)", () => {
+    const sfAllEditNoDelete = { read: true, edit: true, delete: false, transfer: false, all: true, max: "All" };
+    const run = (setOver, sf) => explain(facts({ users: [user(ID.maria, "Maria Keller", { sf, object: { sets: [PROFILE(setOver)] } })] }));
+    // all + edit + no delete: "can edit", sharing still full, and the limit line says why
+    const res = run({ delete: false }, sfAllEditNoDelete);
+    const u = only(res);
+    assert.equal(u.sfLevel, "edit");
+    assert.equal(u.sfShare, "full");
+    assert.match(u.sfText, /can edit/);
+    assert.match(res.verdict, /can edit this record/);
+    assert.doesNotMatch(res.verdict, /full access to this record\.\s*$/);
+    assert.match(u.limitText, /Sharing gives Maria Keller full access to this record, but Maria Keller's object permissions on .* only allow editing, not deleting, so Maria Keller can only edit it/);
+    // the route capped to edit matches Salesforce's answer of edit: no mismatch
+    assert.equal(u.routes[0].effective, "edit");
+    assert.equal(u.mismatch, null);
+    // all + edit + delete: full, no limit line
+    const full = only(run({ delete: true }, SF_ALL));
+    assert.equal(full.sfLevel, "full");
+    assert.equal(full.limitText, null);
+    // read only: view
+    assert.equal(sfLevel({ read: true, edit: false, delete: false, transfer: false, all: false }), "view");
+    assert.equal(sfLevel(sfAllEditNoDelete), "edit");
+  });
+
+  await test("record access: a route that goes through the other user is not listed as missing for that user", () => {
+    // Bob has a manual share; Alice is above Bob in the role hierarchy and so reaches the record through that share.
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.bob, level: "Edit", cause: "Manual" }] },
+      shareUsers: [{ id: ID.bob, name: "Bob Jones", roleId: ID.low }],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.mid, roleName: "UK Manager", object: { sets: [PROFILE({ delete: true })] } }),
+        user(ID.bob, "Bob Jones", { sf: SF_EDIT, roleId: ID.low, roleName: "UK Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    assert.ok(res.users[0].routes.some((r) => r.key.startsWith("shareBoss:")), "Alice has the role-above route");
+    assert.ok(res.users[1].routes.some((r) => r.key.startsWith("share:")), "Bob has the direct share");
+    const text = toPlainText(res);
+    assert.doesNotMatch(text, /does not reach the record through Bob Jones/);
+    assert.ok(res.difference.items.every((i) => !/who is below/.test(i.route)));
+    assert.match(res.difference.via.join(" "), /Alice Smith also reaches this record because Alice Smith is above Bob Jones/);
+    assert.match(text, /Alice Smith is above Bob Jones/);
+    // the owner's role route is held by the owner themself
+    const g = facts({ users: [
+      user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.mid, roleName: "UK Manager" }),
+      user(ID.maria, "Maria Keller", { sf: SF_EDIT, roleId: ID.low, roleName: "UK Rep" }),
+    ] });
+    assert.doesNotMatch(toPlainText(explain(g, [ID.alice, ID.maria])), /Maria Keller's role .* is not above/);
+    assert.doesNotMatch(toPlainText(explain(g, [ID.maria, ID.alice])), /Maria Keller is not the owner/);
+    // a group the other user is in, reached by Alice as a manager of its members, is not a gap either
+    const h = facts({
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      shares: { available: true, rows: [{ who: ID.gBosses, level: "Edit", cause: "Manual" }] },
+      memberRoles: { [ID.gBosses]: { roles: [{ roleId: ID.low, example: "Zed Low", count: 1 }], users: 1, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.mid, roleName: "UK Manager" }),
+        user(ID.bob, "Bob Jones", { sf: SF_EDIT, roleId: ID.other, roleName: "France Rep", memberOf: [{ groupId: ID.gBosses, memberId: ID.bob }] }),
+      ],
+    });
+    assert.doesNotMatch(toPlainText(explain(h, [ID.alice, ID.bob])), /Bob Jones is not in public group 'Field Teams'/);
+  });
+
+  await test("record access: implicit shares are written plainly", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.bob, level: "Read", cause: "ImplicitParent" }, { who: ID.alice, level: "Read", cause: "ImplicitChild" }] },
+      users: [user(ID.bob, "Dana Fields", { sf: SF_VIEW }), user(ID.alice, "Alice Smith", { sf: SF_VIEW })],
+    });
+    const res = explain(f);
+    assert.equal(res.users[0].routes[0].steps[0], "Shared implicitly with Dana Fields, through access to a related record (the parent of this record)");
+    assert.equal(res.users[1].routes[0].steps[0], "Shared implicitly with Alice Smith, through access to a child record of this record");
+    assert.doesNotMatch(toPlainText(res), /the user has access/);
+    const g = facts({
+      shares: { available: true, rows: [{ who: ID.bob, level: "Read", cause: "ImplicitParent" }] },
+      users: [user(ID.bob, "Dana Fields", { sf: SF_VIEW, childCounts: { Contact: 1 } })],
+    });
+    assert.equal(only(explain(g)).routes[0].steps[0], "Dana Fields owns 1 contact on this account, so Salesforce gives Dana Fields implicit access to it");
+  });
+
+  await test("record access: territories with the same name are told apart by where they sit", () => {
+    const T3 = "0MI000000000003AAA", T4 = "0MI000000000004AAA";
+    const territories = {
+      on: true,
+      items: [{ id: ID.t1, parentId: null, name: "EMEA Region" }, { id: ID.t2, parentId: ID.t1, name: "EM" }, { id: T3, parentId: null, name: "APAC Region" }, { id: T4, parentId: T3, name: "EM" }],
+      record: [{ id: ID.t2, cause: "Territory2AssignmentRule" }, { id: T4, cause: "Territory2AssignmentRule" }],
+    };
+    const f = facts({ territories, users: [user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t2, T4] })] });
+    const steps = only(explain(f)).routes.map((r) => r.steps[0]).sort();
+    assert.deepEqual(steps, ["The record is in territory 'EM (under APAC Region)' (by an assignment rule)", "The record is in territory 'EM (under EMEA Region)' (by an assignment rule)"]);
+    // same name under same-named parents: the whole path
+    const g = facts({
+      territories: { on: true, items: [
+        { id: ID.t1, parentId: null, name: "North" }, { id: T3, parentId: null, name: "North" },
+        { id: ID.t2, parentId: ID.t1, name: "EM" }, { id: T4, parentId: T3, name: "EM" },
+      ], record: [{ id: ID.t2, cause: "" }, { id: T4, cause: "" }] },
+      users: [user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t2, T4] })],
+    });
+    const names = only(explain(g)).routes.map((r) => r.steps[0]);
+    assert.equal(names.length, 2);
+    assert.notEqual(names[0], names[1]);
+    // a unique name stays plain
+    const h = facts({ territories: { on: true, items: [{ id: ID.t1, parentId: null, name: "Traffic" }], record: [{ id: ID.t1, cause: "" }] }, users: [user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1] })] });
+    assert.match(only(explain(h)).routes[0].steps[0], /territory 'Traffic'$/);
+  });
+
+  await test("record access: a team route that only restates the owner is shown once", () => {
+    const f = facts({
+      record: { ...facts().record, ownerId: ID.alice, ownerName: "Alice Smith" },
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Team" }, { who: ID.bob, level: "Edit", cause: "Team" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_ALL, teamRole: "Sales Rep", object: { sets: [PROFILE({ delete: true })] } }),
+        user(ID.bob, "Bob Jones", { sf: SF_EDIT, teamRole: "Sales Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    assert.deepEqual(kinds(res.users[0]), ["owner"]);
+    assert.equal(res.users[1].routes.length, 1, "a real team route stays");
+  });
+
+  await test("record access: every 'X is not ...' line is checked against X's own facts", () => {
+    // Both have a manual share row: neither lacks "shared directly"
+    const both = facts({
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }, { who: ID.bob, level: "Read", cause: "Manual" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT }), user(ID.bob, "Bob Jones", { sf: SF_VIEW })],
+    });
+    const r1 = explain(both, [ID.alice, ID.bob]);
+    assert.doesNotMatch(toPlainText(r1), /not shared directly with Bob Jones/);
+    assert.match(r1.difference.items[0].missing[0], /Bob Jones has this route too, but it gives only view access/);
+    // Alice is a member of the owner queue, Bob is above a member: Bob does not lack the queue route
+    const q = facts({
+      record: { ...facts().record, ownerKind: "queue", ownerId: ID.gQueue, ownerName: "Support Queue" },
+      groups: [grp(ID.gQueue, "Queue", "Support Queue")],
+      memberRoles: { [ID.gQueue]: { roles: [{ roleId: ID.low, example: "Maria Keller", count: 1 }], users: 1, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gQueue, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" }),
+      ],
+    });
+    assert.doesNotMatch(toPlainText(explain(q, [ID.alice, ID.bob])), /Bob Jones is not a member of queue/);
+    // A statement that is true is still printed
+    const lacks = explain(facts({
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT }), user(ID.bob, "Bob Jones", { sf: SF_NONE })],
+    }), [ID.alice, ID.bob]);
+    assert.match(lacks.difference.items[0].missing[0], /not shared directly with Bob Jones/);
+  });
+
+  await test("record access: a task whose parent is readable but is not visible states no parent route as fact", () => {
+    const task = (users, over = {}) => facts({
+      owd: { internal: "ControlledByParent", external: "ControlledByParent" },
+      object: { api: "Task", label: "Task", plural: "Tasks", custom: false, permissionsApply: false },
+      record: { ...facts().record, object: "Task", name: "Call", ownerId: null, ownerKind: null, ownerName: "", parentId: ID.rec, parentObjectLabel: "Account", parentName: "Contoso (sample)", whoId: ID.carl, whoObjectLabel: "Contact", whoName: "Pat Doe", ...over },
+      users,
+    });
+    const none = explain(task([user(ID.alice, "Alice Smith", { sf: SF_NONE, parentSf: SF_ALL, whoSf: SF_NONE })]));
+    const u = none.users[0];
+    assert.deepEqual(u.routes, [], "no 'gives view access' route when Salesforce says no");
+    assert.equal(u.mismatch, null);
+    assert.match(u.parentLine, /On the parent Account 'Contoso \(sample\)', Salesforce says Alice Smith has full access to it\./);
+    assert.match(u.parentLine, /That is not enough: Alice Smith also can't see the Contact 'Pat Doe' that this task is about\. That is the likely reason/);
+    assert.doesNotMatch(none.record.owdText, /whoever can see the parent can see them/);
+    // person not checked: say so, do not guess
+    const unknown = explain(task([user(ID.alice, "Alice Smith", { sf: SF_NONE, parentSf: SF_VIEW })])).users[0];
+    assert.match(unknown.parentLine, /we could not check whether Alice Smith can see that/);
+    // no linked person at all: still no route, and no claimed reason
+    const plain = explain(task([user(ID.alice, "Alice Smith", { sf: SF_NONE, parentSf: SF_VIEW })], { whoId: null })).users[0];
+    assert.deepEqual(plain.routes, []);
+    assert.match(plain.parentLine, /We could not tell what/);
+    // when Salesforce says the user can see it, the parent route still explains it
+    const yes = explain(task([user(ID.alice, "Alice Smith", { sf: SF_VIEW, parentSf: SF_VIEW, whoSf: SF_VIEW })])).users[0];
+    assert.deepEqual(kinds(yes), ["parent"]);
+  });
+
+  await test("record access: two users with the same access read plainly", () => {
+    const f = (lvl) => explain(facts({ owd: { internal: "Read", external: "Read" }, users: [user(ID.alice, "Alice Smith", { sf: lvl }), user(ID.bob, "Bob Jones", { sf: lvl })] })).difference.text;
+    assert.equal(f(SF_ALL), "Both users have full access to this record.");
+    assert.equal(f(SF_EDIT), "Both users can edit this record.");
+    assert.equal(f(SF_VIEW), "Both users can view this record.");
+    assert.equal(f(SF_NONE), "Neither user can see this record.");
+  });
+
+  await test("record access: View All, Modify All, View All Data name the profile, permission set or group", () => {
+    const f = facts({
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, object: { sets: [PROFILE({ name: "Support", viewAll: true }), { ...PROFILE({ kind: "group", name: "Support Lead Group", viewAll: true }) }] } }),
+        user(ID.bob, "Bob Jones", { sf: SF_ALL, object: { sets: [PROFILE({ name: "System Administrator", viewAllData: true, modifyAllData: true }), PROFILE({ kind: "permissionSet", name: "Extra", read: false, edit: false })] } }),
+      ],
+    });
+    const res = explain(f);
+    const a = res.users[0].routes.find((r) => r.key === "objectAll");
+    assert.equal(a.access, "view");
+    assert.match(a.steps[0], /'View All' on Accounts is turned on in profile 'Support' and permission set group 'Support Lead Group'/);
+    const b = res.users[1].routes.find((r) => r.key === "systemAll");
+    assert.equal(b.access, "full");
+    assert.match(b.steps[0], /'Modify All Data' is turned on in profile 'System Administrator'/);
+  });
+
+  await test("record access: no Read on the object means nothing else counts", () => {
+    const f = facts({
+      owd: { internal: "Read", external: "Read" },
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_NONE, object: { sets: [PROFILE({ read: false, create: false, edit: false })] } })],
+    });
+    const u = only(explain(f));
+    assert.equal(u.gate, true);
+    assert.deepEqual(u.routes, []);
+    assert.match(u.gateText, /Alice Smith has no Read access to Accounts at all \(checked the profile, permission sets and permission set groups\)/);
+    assert.equal(u.mismatch, null);
+    const text = toPlainText(explain(f));
+    assert.match(text, /no Read access to Accounts at all/);
+  });
+
+  await test("record access: object permissions cap what a share gives", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, object: { sets: [PROFILE({ edit: false })] } })],
+    });
+    const u = only(explain(f));
+    assert.equal(u.routes[0].access, "edit");
+    assert.equal(u.routes[0].effective, "view");
+    assert.equal(u.routes[0].limited, true);
+    assert.equal(u.mismatch, null);
+    assert.match(toPlainText(explain(f)), /gives edit access, limited to view access by object permissions/);
+  });
+
+  // ---------- Salesforce's answer wins ----------
+
+  await test("record access: the verdict comes only from Salesforce's answer", () => {
+    // Routes say the owner has access, Salesforce says none: the verdict says none.
+    const f = facts({ users: [user(ID.maria, "Maria Keller", { sf: SF_NONE })] });
+    const res = explain(f);
+    assert.equal(res.verdict, "Maria Keller can't see this record.");
+    assert.equal(res.users[0].mismatch.kind, "routeButNone");
+    assert.match(res.users[0].mismatch.text, /Salesforce's answer is the one that counts/);
+    assert.ok(res.users[0].mismatch.causes.some((c) => /restriction rule/.test(c)));
+    assert.ok(!res.users[0].mismatch.causes.some((c) => /inactive/.test(c)));
+    const inactive = explain(facts({ users: [user(ID.maria, "Maria Keller", { sf: SF_NONE, isActive: false })] }));
+    assert.ok(inactive.users[0].mismatch.causes.some((c) => /inactive or frozen/.test(c)));
+    assert.match(toPlainText(res), /Does not match Salesforce/);
+  });
+
+  await test("record access: Salesforce says access but no route is found", () => {
+    const f = facts({ users: [user(ID.bob, "Bob Jones", { sf: SF_EDIT })] });
+    const res = explain(f);
+    assert.equal(res.verdict, "Bob Jones can edit this record.");
+    assert.equal(res.users[0].mismatch.kind, "noRouteFound");
+    assert.match(res.users[0].mismatch.text, /Salesforce says Bob Jones can edit this record, but we found no route that explains it/);
+    assert.ok(res.users[0].mismatch.causes.some((c) => /related record/.test(c)));
+    assert.match(res.notes.join(" "), /did not match/);
+  });
+
+  await test("record access: routes that explain less or more than Salesforce says", () => {
+    const rows = [{ who: ID.alice, level: "Read", cause: "Manual" }];
+    const lower = explain(facts({ shares: { available: true, rows }, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT })] }));
+    assert.equal(lower.users[0].mismatch.kind, "routesLower");
+    assert.match(lower.users[0].mismatch.text, /explain only view access/);
+    const higher = explain(facts({ shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }] }, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW })] }));
+    assert.equal(higher.users[0].mismatch.kind, "routesHigher");
+    // Salesforce's answer missing: no verdict is invented
+    const unknown = explain(facts({ users: [user(ID.maria, "Maria Keller", { sf: null })] }));
+    assert.equal(unknown.verdict, "Salesforce did not say whether Maria Keller can see this record.");
+    assert.equal(unknown.users[0].mismatch, null);
+  });
+
+  // ---------- two users ----------
+
+  await test("record access: the difference says what the other user is missing on each route", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.maria, level: "All", cause: "Owner" }, { who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales"), grp(ID.gUk, "Regular", "UK Sales"), grp(ID.gRole, "RoleAndSubordinates", "", ID.mid)],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.mid, roleName: "UK Manager", memberOf: [{ groupId: ID.gUk, memberId: ID.gRole }, { groupId: ID.gEmea, memberId: ID.gUk }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+      ],
+    });
+    const res = explain(f);
+    assert.equal(res.verdict, "Alice Smith can edit this record. Bob Jones can't see this record.");
+    const d = res.difference;
+    assert.equal(d.more, "Alice Smith");
+    assert.equal(d.less, "Bob Jones");
+    const missing = d.items.flatMap((i) => i.missing);
+    assert.ok(missing.includes("Bob Jones is not in public group 'EMEA Sales', directly or through another group."), missing.join("\n"));
+    assert.ok(missing.includes("Bob Jones's role 'France Rep' is not above the owner's role 'UK Rep' in the role hierarchy."), missing.join("\n"));
+    assert.ok(d.items.every((i) => i.change.length === 1));
+    // swapping the pickers does not change who is described as having more
+    const swapped = explain(f, [ID.bob, ID.alice]);
+    assert.equal(swapped.difference.more, "Alice Smith");
+    assert.equal(swapped.users[0].name, "Bob Jones");
+  });
+
+  await test("record access: the difference names missing object access first, and a limit on a shared route", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.maria, level: "All", cause: "Owner" }, { who: ID.alice, level: "Edit", cause: "Manual" }, { who: ID.bob, level: "Edit", cause: "Manual" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, object: { sets: [PROFILE({ read: false, create: false, edit: false })] } }),
+      ],
+    });
+    const d = explain(f).difference;
+    assert.match(d.gate, /Bob Jones has no Read access to Accounts at all/);
+    // a user who has the same share but whose profile only reads
+    const g = facts({
+      shares: { available: true, rows: [{ who: ID.alice, level: "Edit", cause: "Manual" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT }), user(ID.carl, "Carl Brown", { sf: SF_VIEW, object: { sets: [PROFILE({ edit: false })] } })],
+    });
+    const items = explain(g).difference.items;
+    assert.equal(items.length, 1);
+    assert.match(items[0].missing[0], /The record is not shared directly with Carl Brown/);
+  });
+
+  await test("record access: same access gives no difference list; no route for the better-off user is said plainly", () => {
+    const same = explain(facts({ owd: { internal: "Read", external: "Read" }, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW }), user(ID.bob, "Bob Jones", { sf: SF_VIEW })] }));
+    assert.equal(same.difference.same, true);
+    assert.match(same.verdict, /They have the same access\./);
+    const none = explain(facts({ users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT }), user(ID.bob, "Bob Jones", { sf: SF_NONE })] }));
+    assert.deepEqual(none.difference.items, []);
+    assert.match(none.difference.unexplained, /We found no route that gives Alice Smith more access/);
+    const one = explain(facts({ users: [user(ID.alice, "Alice Smith", { sf: SF_NONE })] }));
+    assert.equal(one.difference, null);
+    const twins = explain(facts({ users: [user(ID.alice, "Sam Lee", { sf: SF_NONE }), user(ID.bob, "Sam Lee", { sf: SF_NONE })] }));
+    assert.notEqual(twins.users[0].name, twins.users[1].name);
+  });
+
+  await test("record access: shares to groups that include managers are noted, not guessed", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.gBosses, level: "Read", cause: "Manual" }] },
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW })],
+    });
+    const res = explain(f);
+    assert.deepEqual(res.users[0].routes, []);
+    assert.ok(res.notes.some((n) => /Field Teams.*managers of its members.*not checked/.test(n)));
+    assert.equal(res.users[0].mismatch.kind, "noRouteFound");
+  });
+
+  await test("record access: plain text for a ticket", () => {
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.maria, level: "All", cause: "Owner" }, { who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const text = toPlainText(explain(f));
+    assert.match(text, /^Why can a user see this record\?\nRecord: Account "Contoso \(sample\)", owner: Maria Keller\nDefault access: Accounts are Private/);
+    assert.match(text, /Alice Smith can view this record\. Bob Jones can't see this record\./);
+    assert.match(text, /Route 1 \(gives view access\):\n {4}Shared by a sharing rule with public group 'EMEA Sales' -> Alice Smith is a direct member of public group 'EMEA Sales'/);
+    assert.match(text, /Bob Jones can't see this record\n {2}No route found/);
+    assert.match(text, /Why the difference\n.*\n(?: {2}.*\n)* {2}- Shared by a sharing rule/);
+    assert.match(text, /Missing: Bob Jones is not in public group 'EMEA Sales'/);
+    assert.match(text, /What would change it: Adding Bob Jones to public group 'EMEA Sales' would change it\./);
+    assert.match(text, /\nNotes\n {2}- /);
+    assert.ok(!/undefined|\[object/.test(text));
+  });
+
+  await test("record access: small helpers", () => {
+    assert.equal(sfLevel(null), null);
+    assert.equal(sfLevel(SF_NONE), "none");
+    assert.equal(sfLevel(SF_VIEW), "view");
+    assert.equal(sfLevel(SF_EDIT), "edit");
+    assert.equal(sfLevel(SF_ALL), "full");
+    assert.deepEqual(["Read", "Edit", "All", "None", "x"].map(shareLevel), ["view", "edit", "full", null, null]);
+  });
+
+  // ---------- fixes from independent testing ----------
+
+  const NO_PERMS = { sets: [PROFILE({ read: false, create: false, edit: false })] };
+
+  await test("record access: Task and Event have no object permissions, so a missing row is not 'no Read'", () => {
+    const f = facts({
+      object: { api: "Task", label: "Task", plural: "Tasks", custom: false, grantByHierarchy: null, permissionsApply: false },
+      record: { ...facts().record, object: "Task" },
+      shares: { available: false, rows: [] },
+      users: [user(ID.maria, "Maria Keller", { sf: SF_VIEW, object: NO_PERMS }), user(ID.bob, "Bob Jones", { sf: SF_NONE, object: NO_PERMS })],
+    });
+    const res = explain(f);
+    assert.equal(res.users[0].gate, false);
+    assert.equal(res.users[0].gateText, null);
+    assert.deepEqual(kinds(res.users[0]), ["owner"]);
+    assert.equal(res.users[1].gateText, null);
+    assert.ok(!/no Read access/.test(JSON.stringify(res)), "never says 'no Read' for Tasks");
+    assert.ok(res.notes.some((n) => /no object permissions for tasks/.test(n)));
+    // safety net: even where permissions apply, a user Salesforce says can see it never gets 'no Read'
+    const g = facts({ users: [user(ID.maria, "Maria Keller", { sf: SF_VIEW, object: NO_PERMS })] });
+    const r2 = explain(g);
+    assert.equal(r2.users[0].gate, false);
+    assert.equal(r2.users[0].gateText, null);
+    assert.deepEqual(kinds(r2.users[0]), ["owner"]);
+    assert.ok(r2.notes.some((n) => /yet Salesforce says Maria Keller can see this record/.test(n)));
+    assert.ok(!/no Read access to Accounts at all/.test(toPlainText(r2)));
+  });
+
+  await test("record access: all access through sharing but only view allowed gives a headline that agrees with the card", () => {
+    const f = facts({
+      owd: { internal: "Read", external: "Read" },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: { read: true, edit: false, delete: false, transfer: false, all: true, max: "All" }, roleId: ID.top, roleName: "Sales Director", object: { sets: [PROFILE({ edit: false })] } }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW }),
+      ],
+    });
+    const res = explain(f);
+    const a = res.users[0];
+    assert.equal(a.sfLevel, "view");
+    assert.ok(!/Alice Smith has full access/.test(res.verdict), res.verdict);
+    assert.match(res.verdict, /Alice Smith can view this record\./);
+    assert.match(res.verdict, /Sharing gives Alice Smith full access to this record, but Alice Smith's object permissions on Accounts only allow viewing, so Alice Smith can only view it\./);
+    assert.equal(a.mismatch, null);
+    // the second user has less from sharing: the difference lists what Bob lacks even though both can only view
+    const d = res.difference;
+    assert.equal(d.same, false);
+    assert.equal(d.more, "Alice Smith");
+    assert.match(d.text, /can both view this record, but sharing gives Alice Smith more/);
+    assert.ok(d.items.some((i) => /Role above the owner's role/.test(i.route)), JSON.stringify(d.items.map((i) => i.route)));
+    assert.match(d.levelNote, /Alice Smith's routes give up to view access/);
+  });
+
+  await test("record access: the difference lists every route the other user lacks, even when both have routes", () => {
+    const f = facts({
+      owd: { internal: "Read", external: "Read" },
+      shares: { available: true, rows: [{ who: ID.maria, level: "All", cause: "Owner" }, { who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.top, roleName: "Sales Director", memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, roleId: ID.other, roleName: "France Rep", memberOf: [{ groupId: ID.gEmea, memberId: ID.bob }] }),
+      ],
+    });
+    const res = explain(f);
+    assert.ok(res.users[1].routes.length >= 2, "both have routes");
+    const d = res.difference;
+    assert.equal(d.unexplained, null);
+    const routes = d.items.map((i) => i.route);
+    assert.ok(routes.includes("Role above the owner's role"), routes.join(" | "));
+    assert.ok(d.items.find((i) => i.route === "Role above the owner's role").missing[0].includes("France Rep"));
+    assert.match(d.levelNote, /Alice Smith's routes give up to edit access; Bob Jones's give only view access\./);
+    assert.ok(!routes.some((r) => /EMEA Sales/.test(r)), "a route both have is not listed");
+    assert.match(toPlainText(res), /Alice Smith's routes give up to edit access/);
+  });
+
+  await test("record access: a territory route takes its level from the territory share rows; unknown levels are said plainly", () => {
+    const territories = { on: true, items: [{ id: ID.t1, parentId: null, name: "EMEA" }, { id: ID.t2, parentId: ID.t1, name: "UK" }], record: [{ id: ID.t2, cause: "Territory2AssignmentRule" }] };
+    const groups = [grp(ID.gTerr, "Territory", "", ID.t2), grp(ID.gTerrSub, "TerritoryAndSubordinates", "", ID.t2)];
+    const rows = [{ who: ID.gTerr, level: "Edit", cause: "TerritoryRule" }, { who: ID.gTerrSub, level: "Edit", cause: "TerritoryRule" }];
+    const f = facts({ territories, groups, shares: { available: true, rows }, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] })] });
+    const r = only(explain(f)).routes.find((x) => x.key.startsWith("shareTerrAbove:"));
+    assert.ok(r, "the user above the record's territory gets a territory route");
+    assert.equal(r.access, "edit");
+    assert.equal(only(explain(f)).mismatch, null);
+    const none = facts({ territories, groups, shares: { available: true, rows: [] }, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] })] });
+    const text = toPlainText(explain(none));
+    assert.ok(!/Access level not read|access level not read/.test(text));
+    assert.match(text, /how much access it gives is not known/);
+    assert.ok(!/Access level not read/.test(readFileSync(ext("tools/record-access/record-access.js"), "utf-8")));
+  });
+
+  await test("record access: an inactive user is said to be inactive, with no answer from Salesforce", () => {
+    const f = facts({ users: [user(ID.maria, "Maria Keller", { sf: null, isActive: false }), user(ID.bob, "Bob Jones", { sf: SF_VIEW })] });
+    const res = explain(f);
+    const m = res.users[0];
+    assert.equal(m.inactive, true);
+    assert.match(m.inactiveText, /^Maria Keller is inactive\. Salesforce gives no answer for an inactive user, and an inactive user can't log in\./);
+    assert.match(res.verdict, /Maria Keller is inactive\. Salesforce gives no answer for inactive users, and they can't log in\./);
+    assert.equal(m.mismatch, null);
+    assert.match(res.difference.text, /Maria Keller is inactive/);
+    const text = toPlainText(res);
+    assert.match(text, /Maria Keller \(inactive, no answer from Salesforce\)\n {2}Maria Keller is inactive/);
+    assert.match(text, /would give full access/);
+    assert.equal(explain(facts({ users: [user(ID.maria, "Maria Keller", { sf: null })] })).users[0].inactive, false);
+  });
+
+  /** An in-memory org for the member walk: GroupMember, Group, User and UserTerritory2Association. */
+  function memberOrg(tables) {
+    const inList = (q) => [...(q.match(/IN \(([^)]*)\)/)?.[1] || "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    const queries = [];
+    return {
+      queries,
+      query: async (q) => {
+        queries.push(q);
+        const ids = inList(q);
+        if (/FROM GroupMember/.test(q)) return { records: tables.members.filter((m) => ids.includes(m.GroupId)) };
+        if (/FROM Group /.test(q)) return { records: tables.groups.filter((g) => ids.includes(g.Id)) };
+        if (/FROM UserTerritory2Association/.test(q)) return { records: tables.terr.filter((t) => ids.includes(t.Territory2Id)) };
+        if (/FROM User WHERE UserRoleId IN/.test(q)) return { records: tables.users.filter((u) => ids.includes(u.UserRoleId)) };
+        if (/FROM User WHERE Id IN/.test(q)) return { records: tables.users.filter((u) => ids.includes(u.Id)) };
+        throw new Error(`unexpected ${q}`);
+      },
+    };
+  }
+  const U5 = (n) => `005000000000${String(n).padStart(3, "0")}AAA`;
+
+  await test("record access: managers through a group that includes bosses (nested, role groups, a loop)", async () => {
+    const tables = {
+      members: [
+        { GroupId: ID.gBosses, UserOrGroupId: ID.gUk }, // nested public group
+        { GroupId: ID.gUk, UserOrGroupId: ID.gBosses }, // loop
+        { GroupId: ID.gUk, UserOrGroupId: ID.gRole }, // role-and-subordinates group inside it
+        { GroupId: ID.gUk, UserOrGroupId: U5(10) }, // a direct member (UK Rep)
+      ],
+      groups: [{ Id: ID.gUk, Type: "Regular", RelatedId: null }, { Id: ID.gRole, Type: "RoleAndSubordinates", RelatedId: ID.mid }, { Id: ID.gBosses, Type: "Regular", RelatedId: null }],
+      users: [
+        { Id: U5(10), Name: "Una Member", UserRoleId: ID.low },
+        { Id: U5(11), Name: "Max Mid", UserRoleId: ID.mid },
+        { Id: U5(12), Name: "Lou Low", UserRoleId: ID.low },
+      ],
+      terr: [],
+    };
+    const api = memberOrg(tables);
+    const roleParent = new Map([[ID.top, null], [ID.mid, ID.top], [ID.low, ID.mid], [ID.other, ID.top]]);
+    const found = await readMemberRoles(api, [ID.gBosses], roleParent, new Map());
+    const m = found[ID.gBosses];
+    assert.equal(m.capped, false);
+    const byRole = Object.fromEntries(m.roles.map((r) => [r.roleId, r]));
+    assert.deepEqual(Object.keys(byRole).sort(), [ID.low, ID.mid].sort());
+    assert.equal(byRole[ID.mid].count, 1);
+    assert.equal(byRole[ID.low].count, 2); // Una (direct) and Lou (below the role group's role)
+    assert.ok(api.queries.every((q) => /^SELECT /.test(q)));
+    // and the explanation
+    const rows = [{ who: ID.gBosses, level: "Edit", cause: "Rule" }];
+    const f = facts({
+      shares: { available: true, rows },
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      memberRoles: found,
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director" }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+      ],
+    });
+    const res = explain(f);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("shareBossGroup:"));
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.equal(r.access, "edit");
+    assert.equal(r.steps[0], "Shared by a sharing rule with public group 'Field Teams', which also gives access to managers");
+    assert.match(r.steps[1], /^Member '.+' \(role 'UK Manager'\) is in that group, directly or through other groups; 2 other members have a role below this user's too$/);
+    assert.equal(r.steps[2], "Alice Smith's role 'Sales Director' is above 'UK Manager' in the role hierarchy");
+    assert.equal(res.users[0].mismatch, null);
+    assert.deepEqual(kinds(res.users[1]), []); // France Rep is not above any member
+    assert.match(res.difference.items.find((i) => /Field Teams/.test(i.route)).missing[0], /Bob Jones is not in public group 'Field Teams' and has no role above the role of one of its members\./);
+    assert.ok(!res.notes.some((n) => /not checked for Alice/.test(n)));
+  });
+
+  await test("record access: member walk stops at its cap and says so; territory groups give members too", async () => {
+    const tables = {
+      members: [{ GroupId: ID.gBosses, UserOrGroupId: ID.gTerr }],
+      groups: [{ Id: ID.gTerr, Type: "TerritoryAndSubordinates", RelatedId: ID.t1 }],
+      users: [{ Id: U5(20), Name: "Tia Terr", UserRoleId: ID.low }],
+      terr: [{ Territory2Id: ID.t2, UserId: U5(20) }],
+    };
+    const found = await readMemberRoles(memberOrg(tables), [ID.gBosses], new Map(), new Map([[ID.t1, null], [ID.t2, ID.t1]]));
+    assert.deepEqual(found[ID.gBosses].roles.map((r) => r.roleId), [ID.low]);
+    // a chain of 40 groups inside groups is cut at the depth limit
+    const chainG = Array.from({ length: 40 }, (_, i) => `00G0000000${String(i).padStart(5, "0")}AAA`);
+    const deep = { members: chainG.slice(0, -1).map((g, i) => ({ GroupId: g, UserOrGroupId: chainG[i + 1] })), groups: chainG.map((g) => ({ Id: g, Type: "Regular", RelatedId: null })), users: [], terr: [] };
+    const cut = await readMemberRoles(memberOrg(deep), [chainG[0]], new Map(), new Map());
+    assert.equal(cut[chainG[0]].capped, true);
+    // the explanation says a cut walk may have missed a manager route
+    const f = facts({
+      shares: { available: true, rows: [{ who: ID.gBosses, level: "Read", cause: "Rule" }] },
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      memberRoles: { [ID.gBosses]: { roles: [], users: 0, capped: true } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    assert.ok(explain(f).notes.some((n) => /many members, so only some were checked for Alice Smith/.test(n)));
+  });
+
+  await test("record access: role hierarchy over a queue owner uses the roles of the queue's members", async () => {
+    const rec = { ...facts().record, ownerId: ID.gQueue, ownerKind: "queue", ownerName: "Support Queue", ownerRoleId: null };
+    const tables = { members: [{ GroupId: ID.gQueue, UserOrGroupId: U5(30) }, { GroupId: ID.gQueue, UserOrGroupId: ID.gEmea }, { GroupId: ID.gEmea, UserOrGroupId: ID.gQueue }], groups: [{ Id: ID.gEmea, Type: "Regular", RelatedId: null }], users: [{ Id: U5(30), Name: "Quinn Queue", UserRoleId: ID.low }], terr: [] };
+    const roleParent = new Map([[ID.top, null], [ID.mid, ID.top], [ID.low, ID.mid]]);
+    const found = await readMemberRoles(memberOrg(tables), [ID.gQueue], roleParent, new Map());
+    const f = facts({
+      record: rec, groups: [grp(ID.gQueue, "Queue", "Support Queue")], memberRoles: found,
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.top, roleName: "Sales Director" }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+      ],
+    });
+    const res = explain(f);
+    const r = res.users[0].routes.find((x) => x.key === "ownerQueueBoss");
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.deepEqual(r.steps, [
+      "The record is owned by queue 'Support Queue'",
+      "Member 'Quinn Queue' (role 'UK Rep') is in queue 'Support Queue', directly or through other groups",
+      "Alice Smith's role 'Sales Director' is above 'UK Rep' in the role hierarchy",
+    ]);
+    assert.equal(res.users[0].mismatch, null);
+    assert.deepEqual(kinds(res.users[1]), []);
+    assert.match(res.difference.items[0].missing[0], /Bob Jones is not a member of queue 'Support Queue' and has no role above/);
+    // a user in the same role as the member is not above it
+    const same = facts({ record: rec, groups: [grp(ID.gQueue, "Queue", "Support Queue")], memberRoles: found, users: [user(ID.carl, "Carl Brown", { sf: SF_NONE, roleId: ID.low, roleName: "UK Rep" })] });
+    assert.deepEqual(kinds(explain(same).users[0]), []);
+  });
+
+  await test("record access: an exact name match is listed first", () => {
+    const users = [{ name: "Ann Smithson", username: "a@example.invalid" }, { name: "Ann Smith", username: "b@example.invalid" }, { name: "Joann Smith", username: "c@example.invalid" }];
+    assert.deepEqual(exactFirst(users, "ann smith").map((u) => u.name), ["Ann Smith", "Ann Smithson", "Joann Smith"]);
+    assert.deepEqual(exactFirst(users, "c@example.invalid").map((u) => u.name)[0], "Joann Smith");
+    assert.equal(exactFirst(users, ""), users);
+  });
+
+  await test("record access: reading a fake org marks Task-like objects (no object permission rows) as not subject to them", async () => {
+    const { api } = fakeOrg();
+    const orig = api.query.bind(api);
+    api.query = async (q) => (/COUNT\(\) FROM ObjectPermissions/.test(q) ? { records: [], totalSize: 0 } : orig(q));
+    api.count = async (q) => (/FROM ObjectPermissions/.test(q) ? 0 : 0);
+    const ctx = await readRecordContext(api, ID.rec);
+    const facts2 = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(facts2.object.permissionsApply, false);
+  });
+
+  // ---------- the demo ----------
+
+  await test("record access: the demo file explains one user through a nested group and the hierarchy, the other not at all", () => {
+    const demo = JSON.parse(readFileSync(ext("samples", "record_access_demo.json"), "utf-8"));
+    const res = explain(demo);
+    assert.match(res.verdict, /^Alice Smith can edit this record\. Bob Jones can't see this record\.$/);
+    assert.ok(res.users[0].routes.length >= 2);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.users[0].mismatch, null);
+    assert.equal(res.users[1].mismatch, null);
+    assert.ok(res.difference.items.length >= 2);
+    assert.ok(!/@(?!example\.invalid)/.test(JSON.stringify(demo)), "demo usernames must be example.invalid");
+  });
+
+  // ---------- reading from the org ----------
+
+  /** A fake org: describe, describeGlobal and a few tables that SELECTs are answered from. */
+  function fakeOrg({ failOn = [] } = {}) {
+    const log = [];
+    const inList = (q) => [...(q.match(/IN \(([^)]*)\)/)?.[1] || "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    const groupsTable = [
+      { Id: ID.gEmea, Name: "EMEA Sales", DeveloperName: "EMEA_Sales", Type: "Regular", RelatedId: null, DoesIncludeBosses: false },
+      { Id: ID.gUk, Name: "UK Sales", DeveloperName: "UK_Sales", Type: "Regular", RelatedId: null, DoesIncludeBosses: false },
+      { Id: ID.gRole, Name: "", DeveloperName: "UKMgr", Type: "RoleAndSubordinates", RelatedId: ID.mid, DoesIncludeBosses: false },
+    ];
+    const members = [
+      { GroupId: ID.gUk, UserOrGroupId: ID.gRole }, { GroupId: ID.gEmea, UserOrGroupId: ID.gUk }, { GroupId: ID.gUk, UserOrGroupId: ID.gEmea },
+    ];
+    const describes = {
+      Account: {
+        label: "Account", labelPlural: "Accounts", custom: false,
+        fields: [{ name: "Id", type: "id" }, { name: "Name", type: "string", nameField: true }, { name: "OwnerId", type: "reference", referenceTo: ["User"] }],
+      },
+      AccountShare: { fields: [{ name: "AccountId" }, { name: "AccountAccessLevel" }, { name: "RowCause" }, { name: "UserOrGroupId" }] },
+    };
+    const route = (q) => {
+      if (failOn.some((re) => re.test(q))) return { fail: "INSUFFICIENT_ACCESS", code: "INSUFFICIENT_ACCESS" };
+      if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
+      if (/FROM Account WHERE Id/.test(q)) return [{ Id: ID.rec, Name: "Contoso (sample)", OwnerId: ID.maria }];
+      if (/FROM User WHERE Id = '005000000000003AAA'/.test(q)) return [{ Name: "Maria Keller", UserRoleId: ID.low }];
+      if (/FROM User WHERE Id = '005000000000001AAA'/.test(q)) return [{ Id: ID.alice, Name: "Alice Smith", Username: "alice@example.invalid", IsActive: true, UserType: "Standard", Profile: { Name: "Standard User" }, UserRoleId: ID.mid, UserRole: { Name: "UK Manager" } }];
+      if (/FROM User WHERE Id IN/.test(q)) return [];
+      if (/FROM UserRole/.test(q)) return /COUNT/.test(q) ? { total: 0 } : [
+        { Id: ID.top, Name: "Sales Director", DeveloperName: "SD", ParentRoleId: null }, { Id: ID.mid, Name: "UK Manager", DeveloperName: "UKM", ParentRoleId: ID.top },
+        { Id: ID.low, Name: "UK Rep", DeveloperName: "UKR", ParentRoleId: ID.mid },
+      ];
+      if (/FROM Territory2 /.test(q)) return { fail: "sObject type 'Territory2' is not supported.", code: "INVALID_TYPE" };
+      if (/FROM AccountShare/.test(q)) return [{ UserOrGroupId: ID.maria, AccountAccessLevel: "All", RowCause: "Owner" }, { UserOrGroupId: ID.gEmea, AccountAccessLevel: "Read", RowCause: "Rule" }];
+      if (/FROM Group WHERE RelatedId IN/.test(q)) return groupsTable.filter((g) => inList(q).includes(g.RelatedId) && /RoleAndSubordinates/.test(g.Type));
+      if (/FROM Group WHERE Id IN/.test(q)) return groupsTable.filter((g) => inList(q).includes(g.Id));
+      if (/FROM GroupMember/.test(q)) return members.filter((m) => inList(q).includes(m.UserOrGroupId));
+      if (/FROM UserRecordAccess/.test(q)) return [{ RecordId: ID.rec, HasReadAccess: true, HasEditAccess: true, HasDeleteAccess: false, HasTransferAccess: false, HasAllAccess: false, MaxAccessLevel: "Edit" }];
+      if (/FROM PermissionSetAssignment/.test(q)) return [{ PermissionSetId: "0PS000000000001AAA", PermissionSetGroupId: null, PermissionSet: { Label: "X", Type: "Profile", IsOwnedByProfile: true, Profile: { Name: "Standard User" }, PermissionsViewAllData: false, PermissionsModifyAllData: false } }];
+      if (/FROM ObjectPermissions/.test(q)) return [{ ParentId: "0PS000000000001AAA", PermissionsRead: true, PermissionsCreate: true, PermissionsEdit: true, PermissionsDelete: false, PermissionsViewAllRecords: false, PermissionsModifyAllRecords: false }];
+      if (/FROM AccountTeamMember/.test(q)) return [];
+      if (/COUNT\(\)/.test(q)) return { total: 0 };
+      return { fail: `no route for ${q}`, code: "TEST" };
+    };
+    const fetchImpl = async (url, opts = {}) => {
+      const u = new URL(url);
+      log.push({ method: opts.method || "GET", path: u.pathname, q: u.searchParams.get("q") });
+      const ok = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) });
+      if (/\/sobjects\/$/.test(u.pathname)) return ok({ sobjects: [{ name: "Account", keyPrefix: "001", label: "Account", labelPlural: "Accounts" }, { name: "Contact", keyPrefix: "003" }] });
+      const m = u.pathname.match(/\/sobjects\/(\w+)\/describe\/$/);
+      if (m) return describes[m[1]] ? ok(describes[m[1]]) : { ok: false, status: 404, text: async () => JSON.stringify([{ message: "not found", errorCode: "NOT_FOUND" }]) };
+      const r = route(u.searchParams.get("q"));
+      if (r.fail) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: r.fail, errorCode: r.code || "TEST" }]) };
+      if (r.total !== undefined) return ok({ done: true, totalSize: r.total, records: [] });
+      return ok({ done: true, totalSize: r.length, records: r });
+    };
+    return { api: new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl }), log };
+  }
+
+  await test("record access: reading the record and a user from a fake org, then explaining it", async () => {
+    const { api, log } = fakeOrg();
+    const ctx = await readRecordContext(api, "001000000000001");
+    assert.equal(ctx.record.id, ID.rec); // 15 characters in, 18 used
+    assert.equal(ctx.record.name, "Contoso (sample)");
+    assert.equal(ctx.record.ownerName, "Maria Keller");
+    assert.equal(ctx.owd.internal, "Private");
+    assert.equal(ctx.object.plural, "Accounts");
+    const facts = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(facts.shares.rows.length, 2);
+    assert.equal(facts.users[0].sf.edit, true);
+    assert.ok(facts.users[0].memberOf.length >= 3, "groups were read upward, loop included");
+    assert.equal(facts.territories.on, false); // territories off: not a problem
+    assert.ok(!facts.notes.some((n) => /Territor/.test(n)), facts.notes.join("\n"));
+    const res = explain(facts);
+    assert.equal(res.verdict, "Alice Smith can edit this record.");
+    assert.ok(res.users[0].routes.some((r) => r.steps.join(" ").includes("EMEA Sales") && r.steps.join(" ").includes("UK Manager")));
+    assert.equal(res.users[0].mismatch, null);
+    // read-only: only GETs, only SELECTs
+    assert.ok(log.every((l) => l.method === "GET"));
+    for (const l of log.filter((x) => x.q)) assert.match(l.q, /^SELECT /);
+    assert.ok(log.some((l) => /FROM UserRecordAccess WHERE UserId = '005000000000001AAA' AND RecordId = '001000000000001AAA'/.test(l.q || "")));
+  });
+
+  await test("record access: an area that fails is left out with a plain note, the raw error is kept apart", async () => {
+    const { api } = fakeOrg({ failOn: [/FROM AccountShare/, /FROM UserRecordAccess/] });
+    const ctx = await readRecordContext(api, ID.rec);
+    const facts = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(facts.users[0].sf, null);
+    assert.ok(facts.notes.some((n) => /sharing rows could not be read, so it was not checked/.test(n)));
+    assert.ok(facts.warnings.some((w) => /INSUFFICIENT_ACCESS/.test(w)));
+    const res = explain(facts);
+    assert.equal(res.verdict, "Salesforce did not say whether Alice Smith can see this record.");
+    assert.ok(!res.notes.some((n) => /INSUFFICIENT_ACCESS/.test(n)), "raw errors stay out of the notes");
+  });
+
+  await test("record access: a record that cannot be read gives a plain message", async () => {
+    await assert.rejects(readRecordContext(fakeOrg().api, "not an id"), /does not look like a record Id/);
+    await assert.rejects(readRecordContext(fakeOrg().api, "a1B000000000001AAA"), /does not know what kind of record/);
+    const { api } = fakeOrg();
+    api.query = async (q) => (/FROM Account WHERE Id/.test(q) ? { records: [] } : { records: [{ InternalSharingModel: "Private" }] });
+    await assert.rejects(readRecordContext(api, ID.rec), /no such record, or your own user cannot see it/);
+  });
+
+  await test("record access: a user is read back by Id (parent page keeps the two users); bad Ids are refused", async () => {
+    const queries = [];
+    const api = { query: async (q) => { queries.push(q); return { records: [{ Id: ID.bob, Name: "Bob Jones", Username: "bob@example.invalid", IsActive: true, Profile: { Name: "Standard User" } }] }; } };
+    const u = await readUserById(api, ID.bob);
+    assert.deepEqual(u, { id: ID.bob, name: "Bob Jones", username: "bob@example.invalid", isActive: true, profile: "Standard User" });
+    assert.match(queries[0], /^SELECT .* FROM User WHERE Id = '005000000000002AAA' LIMIT 1$/);
+    assert.equal(await readUserById(api, "x' OR Name != '"), null);
+    assert.equal(queries.length, 1);
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /p\.set\(side, u\.id\)/);
+    assert.match(page, /params\.get\(side\)/);
+  });
+
+  // ---------- guards ----------
+
+  // ---------- access through the account (Cases and Opportunities) ----------
+
+  /** A Case or Opportunity whose account is "Contoso (sample)": the account's own sharing is in `account`. */
+  function acctFacts(object, { rows = [], owner = null, users = [], territories, groups = [], shareUsers = [], memberRoles } = {}) {
+    const plural = object === "Case" ? "Cases" : "Opportunities";
+    return facts({
+      record: { id: "500000000000001AAA", object, name: "Sample record", ownerId: ID.carl, ownerKind: "user", ownerName: "Carl Brown", ownerRoleId: ID.other, accountId: ID.rec, accountName: "Contoso (sample)", parentId: null, parentObjectLabel: "", parentName: "" },
+      object: { api: object, label: object, plural, custom: false, grantByHierarchy: null },
+      shares: { available: true, truncated: false, rows: [{ who: ID.carl, level: "All", cause: "Owner" }] },
+      account: { id: ID.rec, name: "Contoso (sample)", rows, owner, truncated: false },
+      ...(territories ? { territories } : {}), groups, shareUsers, ...(memberRoles ? { memberRoles } : {}), users,
+    });
+  }
+  const chainText = (r) => r.steps.join(" -> ");
+
+  await test("record access: a case is reached through an account sharing rule with a group that contains the user's group", () => {
+    const f = acctFacts("Case", {
+      rows: [{ who: ID.gEmea, level: "Read", cause: "Rule" }, { who: ID.gUk, level: "None", cause: "Manual" }],
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales"), grp(ID.gUk, "Regular", "UK Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, memberOf: [{ groupId: ID.gUk, memberId: ID.alice }, { groupId: ID.gEmea, memberId: ID.gUk }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    const a = res.users[0];
+    assert.equal(a.routes.length, 1);
+    assert.equal(a.routes[0].access, "view");
+    assert.equal(a.routes[0].steps[0], "The case belongs to account 'Contoso (sample)'");
+    assert.equal(a.routes[0].steps[1], "The account is shared by a sharing rule with public group 'EMEA Sales', which gives view access to the account's cases");
+    assert.match(chainText(a.routes[0]), /Public group 'EMEA Sales' includes public group 'UK Sales' -> Alice Smith is a direct member of public group 'UK Sales'/);
+    assert.equal(a.mismatch, null, "a user who sees a case only through its account is explained, not flagged");
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.users[1].mismatch, null);
+    // the difference names the account route and what would change it
+    assert.equal(res.difference.items.length, 1);
+    assert.match(res.difference.items[0].route, /^The account is shared by a sharing rule with public group 'EMEA Sales'/);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not in public group 'EMEA Sales', directly or through another group.");
+    assert.match(res.difference.items[0].change[0], /Adding Bob Jones to public group 'EMEA Sales'/);
+    assert.ok(!/AccountShare|CaseAccessLevel/.test(JSON.stringify(res)), "plain words only");
+    assert.ok(res.notes.some((n) => /Access through the account is checked for cases/.test(n)));
+  });
+
+  await test("record access: an opportunity is reached through the account's territory, and says which territory", () => {
+    const f = acctFacts("Opportunity", {
+      rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }, { who: ID.gTerrSub, level: "Read", cause: "Territory2AssociationManual" }],
+      groups: [grp(ID.gTerr, "Territory", "", ID.t1), grp(ID.gTerrSub, "TerritoryAndSubordinates", "", ID.t2)],
+      territories: { on: true, items: [{ id: ID.t1, parentId: null, name: "EMEA" }, { id: ID.t2, parentId: ID.t1, name: "UK" }], record: [] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    const a = res.users[0];
+    const edit = a.routes.find((r) => r.access === "edit");
+    assert.ok(edit);
+    assert.equal(edit.steps[0], "The opportunity belongs to account 'Contoso (sample)'");
+    assert.equal(edit.steps[1], "The account is shared through territory assignment with territory 'EMEA', which gives edit access to the account's opportunities");
+    assert.equal(edit.steps[2], "Alice Smith is assigned to territory 'EMEA'");
+    assert.equal(a.mismatch, null);
+    // Alice is in EMEA, which is above UK: the "and below" row does not reach her
+    // ... but the "territory only" row for EMEA is reached by Alice directly, and the "and below" row for UK is reached from above too
+    assert.equal(a.routes.length, 2);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'EMEA' or one above it.");
+    // a second user assigned to the territory is never told they lack it
+    const g = acctFacts("Opportunity", {
+      rows: f.account.rows, groups: f.groups, territories: f.territories,
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1] })],
+    });
+    const d = explain(g).difference;
+    for (const it of d.items) assert.ok(!/not assigned to territory 'EMEA'/.test(it.missing.join(" ")), JSON.stringify(it));
+  });
+
+  await test("record access: an account team member with case access None gets no route, with Read gets one", () => {
+    const f = acctFacts("Case", {
+      rows: [{ who: ID.alice, level: "None", cause: "Team" }, { who: ID.bob, level: "Read", cause: "Team" }],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_NONE, accountTeamRole: "Support" }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, accountTeamRole: "Sales Rep" }),
+      ],
+    });
+    const res = explain(f);
+    assert.deepEqual(res.users[0].routes, []);
+    assert.equal(res.users[0].mismatch, null, "no route and no access: nothing to flag");
+    assert.equal(res.users[1].routes.length, 1);
+    assert.equal(res.users[1].routes[0].steps[1], "Bob Jones is on the account team as 'Sales Rep', which gives view access to the account's cases");
+    assert.equal(res.users[1].mismatch, null);
+    // Alice sits on the account team (case level None): the difference must not say anything false about her
+    assert.equal(res.difference.items.length, 1);
+    assert.equal(res.difference.items[0].missing[0], "Alice Smith is not on the account team with access to its cases.");
+    assert.ok(!/is not on the account team\.$/.test(res.difference.items[0].missing[0]));
+  });
+
+  await test("record access: the account owner's role setting gives the owner and the roles above them access to the account's cases", () => {
+    const owner = { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Read" };
+    const f = acctFacts("Case", {
+      owner,
+      users: [
+        user(ID.maria, "Maria Keller", { sf: SF_VIEW, roleId: ID.low, roleName: "UK Rep" }),
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.mid, roleName: "UK Manager" }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.maria, ID.alice]);
+    const m = res.users[0].routes[0];
+    assert.equal(m.kind, "owner");
+    assert.deepEqual(m.steps, ["The case belongs to account 'Contoso (sample)'", "Maria Keller owns the account", "Maria Keller's role 'UK Rep' gives account owners view access to the account's cases"]);
+    const al = res.users[1].routes[0];
+    assert.equal(al.kind, "hierarchy");
+    assert.match(chainText(al), /The account is owned by Maria Keller -> .*gives account owners view access to the account's cases -> Alice Smith's role 'UK Manager' is above 'UK Rep' in the role hierarchy/);
+    assert.equal(res.users[1].mismatch, null);
+    // Bob has no role above the owner's
+    assert.deepEqual(explain(f, [ID.bob]).users[0].routes, []);
+    // the level None (the usual setting) gives nothing
+    const none = acctFacts("Case", { owner: { ...owner, level: "None" }, users: [user(ID.maria, "Maria Keller", { sf: SF_NONE, roleId: ID.low })] });
+    assert.deepEqual(explain(none).users[0].routes, []);
+    // the difference: Alice is above the owner; Bob is not, and Alice is not asked to own the account
+    const d = explain(f, [ID.alice, ID.bob]).difference;
+    assert.match(d.items[0].missing[0], /Bob Jones's role 'France Rep' is not above the account owner's role 'UK Rep'/);
+    const own = explain(f, [ID.maria, ID.bob]).difference;
+    assert.match(own.items[0].missing[0], /Bob Jones does not own the account \(it is owned by Maria Keller\)/);
+    // the owner's boss route is not listed as missing for the owner, whose own route covers it
+    const back = explain(f, [ID.alice, ID.maria]).difference;
+    for (const it of back.items || []) assert.ok(!/not above the account owner/.test(it.missing.join(" ")));
+  });
+
+  await test("record access: account access with case level None gives no route and no false missing line", () => {
+    const f = acctFacts("Case", {
+      rows: [{ who: ID.bob, level: "None", cause: "Manual" }, { who: ID.alice, level: "Read", cause: "Manual" }],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.users[1].mismatch, null);
+    assert.equal(res.users[0].routes.length, 1);
+    const line = res.difference.items[0].missing[0];
+    assert.equal(line, "The account is not shared with Bob Jones in a way that gives access to its cases.");
+    assert.ok(!/not shared at all|has no access to the account/.test(line));
+    // The level None row never becomes an "unknown level" route.
+    assert.ok(res.users[1].routes.every((r) => r.access !== null));
+  });
+
+  await test("record access: account routes join topic matching, so a route both users have is not listed, and a lower level is", () => {
+    const f = acctFacts("Opportunity", {
+      rows: [{ who: ID.gEmea, level: "Edit", cause: "Rule" }],
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, memberOf: [{ groupId: ID.gEmea, memberId: ID.bob }], object: { sets: [PROFILE({ edit: false })] } }),
+      ],
+    });
+    const res = explain(f);
+    assert.equal(res.users[1].routes[0].limited, true);
+    assert.match(res.difference.items[0].missing[0], /Bob Jones has this route too, but Bob Jones's object permissions limit it to view access/);
+    // the object-permission cap applies: Bob has Read only
+    assert.equal(res.users[1].routes[0].effective, "view");
+    // a user who is in the group through the role is never called "not in" it
+    const g = acctFacts("Opportunity", {
+      rows: [{ who: ID.gRole, level: "Read", cause: "Rule" }, { who: ID.gEmea, level: "Edit", cause: "Rule" }],
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales"), grp(ID.gRole, "RoleAndSubordinates", "", ID.mid)],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, roleId: ID.low, roleName: "UK Rep", memberOf: [{ groupId: ID.gEmea, memberId: ID.gRole }] }),
+      ],
+    });
+    const d = explain(g).difference;
+    for (const it of d.items) assert.ok(!/EMEA Sales/.test(it.missing.join(" ")), `false missing line: ${JSON.stringify(it)}`);
+  });
+
+  await test("record access: a group on the account that also reaches managers gives the boss a route, in one sentence", () => {
+    const f = acctFacts("Case", {
+      rows: [{ who: ID.gBosses, level: "Edit", cause: "Rule" }],
+      groups: [grp(ID.gBosses, "Regular", "Field Reps", null, true)],
+      memberRoles: { [ID.gBosses]: { roles: [{ roleId: ID.low, example: "Maria Keller", count: 1 }], users: 1, capped: false } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.mid, roleName: "UK Manager" }), user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" })],
+    });
+    const res = explain(f);
+    assert.equal(res.users[0].routes[0].steps[1], "The account is shared by a sharing rule with public group 'Field Reps', which gives edit access to the account's cases, and it also gives access to managers");
+    assert.match(res.users[0].routes[0].steps[3], /Alice Smith's role 'UK Manager' is above 'UK Rep'/);
+    assert.equal(res.users[0].mismatch, null);
+    assert.match(res.difference.items[0].missing[0], /Bob Jones is not in public group 'Field Reps' and has no role above the role of one of its members/);
+  });
+
+  await test("record access: a case with no account has no account route and no account note", () => {
+    const f = acctFacts("Case", { users: [user(ID.alice, "Alice Smith", { sf: SF_NONE })] });
+    delete f.account;
+    const res = explain(f);
+    assert.deepEqual(res.users[0].routes, []);
+    assert.ok(!res.notes.some((n) => /through the account/.test(n)));
+  });
+
+  await test("record access: reading a case reads its account's sharing with one extra share query, and nothing is written", async () => {
+    const log = [];
+    const inList = (q) => [...(q.match(/IN \(([^)]*)\)/)?.[1] || "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
+    const route = (q) => {
+      if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
+      if (/FROM Case WHERE Id/.test(q)) return [{ Id: "500000000000001AAA", CaseNumber: "0001", OwnerId: ID.carl, AccountId: ID.rec }];
+      if (/SELECT Name FROM Account/.test(q)) return [{ Name: "Contoso (sample)" }];
+      if (/SELECT OwnerId, Owner.Name, Owner.UserRoleId FROM Account/.test(q)) return [{ OwnerId: ID.maria, Owner: { Name: "Maria Keller", UserRoleId: ID.low } }];
+      if (/SELECT CaseAccessForAccountOwner FROM UserRole/.test(q)) return [{ CaseAccessForAccountOwner: "None" }];
+      if (/FROM User WHERE Id = '005000000000004AAA'/.test(q)) return [{ Name: "Carl Brown", UserRoleId: ID.other }];
+      if (/FROM User WHERE Id = '005000000000001AAA'/.test(q)) return [{ Id: ID.alice, Name: "Alice Smith", Username: "alice@example.invalid", IsActive: true, UserType: "Standard", Profile: { Name: "Standard User" }, UserRoleId: ID.mid, UserRole: { Name: "UK Manager" } }];
+      if (/FROM User WHERE Id IN/.test(q)) return [];
+      if (/FROM UserRole/.test(q)) return [{ Id: ID.top, Name: "Sales Director", DeveloperName: "SD", ParentRoleId: null }, { Id: ID.mid, Name: "UK Manager", DeveloperName: "UKM", ParentRoleId: ID.top }, { Id: ID.low, Name: "UK Rep", DeveloperName: "UKR", ParentRoleId: ID.mid }, { Id: ID.other, Name: "France Rep", DeveloperName: "FR", ParentRoleId: ID.top }];
+      if (/FROM Territory2 /.test(q)) return { fail: "sObject type 'Territory2' is not supported.", code: "INVALID_TYPE" };
+      if (/FROM CaseShare/.test(q)) return [{ UserOrGroupId: ID.carl, CaseAccessLevel: "All", RowCause: "Owner" }];
+      if (/FROM AccountShare/.test(q)) return [
+        { UserOrGroupId: ID.maria, RowCause: "Owner", CaseAccessLevel: "None" },
+        { UserOrGroupId: ID.gEmea, RowCause: "Rule", CaseAccessLevel: "Read" },
+        { UserOrGroupId: ID.gUk, RowCause: "ImplicitParent", CaseAccessLevel: "None" },
+      ];
+      if (/FROM Group WHERE RelatedId IN/.test(q)) return [];
+      if (/FROM Group WHERE Id IN/.test(q)) return [{ Id: ID.gEmea, Name: "EMEA Sales", DeveloperName: "EMEA", Type: "Regular", RelatedId: null, DoesIncludeBosses: false }].filter((g) => inList(q).includes(g.Id));
+      if (/FROM GroupMember/.test(q)) return inList(q).includes(ID.alice) ? [{ GroupId: ID.gEmea, UserOrGroupId: ID.alice }] : [];
+      if (/FROM UserRecordAccess/.test(q)) return [{ RecordId: "500000000000001AAA", HasReadAccess: true, HasEditAccess: false, HasDeleteAccess: false, HasTransferAccess: false, HasAllAccess: false, MaxAccessLevel: "Read" }];
+      if (/FROM PermissionSetAssignment/.test(q)) return [{ PermissionSetId: "0PS000000000001AAA", PermissionSetGroupId: null, PermissionSet: { Label: "X", Type: "Profile", IsOwnedByProfile: true, Profile: { Name: "Standard User" }, PermissionsViewAllData: false, PermissionsModifyAllData: false } }];
+      if (/FROM ObjectPermissions/.test(q)) return [{ ParentId: "0PS000000000001AAA", PermissionsRead: true, PermissionsCreate: true, PermissionsEdit: true, PermissionsDelete: false, PermissionsViewAllRecords: false, PermissionsModifyAllRecords: false }];
+      if (/FROM AccountTeamMember/.test(q)) return [];
+      if (/COUNT\(\)/.test(q)) return { total: 0 };
+      return { fail: `no route for ${q}`, code: "TEST" };
+    };
+    const describes = {
+      Case: { label: "Case", labelPlural: "Cases", custom: false, fields: [{ name: "Id", type: "id" }, { name: "CaseNumber", type: "string", nameField: true }, { name: "OwnerId", type: "reference", referenceTo: ["User"] }, { name: "AccountId", type: "reference", referenceTo: ["Account"] }] },
+      Account: { label: "Account", labelPlural: "Accounts", custom: false, fields: [{ name: "Id", type: "id" }, { name: "Name", type: "string", nameField: true }] },
+      CaseShare: { fields: [{ name: "CaseId" }, { name: "CaseAccessLevel" }, { name: "RowCause" }, { name: "UserOrGroupId" }] },
+    };
+    const fetchImpl = async (url, opts = {}) => {
+      const u = new URL(url);
+      log.push({ method: opts.method || "GET", q: u.searchParams.get("q") });
+      const ok = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) });
+      if (/\/sobjects\/$/.test(u.pathname)) return ok({ sobjects: [{ name: "Case", keyPrefix: "500", label: "Case", labelPlural: "Cases" }, { name: "Account", keyPrefix: "001", label: "Account", labelPlural: "Accounts" }] });
+      const m = u.pathname.match(/\/sobjects\/(\w+)\/describe\/$/);
+      if (m) return describes[m[1]] ? ok(describes[m[1]]) : { ok: false, status: 404, text: async () => JSON.stringify([{ message: "not found", errorCode: "NOT_FOUND" }]) };
+      const r = route(u.searchParams.get("q"));
+      if (r.fail) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: r.fail, errorCode: r.code || "TEST" }]) };
+      if (r.total !== undefined) return ok({ done: true, totalSize: r.total, records: [] });
+      return ok({ done: true, totalSize: r.length, records: r });
+    };
+    const api = new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl });
+    const ctx = await readRecordContext(api, "500000000000001AAA");
+    assert.equal(ctx.record.accountId, ID.rec);
+    assert.equal(ctx.record.accountName, "Contoso (sample)");
+    const f = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(f.account.id, ID.rec);
+    assert.deepEqual(f.account.rows, [{ who: ID.gEmea, level: "Read", cause: "Rule" }], "Owner and None rows are left out");
+    assert.deepEqual(f.account.owner, { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "None" });
+    assert.equal(log.filter((l) => /FROM AccountShare/.test(l.q || "")).length, 1, "one share query for the account");
+    assert.match(log.find((l) => /FROM AccountShare/.test(l.q || "")).q, /SELECT UserOrGroupId, RowCause, CaseAccessLevel FROM AccountShare WHERE AccountId = '001000000000001AAA'/);
+    assert.ok(log.some((l) => /FROM AccountTeamMember WHERE AccountId = '001000000000001AAA' AND UserId = '005000000000001AAA'/.test(l.q || "")));
+    const res = explain(f);
+    assert.equal(res.users[0].mismatch, null);
+    assert.equal(res.users[0].routes[0].steps[1], "The account is shared by a sharing rule with public group 'EMEA Sales', which gives view access to the account's cases");
+    assert.ok(log.every((l) => l.method === "GET"));
+    for (const l of log.filter((x) => x.q)) assert.match(l.q, /^SELECT /);
+  });
+
+  await test("record access: the new files never use innerHTML, storage or remote code, and only read", () => {
+    const files = [["tools/record-access/record-access.js"], ["tools/record-access/record-access.html"], ["tools/record-access/record-access.css"], ["tools/record-access/record-access-logic.js"], ["tools/record-access/record-access-read.js"], ["menu.js"]];
+    for (const f of files) {
+      const text = readFileSync(ext(...f), "utf-8");
+      for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "localStorage", "sessionStorage", "chrome.storage", "document.write", "eval("]) {
+        assert.ok(!text.includes(bad), `${f.join("/")} contains ${bad}`);
+      }
+      assert.ok(!/https?:\/\/(?!127\.0\.0\.1)/.test(text.replace(/https:\/\/\$\{/g, "")), `${f.join("/")} mentions a remote URL`);
+    }
+    const pure = readFileSync(ext("tools/record-access/record-access-logic.js"), "utf-8");
+    for (const bad of ["document.", "window.", "fetch(", "chrome.", "location.", "import "]) assert.ok(!pure.includes(bad), `record-access-logic.js contains ${bad}`);
+    const read = readFileSync(ext("tools/record-access/record-access-read.js"), "utf-8");
+    assert.ok(!/\b(INSERT|UPDATE|DELETE|UPSERT|POST|PATCH|PUT)\b/.test(read.replace(/Delete|Update/g, "")), "record-access-read.js has a write verb");
+    assert.ok(!/api\.(post|patch|put|delete)\b|method:/i.test(read));
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.ok(!/method:\s*["'](POST|PUT|PATCH|DELETE)/i.test(page));
+    assert.ok(!/replaceChildren\([^;]*\?[^;]*:\s*null/.test(page));
+    assert.match(page, /navigator\.clipboard\.writeText/);
+  });
+
+  await test("record access: popup entry, record Id in the address, and the manifest version", () => {
+    const popup = readFileSync(ext("menu.js"), "utf-8");
+    assert.match(popup, /page: "tools\/record-access\/record-access\.html"[\s\S]*?title: "Why can a user see this record\?"[\s\S]*?description: "Explain who can see the record open in this tab, and why"/);
+    assert.match(popup, /&record=\$\{encodeURIComponent\(recordId\)\}/);
+    assert.match(popup, /Open a record first/);
+    assert.ok(!/btn\.disabled = !inOrg \|\| /.test(popup), "the button stays enabled when no record is open");
+    assert.match(popup, /btn\.disabled = !inOrg;/);
+    const manifest = JSON.parse(readFileSync(ext("manifest.json"), "utf-8"));
+    assert.match(manifest.version, /^0\.([5-9]|\d\d)\.\d+$/);
+    assert.ok(manifest.description.length <= 132, "Chrome limits the description to 132 characters");
+    assert.match(manifest.description, /record/);
+    assert.match(manifest.description, /territory/);
+  });
+
+  // ---------- territories: a user above a territory, a role above a territory member ----------
+
+  const T3 = "0MI000000000003AAA"; // another top-level territory
+  const T4 = "0MI000000000004AAA"; // under UK
+  const terrTree = (record = []) => ({
+    on: true,
+    items: [{ id: ID.t1, parentId: null, name: "EMEA" }, { id: ID.t2, parentId: ID.t1, name: "UK" }, { id: T3, parentId: null, name: "APAC" }, { id: T4, parentId: ID.t2, name: "Scotland" }],
+    record,
+  });
+
+  await test("record access: a record shared with a territory reaches a user assigned to a territory above it", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] })],
+    });
+    const a = only(explain(f));
+    assert.equal(a.routes.length, 1);
+    assert.deepEqual(a.routes[0].steps, ["Shared through territory assignment with territory 'UK'", "Alice Smith is assigned to territory 'EMEA', which is above 'UK'"]);
+    assert.equal(a.routes[0].access, "edit");
+    assert.equal(a.mismatch, null);
+    // the nearest territory above is named when the user has several
+    const g = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1, T3] })] });
+    assert.match(only(explain(g)).routes[0].steps[1], /'EMEA', which is above 'UK'/);
+    // a territory next to it (not above) gives nothing
+    const h = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_NONE, territoryIds: [T3] })] });
+    assert.deepEqual(only(explain(h)).routes, []);
+    // the object permissions cap it like every other route
+    const c = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t1], object: { sets: [PROFILE({ edit: false })] } })] });
+    const cr = only(explain(c)).routes[0];
+    assert.equal(cr.access, "edit");
+    assert.equal(cr.effective, "view");
+    assert.equal(cr.limited, true);
+  });
+
+  for (const object of ["Case", "Opportunity"]) {
+    await test(`record access: ${object === "Case" ? "a" : "an"} ${object.toLowerCase()} is reached through an account shared with a territory below the user's territory`, () => {
+      const many = object === "Case" ? "cases" : "opportunities";
+      const f = acctFacts(object, {
+        rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }],
+        groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+        territories: terrTree(),
+        users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3] })],
+      });
+      const res = explain(f);
+      const a = res.users[0];
+      assert.equal(a.routes.length, 1);
+      assert.deepEqual(a.routes[0].steps, [
+        `The ${object.toLowerCase()} belongs to account 'Contoso (sample)'`,
+        `The account is shared through territory assignment with territory 'UK', which gives edit access to the account's ${many}`,
+        "Alice Smith is assigned to territory 'EMEA', which is above 'UK'",
+      ]);
+      assert.equal(a.mismatch, null);
+      assert.deepEqual(res.users[1].routes, []);
+      assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK' or one above it.");
+      assert.match(res.difference.items[0].change[0], /Assigning Bob Jones to territory 'UK' \(or one above it\)/);
+    });
+  }
+
+  await test("record access: an account in two territories gives a route for each one the user is in or above", () => {
+    const rec = [{ id: ID.t2, cause: "Territory2AssignmentRule" }, { id: T4, cause: "Territory2AssignmentRule" }];
+    // Alice is in UK (the record's territory) and above Scotland (also the record's territory): both routes, no share row needed
+    const f = facts({ territories: terrTree(rec), shares: { available: true, rows: [] }, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t2] })] });
+    const a = only(explain(f));
+    assert.deepEqual(a.routes.map((r) => r.key).sort(), [`territory:${k15(ID.t2)}`, `territory:${k15(T4)}`].sort());
+    assert.ok(a.routes.some((r) => r.steps.at(-1) === "Alice Smith is assigned to territory 'UK'"));
+    assert.ok(a.routes.some((r) => r.steps.at(-1) === "Alice Smith is assigned to territory 'UK', which is above 'Scotland'"));
+    // a share row to one territory does not hide the route for the other, and the same territory is not listed twice
+    const g = facts({
+      territories: terrTree(rec), groups: [grp(ID.gTerr, "Territory", "", T4)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t2] })],
+    });
+    const b = only(explain(g));
+    assert.deepEqual(b.routes.map((r) => r.key).sort(), [`shareTerrAbove:${k15(ID.gTerr)}:Territory`, `territory:${k15(ID.t2)}`].sort());
+    assert.equal(b.mismatch, null);
+  });
+
+  await test("record access: one user in the territory and one above it are compared by level, not called missing", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1], object: { sets: [PROFILE({ edit: false })] } }), // above, but cannot edit
+      ],
+    });
+    const res = explain(f);
+    const text = toPlainText(res);
+    assert.doesNotMatch(text, /Bob Jones is not assigned to territory/);
+    assert.equal(res.difference.items.length, 1);
+    assert.match(res.difference.items[0].missing[0], /^Bob Jones has this route too, but Bob Jones's object permissions limit it to view access\.$/);
+    // the other way round: the user above has the full level and the one inside is the one with less
+    const g = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t2], object: { sets: [PROFILE({ edit: false })] } })] });
+    const d = explain(g).difference;
+    assert.ok(d.items.every((i) => !/not assigned to territory/.test(i.missing.join(" "))), JSON.stringify(d.items));
+    assert.equal(d.items.length, 1);
+  });
+
+  await test("record access: a user in an unrelated territory has no route, and the difference says 'or one above it'", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3, T4] }), // APAC, and Scotland (below UK, not above it)
+      ],
+    });
+    const res = explain(f);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK' or one above it.");
+    assert.equal(res.difference.items[0].change[0], "Assigning Bob Jones to territory 'UK' (or one above it) would change it.");
+    // "and below" groups: the wording covers below and above
+    const g = facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2)], users: [f.users[0], user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3] })] });
+    assert.equal(explain(g).difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK', one below it or one above it.");
+  });
+
+  await test("record access: a role above a member of a territory the record is shared with is a route ('Manager of Territory Member')", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", count: 3 }], users: 3, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director" }), // no territory at all
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+        user(ID.carl, "Carl Brown", { sf: SF_EDIT, roleId: ID.low, roleName: "UK Rep", territoryIds: [ID.t2] }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const a = res.users[0];
+    const bossRoutes = a.routes.filter((r) => r.key.startsWith("shareBossTerr:")); // (Alice's role is also above the owner's: a different route)
+    assert.equal(bossRoutes.length, 1);
+    assert.deepEqual(bossRoutes[0].steps, [
+      "Shared through territory assignment with territory 'UK'",
+      "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'UK'; 2 other members have a role below this user's too",
+      "Alice Smith's role 'Sales Director' is above 'UK Rep' in the role hierarchy",
+    ]);
+    assert.equal(bossRoutes[0].access, "edit");
+    assert.equal(a.mismatch, null);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.match(res.difference.items.find((i) => /territory 'UK'/.test(i.route)).missing[0], /^Bob Jones is not assigned to territory 'UK', or to a territory above it, and has no role above the role of one of its members\.$/);
+    // someone in the territory and someone whose role is above a member share one topic: compared by level
+    const both = explain(f, [ID.alice, ID.carl]);
+    assert.doesNotMatch(toPlainText(both), /is not assigned to territory/);
+    // a role equal to the member's is not above it
+    const same = explain(facts({ ...f, users: [user(ID.carl, "Carl Brown", { sf: SF_NONE, roleId: ID.low, roleName: "UK Rep" })] }));
+    assert.deepEqual(same.users[0].routes, []);
+    // a user who is also assigned above gets the territory route, not a second one
+    const two = explain(facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director", territoryIds: [ID.t1] })] }));
+    assert.deepEqual(two.users[0].routes.map((r) => r.key).filter((x) => /^share/.test(x)), [`shareTerrAbove:${k15(ID.gTerr)}:Territory`]);
+    // "and below" groups name the territories below it
+    const sub = explain(facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2, true)] }));
+    assert.match(sub.users[0].routes.find((r) => r.key.startsWith("shareBossTerr:")).steps[1], /is assigned to territory 'UK' or one below it/);
+    // a walk that was cut says so once
+    const cut = explain(facts({ ...f, memberRoles: { [ID.gTerr]: { roles: [], users: 0, capped: true } } }), [ID.alice]);
+    assert.equal(cut.notes.filter((n) => /also reaches the managers of their members, but it has many members/.test(n)).length, 1);
+  });
+
+  await test("record access: the reader walks the people assigned to a territory group the record is shared with", async () => {
+    const tables = {
+      members: [], groups: [],
+      users: [{ Id: U5(40), Name: "Tia Terr", UserRoleId: ID.low }, { Id: U5(41), Name: "Sam Sub", UserRoleId: ID.mid }],
+      terr: [{ Territory2Id: ID.t2, UserId: U5(40) }, { Territory2Id: T4, UserId: U5(41) }],
+    };
+    const tp = new Map([[ID.t1, null], [ID.t2, ID.t1], [T4, ID.t2]]);
+    const only2 = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "Territory", relatedId: ID.t2 }]]));
+    assert.deepEqual(only2[ID.gTerr].roles.map((r) => r.roleId), [ID.low]);
+    const sub = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "TerritoryAndSubordinates", relatedId: ID.t2 }]]));
+    assert.deepEqual(sub[ID.gTerr].roles.map((r) => r.roleId).sort(), [ID.low, ID.mid].sort());
+  });
+
+  await test("record access: an empty territory under a populated one: managers of the people above it get a route, and the example says where", async () => {
+    // EMEA > UK > Scotland (empty, shared with); APAC is unrelated. Mia is assigned to UK only.
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: ID.t2, count: 1 }], users: 1, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" }), // no territory, role above Mia
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }), // role not above Mia
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:"));
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.equal(r.access, "view");
+    assert.equal(r.steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'UK', which is above 'Scotland'");
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.difference.items.find((i) => /territory 'Scotland'/.test(i.route)).missing[0],
+      "Bob Jones is not assigned to territory 'Scotland', or to a territory above it, and has no role above the role of one of its members.");
+    // the other user: someone with that role shows the route is in their own facts, so no "lacks" line
+    const alsoBoss = explain(facts({ ...f, users: [f.users[0], user(ID.carl, "Carl Brown", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })] }), [ID.alice, ID.carl]);
+    assert.doesNotMatch(toPlainText(alsoBoss), /is not assigned to territory/);
+    // an example in the shared territory itself keeps the short wording
+    const same = explain(facts({ ...f, memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: T4, count: 1 }], users: 1, capped: false } } }), [ID.alice]);
+    assert.equal(same.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:")).steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'Scotland'");
+    // an example from below ("and below" groups) says so
+    const sub = explain(facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2, true)], memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: T4, count: 1 }], users: 1, capped: false } } }), [ID.alice]);
+    assert.equal(sub.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:")).steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'Scotland', which is below 'UK'");
+
+    // the reader: people in the shared territory, in every territory above it and (and below) under it; not in an unrelated one
+    const tables = {
+      members: [], groups: [],
+      users: [{ Id: U5(40), Name: "Mia Member", UserRoleId: ID.low }, { Id: U5(41), Name: "Pat Pacific", UserRoleId: ID.mid }],
+      terr: [{ Territory2Id: ID.t2, UserId: U5(40) }, { Territory2Id: T3, UserId: U5(41) }],
+    };
+    const tp = new Map([[ID.t1, null], [ID.t2, ID.t1], [T4, ID.t2], [T3, null]]);
+    const found = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "Territory", relatedId: T4 }]]));
+    assert.deepEqual(found[ID.gTerr].roles.map((x) => [x.roleId, x.example, x.terrId]), [[ID.low, "Mia Member", ID.t2]]);
+    assert.equal(found[ID.gTerr].capped, false);
+  });
+
+  await test("record access: two share rows to one territory group with two territory causes give two differently worded routes", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }, { who: ID.gTerr, level: "Edit", cause: "Territory2AssociationManual" }, { who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] })],
+    });
+    const rs = explain(f, [ID.alice]).users[0].routes.filter((x) => x.key.startsWith("shareTerrAbove:"));
+    assert.equal(rs.length, 2);
+    assert.notEqual(rs[0].steps[0], rs[1].steps[0]);
+    assert.ok(rs.some((x) => /^Shared through territory assignment with/.test(x.steps[0])));
+    assert.ok(rs.some((x) => /^Shared through manual territory assignment .*with/.test(x.steps[0])));
+  });
+
+  await test("record access: reading a record shared with a territory group looks up who is assigned to it, and a role above them gets a route", async () => {
+    const { api, log } = fakeOrg();
+    const orig = api.query.bind(api);
+    api.query = async (q, o) => {
+      if (/FROM Territory2 WHERE/.test(q)) return { records: [{ Id: ID.t1, Name: "EMEA", ParentTerritory2Id: null }, { Id: ID.t2, Name: "UK", ParentTerritory2Id: ID.t1 }] };
+      if (/FROM ObjectTerritory2Association/.test(q)) return { records: [] };
+      if (/FROM AccountShare/.test(q)) return { records: [{ UserOrGroupId: ID.gTerr, AccountAccessLevel: "Edit", RowCause: "Territory" }] };
+      if (/FROM Group WHERE Id IN \('00G000000000005AAA'\)/.test(q)) return { records: [{ Id: ID.gTerr, Name: "", DeveloperName: "", Type: "Territory", RelatedId: ID.t2, DoesIncludeBosses: true }] };
+      if (/FROM UserTerritory2Association WHERE UserId/.test(q)) return { records: [] };
+      if (/FROM UserTerritory2Association WHERE Territory2Id IN/.test(q)) return { records: [{ UserId: U5(40), Territory2Id: ID.t2 }] };
+      if (/FROM User WHERE Id IN \('005000000000040AAA'\)/.test(q)) return { records: [{ Id: U5(40), Name: "Tia Terr", UserRoleId: ID.low }] };
+      return orig(q, o);
+    };
+    const ctx = await readRecordContext(api, ID.rec);
+    const f = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(f.memberRoles[ID.gTerr].roles[0].roleId, ID.low);
+    const res = explain(f);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:"));
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.match(r.steps[1], /Member 'Tia Terr' \(role 'UK Rep'\) is assigned to territory 'UK'/);
+    assert.ok(log.every((l) => l.method === "GET"));
+  });
+
+  // ---------- a read that failed for a passing reason is tried again ----------
+
+  /** An api whose get fails with the given errors, one after the other, then answers. */
+  function flaky(errors) {
+    const api = new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl: async () => { throw new Error("unused"); } });
+    let n = 0;
+    api.get = async () => {
+      api.calls++;
+      if (n < errors.length) throw errors[n++];
+      return { done: true, totalSize: 1, records: [{ Id: "x" }] };
+    };
+    return api;
+  }
+  const httpErr = (status, errorCode) => new SalesforceError(`HTTP ${status}`, { status, errorCode });
+  const noWait = { delays: [0, 0], sleep: async () => {} };
+
+  await test("record access: one 502 or a dropped connection is tried again and the answer is kept", async () => {
+    for (const first of [httpErr(502), httpErr(503, "SERVER_UNAVAILABLE"), new TypeError("Failed to fetch")]) {
+      const api = flaky([first]);
+      const r = await withRetry(api, noWait).query("SELECT Id FROM Account");
+      assert.deepEqual(r.records, [{ Id: "x" }]);
+      assert.equal(api.calls, 2);
+    }
+    // through a whole read: a 502 on Salesforce's own answer is not shown to the person
+    const { api } = fakeOrg();
+    const real = api.get.bind(api);
+    let failed = false;
+    api.get = async (p) => { if (!failed && /UserRecordAccess/.test(decodeURIComponent(p))) { failed = true; throw httpErr(502); } return real(p); };
+    const wrapped = withRetry(api, noWait);
+    const ctx = await readRecordContext(wrapped, ID.rec);
+    const facts2 = await readRecordAccess(wrapped, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(failed, true);
+    assert.equal(facts2.users[0].sf.edit, true);
+    assert.ok(!facts2.notes.some((n) => /access answer/.test(n)), facts2.notes.join("\n"));
+    assert.ok(!facts2.warnings.some((w) => /access answer/.test(w)), facts2.warnings.join(" | "));
+  });
+
+  await test("record access: a read that keeps failing is tried twice more, then left out with the usual note", async () => {
+    const api = flaky([httpErr(502), httpErr(502), httpErr(502), httpErr(502)]);
+    await assert.rejects(withRetry(api, noWait).query("SELECT Id FROM Account"), /HTTP 502/);
+    assert.equal(api.calls, 3, "one try and two more");
+    const { api: org } = fakeOrg();
+    const real = org.get.bind(org);
+    org.get = async (p) => { if (/UserRecordAccess/.test(decodeURIComponent(p))) throw httpErr(502); return real(p); };
+    const wrapped = withRetry(org, noWait);
+    const ctx = await readRecordContext(wrapped, ID.rec);
+    const facts2 = await readRecordAccess(wrapped, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(facts2.users[0].sf, null);
+    assert.ok(facts2.notes.some((n) => /Salesforce's own access answer could not be read/.test(n)));
+    assert.equal(explain(facts2).users[0].sfText, "Salesforce's answer could not be read");
+  });
+
+  await test("record access: an expired session, a bad request and query errors are never tried again", async () => {
+    for (const err of [httpErr(401), httpErr(400, "INVALID_FIELD"), httpErr(400, "MALFORMED_QUERY"), httpErr(400, "INVALID_TYPE"), httpErr(403, "INSUFFICIENT_ACCESS"), httpErr(404, "NOT_FOUND"), httpErr(400, "SERVER_UNAVAILABLE"), httpErr(429, "SERVER_UNAVAILABLE")]) {
+      const api = flaky([err, err]);
+      await assert.rejects(withRetry(api, noWait).query("SELECT Id FROM Account"), (e) => e === err);
+      assert.equal(api.calls, 1, `${err.status} ${err.errorCode || ""}`);
+    }
+    // the caller's api is left as it was, and the page wraps its own connection
+    const api = flaky([]);
+    const w = withRetry(api);
+    assert.notEqual(w, api);
+    assert.equal(Object.getPrototypeOf(w), api);
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /withRetry\(new SfApi\(session\)\)/);
+    assert.equal(readFileSync(ext("shared/sfconn.js"), "utf-8").includes("withRetry"), false, "the shared connection code is unchanged");
+  });
+
+  // ---------- "Why the difference" says the same as the person's card ----------
+
+  await test("record access: a difference item held back by object permissions says so the same way as the card, on the page and in the copied text", () => {
+    const f = facts({
+      groups: [grp(ID.gUk, "Regular", "UK Sales"), grp(ID.gEmea, "Regular", "EMEA Sales")],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Edit", cause: "Rule" }, { who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, object: { sets: [PROFILE({ edit: false })] }, memberOf: [{ groupId: ID.gUk, memberId: ID.alice }, { groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    const [lim, plain] = [res.difference.items.find((i) => /UK Sales/.test(i.route)), res.difference.items.find((i) => /EMEA Sales/.test(i.route))];
+    assert.equal(lim.limited, true);
+    assert.equal(lim.effective, "view");
+    assert.equal(givesText(lim), "Would give edit access, limited to view by object permissions");
+    assert.equal(plain.limited, false);
+    assert.equal(givesText(plain), "Gives view access");
+    // the card words it the same way
+    const card = res.users[0].routes.find((r) => /UK Sales/.test(r.summary));
+    assert.equal(`Would give ${card.access} access, limited to ${card.effective} by object permissions`, givesText(lim));
+    const text = toPlainText(res);
+    assert.match(text, /UK Sales.*\(would give edit access, limited to view by object permissions\)/);
+    assert.match(text, /EMEA Sales.*\(gives view access\)/);
+    // an unknown level says nothing new
+    assert.equal(givesText({ gives: null, limited: false }), "");
+    // the page uses the same words
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /givesText\(it\)/);
+    assert.ok(!/`Gives \$\{it\.gives\}`/.test(page));
+  });
+
+  // ---------- Salesforce's reason label next to our wording ----------
+
+  await test("record access: routes Salesforce words as 'Manager of ...' carry its label on the page model and in the copied text", () => {
+    // 1. a user assigned to a territory above one the record is shared with (shareTerrAbove)
+    const fAbove = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_NONE })],
+    });
+    const above = explain(fAbove, [ID.alice, ID.bob]);
+    const rAbove = above.users[0].routes.find((r) => r.key.startsWith("shareTerrAbove:"));
+    assert.equal(rAbove.sfLabel, "Manager of Territory Member");
+    assert.match(toPlainText(above), /Route 1 \(gives view access; Salesforce: Manager of Territory Member\):/);
+    assert.equal(above.difference.items.find((i) => /territory/i.test(i.route)).sfLabel, "Manager of Territory Member");
+    assert.match(toPlainText(above), /\(Salesforce: Manager of Territory Member\)/);
+    // 2. a role above someone who gets a territory's access (shareBossTerr)
+    const fBoss = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: ID.t2, count: 1 }], users: 1, capped: false } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const boss = explain(fBoss, [ID.alice]);
+    assert.equal(boss.users[0].routes.find((r) => r.key.startsWith("shareBossTerr:")).sfLabel, "Manager of Territory Member");
+    // 3. a public group that also reaches managers (shareBossGroup)
+    const fGroup = facts({
+      shares: { available: true, rows: [{ who: ID.gBosses, level: "Edit", cause: "Rule" }] },
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      memberRoles: { [ID.gBosses]: { roles: [{ roleId: ID.mid, example: "Max Mid", count: 1 }], users: 1, capped: false } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const grpRes = explain(fGroup, [ID.alice]);
+    const rGroup = grpRes.users[0].routes.find((r) => r.key.startsWith("shareBossGroup:"));
+    assert.equal(rGroup.sfLabel, "Manager of Group Member");
+    assert.match(toPlainText(grpRes), /Route \d \(gives edit access; Salesforce: Manager of Group Member\):/);
+    // 4. the role above the account owner's role, for a case (acct:ownerRole)
+    const fAcct = acctFacts("Case", {
+      owner: { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Read" },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const acctRes = explain(fAcct, [ID.alice]);
+    assert.equal(acctRes.users[0].routes.find((r) => r.key === "acct:ownerRole").sfLabel, "Manager of User");
+    assert.match(toPlainText(acctRes), /Salesforce: Manager of User/);
+    // the same kinds of route through the account's rows carry the label too
+    assert.equal(sfLabelFor("acct:shareBossTerr:0MI000000000004:Territory"), "Manager of Territory Member");
+    assert.equal(sfLabelFor("acct:shareBossGroup:00G1:Rule"), "Manager of Group Member");
+    assert.equal(sfLabelFor("acct:shareTerrAbove:00G1:Territory"), "Manager of Territory Member");
+  });
+
+  await test("record access: 'Manager of User' on the account shared with a user above whom our user's role is; 'Manager of Queue Member' on the owner queue route", async () => {
+    // the account is shared with a specific user whose role is below Alice's
+    const aliceTop = user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" });
+    const fAcct = acctFacts("Case", {
+      rows: [{ who: ID.bob, level: "Read", cause: "Manual" }],
+      shareUsers: [{ id: ID.bob, name: "Bob Jones", roleId: ID.low }],
+      users: [aliceTop],
+    });
+    const res = explain(fAcct, [ID.alice]);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("acct:shareBoss:"));
+    assert.ok(r && r.detail.whoId && r.detail.acct, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.equal(r.sfLabel, "Manager of User");
+    assert.match(toPlainText(res), /Route \d \(gives view access; Salesforce: Manager of User\):/);
+    // the record-level share to a user, with the same role order, is not confirmed: no tag
+    const fRec = facts({
+      shares: { available: true, rows: [{ who: ID.carl, level: "Read", cause: "Manual" }] },
+      shareUsers: [{ id: ID.carl, name: "Carl Brown", roleId: ID.low }],
+      users: [aliceTop],
+    });
+    const recRes = explain(fRec, [ID.alice]);
+    const rr = recRes.users[0].routes.find((x) => x.key.startsWith("shareBoss:"));
+    assert.ok(rr && rr.detail.whoId && !rr.detail.acct);
+    assert.equal(rr.sfLabel, null);
+    // a share to a role group, with our user's role above it: not confirmed either
+    const fRole = facts({
+      groups: [grp(ID.gUk, "Role", "UK Rep", ID.low)],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Read", cause: "Rule" }] },
+      users: [aliceTop],
+    });
+    const roleRes = explain(fRole, [ID.alice]);
+    const rg = roleRes.users[0].routes.find((x) => x.key.startsWith("shareBoss:"));
+    assert.ok(rg && rg.detail.group && !rg.detail.whoId, JSON.stringify(roleRes.users[0].routes.map((x) => x.key)));
+    assert.equal(rg.sfLabel, null);
+    for (const t of [toPlainText(roleRes), toPlainText(recRes)]) assert.ok(!/[;(]\s*Salesforce: /.test(t), "no label tag");
+    // the same role group through the account's rows: no tag
+    const fAcctRole = acctFacts("Case", { rows: [{ who: ID.gUk, level: "Read", cause: "Rule" }], groups: [grp(ID.gUk, "Role", "UK Rep", ID.low)], users: [aliceTop] });
+    const ar = explain(fAcctRole, [ID.alice]).users[0].routes.find((x) => x.key.startsWith("acct:shareBoss:"));
+    assert.ok(ar && ar.detail.group);
+    assert.equal(ar.sfLabel, null);
+    // the label lookup in one place: by key and detail
+    assert.equal(sfLabelFor("acct:shareBoss:005:Manual", { type: "shareBoss", whoId: "005", acct: true }), "Manager of User");
+    assert.equal(sfLabelFor("acct:shareBoss:005:Manual"), null);
+    assert.equal(sfLabelFor("shareBoss:005:Manual", { type: "shareBoss", whoId: "005" }), null);
+    // the owner queue: role above a member of the queue
+    const rec = { ...facts().record, ownerId: ID.gQueue, ownerKind: "queue", ownerName: "Support Queue", ownerRoleId: null };
+    const tables = { members: [{ GroupId: ID.gQueue, UserOrGroupId: U5(30) }], groups: [], users: [{ Id: U5(30), Name: "Quinn Queue", UserRoleId: ID.low }], terr: [] };
+    const roleParent = new Map([[ID.top, null], [ID.mid, ID.top], [ID.low, ID.mid]]);
+    const found = await readMemberRoles(memberOrg(tables), [ID.gQueue], roleParent, new Map());
+    const fq = facts({
+      record: rec, groups: [grp(ID.gQueue, "Queue", "Support Queue")], memberRoles: found,
+      users: [user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const qRes = explain(fq, [ID.alice]);
+    assert.equal(qRes.users[0].routes.find((x) => x.key === "ownerQueueBoss").sfLabel, "Manager of Queue Member");
+    assert.match(toPlainText(qRes), /Salesforce: Manager of Queue Member/);
+  });
+
+  await test("record access: a route kind Salesforce's label is not known for shows no label", () => {
+    const f = facts({
+      groups: [grp(ID.gUk, "Regular", "UK Sales")],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Edit", cause: "Rule" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.mid, roleName: "UK Manager", memberOf: [{ groupId: ID.gUk, memberId: ID.alice }] }),
+        user(ID.maria, "Maria Keller", { sf: SF_ALL, roleId: ID.low, roleName: "UK Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.maria]);
+    const keys = res.users.flatMap((u) => u.routes.map((r) => r.key));
+    assert.ok(keys.includes("owner") && keys.some((x) => x.startsWith("share:")) && keys.includes("ownerRole"), keys.join(", "));
+    for (const u of res.users) for (const r of u.routes) assert.equal(r.sfLabel, null, r.key);
+    assert.ok(!/Salesforce: /.test(toPlainText(res)));
+    for (const key of ["owner", "ownerRole", "share:00G1:Rule", "shareBoss:00G1:Rule", "acct:owner", "acct:share:00G1:Rule", "territory:0MI1", "owd", "parent", "objectAll"]) assert.equal(sfLabelFor(key), null, key);
+  });
+
+  await test("record access: the page shows the label with textContent, small and quiet", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /const sfLabelNode = .*el\("span", \{ class: "sf-label".*text: `Salesforce: \$\{label\}`/);
+    assert.equal((page.match(/const sfLabelNode = /g) || []).length, 1);
+    assert.equal((page.match(/sfLabelNode\(/g) || []).length, 2, "used on a route card and on a difference item");
+    assert.match(readFileSync(ext("tools/record-access/record-access.css"), "utf-8"), /\.sf-label \{[^}]*color: var\(--muted\)/);
+  });
+
+  // ---------- reads run together, and what is kept for the page session ----------
+
+  /** The fake org, with every request taking a few milliseconds, counting how many are on their way at once. */
+  function slowOrg(opts) {
+    const org = fakeOrg(opts);
+    const orig = org.api.fetch;
+    const flight = { now: 0, max: 0 };
+    org.api.fetch = async (url, o) => {
+      flight.now++;
+      flight.max = Math.max(flight.max, flight.now);
+      await new Promise((r) => setTimeout(r, 4));
+      try { return await orig(url, o); } finally { flight.now--; }
+    };
+    return { ...org, flight };
+  }
+  const BOTH = [{ id: ID.alice, name: "Alice Smith" }, { id: ID.alice, name: "Alice Smith" }];
+
+  await test("record access: reads run together, never more than the cap at once", async () => {
+    const { api, flight } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    flight.max = 0;
+    await readRecordAccess(api, ctx, BOTH);
+    assert.ok(flight.max > 1, `reads overlapped (most at once: ${flight.max})`);
+    assert.ok(flight.max <= MAX_IN_FLIGHT, `no more than ${MAX_IN_FLIGHT} at once (most at once: ${flight.max})`);
+    // the limiter on its own
+    let now = 0, max = 0;
+    const base = { get: async () => { now++; max = Math.max(max, now); await new Promise((r) => setTimeout(r, 2)); now--; return 1; } };
+    const lim = withLimit(base, 3);
+    const results = await Promise.all(Array.from({ length: 20 }, () => lim.get("/x")));
+    assert.equal(results.length, 20);
+    assert.equal(max, 3);
+    assert.equal(withLimit(lim, 1), lim, "an api that is already limited is not limited again");
+    // a failing read gives its place back
+    const bad = withLimit({ get: async () => { throw new Error("no"); } }, 1);
+    await assert.rejects(bad.get("/x"), /no/);
+    await assert.rejects(bad.get("/x"), /no/);
+  });
+
+  await test("record access: the answer is the same as one read after another, notes and warnings in the same order", async () => {
+    for (const failOn of [[], [/FROM AccountShare/, /FROM UserRecordAccess/], [/FROM UserRole/]]) {
+      const a = fakeOrg({ failOn: [...failOn] });
+      const b = fakeOrg({ failOn: [...failOn] });
+      const ctxA = await readRecordContext(a.api, ID.rec);
+      const ctxB = await readRecordContext(b.api, ID.rec);
+      const together = await readRecordAccess(a.api, ctxA, [{ id: ID.alice, name: "Alice Smith" }]);
+      const oneByOne = await readRecordAccess(withLimit(b.api, 1), ctxB, [{ id: ID.alice, name: "Alice Smith" }]);
+      const byJson = (x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y));
+      const norm = (f) => ({ ...f, groups: [...f.groups].sort(byJson), users: f.users.map((u) => ({ ...u, memberOf: [...u.memberOf].sort(byJson) })) });
+      assert.deepEqual(norm(together), norm(oneByOne));
+      assert.deepEqual(together.notes, oneByOne.notes);
+      assert.deepEqual(together.warnings, oneByOne.warnings);
+      assert.deepEqual(explain(together), explain(oneByOne));
+      // the same set of reads, whatever the order
+      const qs = (l) => l.filter((x) => x.q).map((x) => x.q).sort();
+      assert.deepEqual(qs(a.log), qs(b.log));
+    }
+  });
+
+  await test("record access: two users are read together and each gets their own facts", async () => {
+    const { api, flight } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    flight.max = 0;
+    const f = await readRecordAccess(api, ctx, BOTH);
+    assert.equal(f.users.length, 2);
+    assert.ok(f.users.every((u) => u.sf?.edit === true));
+    assert.ok(flight.max >= 4, `both users' reads were under way together (${flight.max})`);
+  });
+
+  await test("record access: a second Explain on the same record reads only the user-specific parts; another record reads its facts again", async () => {
+    const { api, log } = fakeOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const count = (re) => log.filter((l) => re.test(l.q || "")).length;
+    const first = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    assert.equal(count(/FROM Territory2 /), 1);
+    assert.equal(count(/FROM AccountShare/), 1);
+    const permCounts = count(/COUNT\(\) FROM ObjectPermissions WHERE SobjectType = 'Account'/);
+    assert.equal(permCounts, 1);
+    const userReads = count(/FROM UserRecordAccess/);
+    const second = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1, "roles are kept");
+    assert.equal(count(/FROM Territory2 /), 2, "this fake org has no territories, so that read failed and is asked again (a failure is never kept)");
+    assert.equal(count(/FROM AccountShare/), 1, "the account's sharing is kept");
+    assert.equal(count(/COUNT\(\) FROM ObjectPermissions WHERE SobjectType = 'Account'/), 1, "the permission count is kept");
+    assert.equal(count(/FROM UserRecordAccess/), userReads + 1, "the user's own answer is read again");
+    assert.deepEqual(explain(second), explain(first));
+    // what is kept cannot be changed from outside
+    first.roles.push({ id: "x", parentId: null, name: "Added" });
+    first.shares.rows.length = 0;
+    const third = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.ok(!third.roles.some((r) => r.id === "x"));
+    // another record: its facts are read again, the org-wide lists are not
+    const other = { ...ctx, record: { ...ctx.record, id: "001000000000009AAA" } };
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM AccountShare/), 2);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    // the page empties the record's facts when the record changes
+    clearRecordFacts(cache);
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM AccountShare/), 3);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    // nothing is kept when no cache is given
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2);
+  });
+
+  await test("record access: facts kept from an earlier Explain are marked with when they were first read; reading again removes the mark", async () => {
+    const { api } = fakeOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const pickA = [{ id: ID.alice, name: "Alice Smith" }];
+    const before = Date.now();
+    const first = await readRecordAccess(api, ctx, pickA, { cache });
+    const after = Date.now();
+    assert.ok(!first.kept, "the first Explain read everything just now");
+    const second = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.ok(second.kept && typeof second.kept.at === "number");
+    assert.ok(second.kept.at >= before && second.kept.at <= after, "the time of the first read");
+    const third = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.equal(third.kept.at, second.kept.at, "still the first read's time");
+    // reading again (the page clears the record's facts)
+    clearRecordFacts(cache);
+    const fourth = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.ok(!fourth.kept);
+    assert.ok((await readRecordAccess(api, ctx, pickA, { cache })).kept, "and the facts read just now are kept again");
+    // a new record starts afresh too
+    const other = { ...ctx, record: { ...ctx.record, id: "001000000000009AAA" } };
+    assert.ok(!(await readRecordAccess(api, other, pickA, { cache })).kept);
+    // nothing in the facts but the marker differs
+    const { kept, ...rest } = second;
+    assert.deepEqual(rest, first);
+    // no cache: never a marker
+    assert.ok(!(await readRecordAccess(api, ctx, pickA)).kept);
+  });
+
+  await test("record access: the page shows one quiet line for kept facts, with a link-style button to read again", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /facts\.kept\?\.at/);
+    assert.match(page, /el\("button", \{ class: "link", text: "Read it again", onclick: readAgain \}\)/);
+    assert.match(page, /function readAgain\(\) \{\s*clearRecordFacts\(state\.cache\);\s*run\(\);/);
+    assert.match(page, /was read at \$\{time\}, the first time you explained it on this page/);
+    assert.match(page, /toLocaleTimeString\(\[\], \{ hour: "2-digit", minute: "2-digit" \}\)/);
+    assert.match(readFileSync(ext("tools/record-access/record-access.html"), "utf-8"), /<p class="hint kept" id="kept" hidden><\/p>/);
+  });
+
+  await test("record access: a read that failed is not kept; the next Explain tries it again and the note goes away", async () => {
+    const failOn = [/FROM AccountShare/, /FROM UserRole WHERE PortalType = 'None'/];
+    const { api, log } = fakeOrg({ failOn });
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const count = (re) => log.filter((l) => re.test(l.q || "")).length;
+    const bad = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.ok(bad.notes.some((n) => /^Roles could not be read/.test(n)));
+    assert.ok(bad.notes.some((n) => /^The account's sharing rows could not be read/.test(n)) || bad.notes.some((n) => /^The record's sharing rows could not be read/.test(n)), bad.notes.join("\n"));
+    assert.equal(bad.roles.length, 0);
+    failOn.length = 0; // the org answers now
+    const good = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2, "the failed read was tried again");
+    assert.equal(good.roles.length, 3);
+    assert.equal(good.notes.filter((n) => /could not be read/.test(n)).length, 0, good.notes.join("\n"));
+    assert.equal(good.shares.rows.length, 2);
+    // and now that it worked it is kept
+    await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2);
+  });
+
+  await test("record access: progress counts up to the end and never goes back", async () => {
+    const { api } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const seen = [];
+    await readRecordAccess(api, ctx, BOTH, { progress: (t) => seen.push(t) });
+    const nums = seen.map((t) => t.match(/^Reading… \((\d+) of (\d+)\)$/)).map((m) => (assert.ok(m, "plain wording"), [Number(m[1]), Number(m[2])]));
+    assert.deepEqual(nums[0], [0, 9]);
+    assert.deepEqual(nums.at(-1), [9, 9]);
+    for (let i = 1; i < nums.length; i++) assert.ok(nums[i][0] === nums[i - 1][0] + 1 && nums[i][1] === 9);
+  });
+
+  await test("record access: the page keeps what it read in memory only and empties the record's facts for a new record", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /cache: createReadCache\(\)/);
+    assert.match(page, /clearRecordFacts\(state\.cache\)/);
+    assert.match(page, /cache: state\.cache/);
+    const read = readFileSync(ext("tools/record-access/record-access-read.js"), "utf-8");
+    const storage = /chrome\.storage|localStorage|sessionStorage|indexedDB/;
+    assert.ok(!storage.test(read), "nothing is written to browser storage");
+    assert.ok(!storage.test(page));
+  });
+}
+
+function k15(id) { return id.slice(0, 15); }

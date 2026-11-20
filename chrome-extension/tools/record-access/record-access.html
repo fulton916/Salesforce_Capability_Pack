@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Why can a user see this record?</title>
+<link rel="stylesheet" href="../../shared/pack.css">
+<link rel="stylesheet" href="../user-access/user-access.css">
+<link rel="stylesheet" href="record-access.css">
+</head>
+<body>
+<header class="top">
+  <h1>Why can a user see this record?</h1>
+  <div class="org" id="org">Not connected</div>
+  <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2 class="step">The record</h2>
+    <div id="recordCard" class="reccard" role="status">No record chosen yet. Open a record in Salesforce and start from the toolbar button, or paste a link or Id below.</div>
+    <div class="recordrow org-only">
+      <label class="pick-label" for="recordInput">Record link or Id (to look at a different record)</label>
+      <div class="inputrow">
+        <input type="text" id="recordInput" class="psg-input" autocomplete="off" placeholder="Paste the address of a record, or its Id">
+        <button id="recordUse">Use this record</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="step">Choose who to look at</h2>
+    <p class="hint">Type part of a name or username. Add a second user to find out why one can see the record and the other can't.</p>
+    <div class="pickers">
+      <div class="picker" data-side="a">
+        <label class="pick-label" for="input-a"><span class="side a">A</span> User</label>
+        <div class="combo org-only">
+          <input type="text" id="input-a" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-a" autocomplete="off" placeholder="Start typing a name or username">
+          <ul class="psg-list" id="list-a" role="listbox" hidden></ul>
+        </div>
+        <div class="chosen"></div>
+      </div>
+      <div class="picker" data-side="b">
+        <label class="pick-label" for="input-b"><span class="side b">B</span> Second user (optional, to compare)</label>
+        <div class="combo org-only">
+          <input type="text" id="input-b" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-b" autocomplete="off" placeholder="Start typing a name or username">
+          <ul class="psg-list" id="list-b" role="listbox" hidden></ul>
+        </div>
+        <div class="chosen"></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="explain" class="primary" disabled>Explain</button>
+      <span id="progress" role="status"></span>
+    </div>
+    <div id="error" class="error" hidden></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="panel hero">
+      <p class="verdict" id="verdict"></p>
+      <div class="resultactions">
+        <button id="copy">Copy explanation</button>
+        <span id="copied" role="status"></span>
+      </div>
+    </div>
+    <p class="hint kept" id="kept" hidden></p>
+    <div id="mismatches"></div>
+    <div class="peopleGrid" id="people"></div>
+    <div class="panel" id="diffPanel" hidden>
+      <h2>Why the difference</h2>
+      <div id="diff"></div>
+    </div>
+    <details class="panel notes" id="notesPanel">
+      <summary id="notesTitle">Notes</summary>
+      <ul id="notes"></ul>
+      <details class="tech" id="techPanel" hidden>
+        <summary>Technical details</summary>
+        <div id="tech"></div>
+      </details>
+    </details>
+  </section>
+
+  <p class="footer">Read-only: this page only reads from your org and never changes anything. Nothing about the users is saved.</p>
+</main>
+<script type="module" src="record-access.js"></script>
+</body>
+</html>

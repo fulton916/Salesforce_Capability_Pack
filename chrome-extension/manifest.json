@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Salesforce Capability Pack",
+  "version": "0.7.0",
+  "description": "Compare permission set groups; user, record and flow lookups; territory and role trees; page details for tickets. Read-only",
+  "permissions": ["cookies", "activeTab", "tabs"],
+  "host_permissions": [
+    "https://*.salesforce.com/*",
+    "https://*.force.com/*",
+    "https://*.salesforce-setup.com/*",
+    "https://*.cloudforce.com/*",
+    "https://*.visualforce.com/*",
+    "https://*.salesforce.mil/*",
+    "https://*.cloudforce.mil/*",
+    "https://*.sfcrmproducts.cn/*"
+  ],
+  "action": {
+    "default_title": "Salesforce Capability Pack",
+    "default_popup": "menu.html"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

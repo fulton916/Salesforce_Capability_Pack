@@ -50,7 +50,7 @@ jobs:
         run: python tests/run_tests.py
 
   node:
-    name: sf-psg-compare (Node 20)
+    name: chrome-extension (Node 20)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -59,5 +59,5 @@ jobs:
         with:
           node-version: 20
       - name: Run tests
-        working-directory: sf-psg-compare
+        working-directory: chrome-extension
         run: node tests/run_tests.mjs
