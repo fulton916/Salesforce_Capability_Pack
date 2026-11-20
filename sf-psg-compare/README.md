@@ -17,6 +17,7 @@ Compare permission set groups:
 User access summary and comparison:
 - What can this user access, and how do they get it (directly or through a group)?
 - How do two users' access differ?
+- Do two users differ in call center, or in a custom setting (such as a bypass flag) that could make Salesforce behave differently for them?
 
 Territory & role hierarchy:
 - What does the whole territory or role tree look like, and what is under this one branch?
@@ -209,7 +210,7 @@ Try it: `python tools/dev_server.py --no-org`, then open
 
 ## Install (unpacked, for your own browser)
 
-New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-step-by-step) in the main README.
+New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
 
 1. Copy this folder anywhere.
 2. Chrome or Edge: open `chrome://extensions` (Edge: `edge://extensions`).
@@ -321,9 +322,11 @@ users are marked "Inactive". Add a second user under "Second user (optional, to 
 |---|---|
 | Profile | the profile and its user license |
 | Role | the role |
+| Call center | the call center the user is assigned to (read from the user's call center field, then the call center itself; "No call center" is a normal result, and the area says "not available" only if the org has no such field) |
 | Permission set groups | groups assigned to the user; a muting permission set is shown as "Muting permission set: ..." |
 | Permission sets | every permission set the user gets, and how: "Assigned directly", "Through group: ...", or both. Profile-owned sets and the summary sets Salesforce keeps for groups are left out |
 | Permission set licenses | the permission set licenses assigned |
+| Custom settings | hierarchy custom settings (the kind with values per user or profile, such as a "Bypass validation rules" box) where the user's value differs from the org default. Each row: setting and field, value for this user, where it comes from (this user, their profile, org default), org default. A count line says how many settings are affected, with plain notes for fields of special types that are not shown and for settings that could not be read (only if every setting fails does the area say "Not available"). In a compare, a setting that could not be read for one user is marked "Could not be read for <name>" and is not counted as a difference. The CSV carries these notes as "Note" rows. Salesforce's rule is applied field by field: user first, then profile, then org default, the first value that is not empty wins (an unchecked box counts as a value). In a compare, rows are matched by API name; a user with no row is at the org default. Values of fields whose name or label looks like a key, token, secret, password or credential (or "private") are shown as "Hidden (looks like a key)" on the page and in the CSV, so an exported file is safe to share; a note says so. Checkboxes are never hidden |
 | Public groups, Queues | direct membership only. Membership through roles or groups inside groups is not shown |
 | Territories | the territories the user is assigned to |
 
@@ -529,7 +532,7 @@ in the browser or on disk.
 User access summary and comparison reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
 `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`, `UserLicense`,
 `PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
-`UserTerritory2Association`. The user search runs in the org (LIKE, limit 50), so it works with
+`UserTerritory2Association`, `CallCenter` (by the Id in `User.CallCenterId`), `EntityDefinition` (custom settings), `Organization` (its Id), a describe of each custom setting and one read of each hierarchy setting. Hierarchy settings are told from list settings by a describe call each (only hierarchy settings have a `SetupOwnerId` field; describes are cached, so a second user costs none), done 6 at a time with progress shown. At most 300 custom settings are checked; if the org has more, the page says so. The user search runs in the org (LIKE, limit 50), so it works with
 thousands of users. When the org's territory feature is off, the page does not ask for it.
 
 The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector finds
@@ -539,7 +542,7 @@ keep the old `licence` spelling so saved files still load. Saved group files use
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.6.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.7.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 

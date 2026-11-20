@@ -9,6 +9,8 @@ import { SfApi, soqlLike } from "../extension/lib/sfconn.js";
 import { searchUsers, readUserAccess } from "../extension/lib/useraccess.js";
 import {
   compareUsers, validateAccess, toRows, toRowsSingle, toCsv, matchUsers, howText, summarize, SECTION_KEYS, plural, countText, detailText, hasDetails, singleRows, statusText, userCardLines, orgParts,
+  resolveHierarchy, settingItems, customSettingsLine, valueText, customSettingsSkippedNote, customSettingsFailedNote,
+  isSecretLike, customSettingsHiddenNote, HIDDEN_TEXT, HIDDEN_NOTE,
 } from "../extension/lib/usercompare.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -24,9 +26,19 @@ function fakeFetch(routes, log = []) {
       const sobjects = (globalThis.__sobjects || ["User", "UserTerritory2Association"]).map((name) => ({ name }));
       return { ok: true, status: 200, text: async () => JSON.stringify({ sobjects }) };
     }
+    const desc = /\/sobjects\/([\w]+)\/describe\/$/.exec(u.pathname);
+    if (desc) {
+      log.push({ method: opts.method || "GET", path: u.pathname, q: null });
+      const d = (routes.describes || {})[desc[1]];
+      if (!d) return { ok: false, status: 404, text: async () => JSON.stringify([{ message: `no describe for ${desc[1]}`, errorCode: "NOT_FOUND" }]) };
+      if (d.fail) return { ok: false, status: 403, text: async () => JSON.stringify([{ message: d.fail, errorCode: "INSUFFICIENT_ACCESS" }]) };
+      return { ok: true, status: 200, text: async () => JSON.stringify(d) };
+    }
     log.push({ method: opts.method || "GET", path: u.pathname, q: u.searchParams.get("q") });
     if (!u.pathname.includes("/query")) throw new Error(`unexpected url ${url}`);
     const q = u.searchParams.get("q");
+    // A real org has no relationship name for User.CallCenterId, so any path through it fails.
+    if (/CallCenter\./.test(q)) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: "Didn't understand relationship 'CallCenter' in field path. If you are attempting to use a custom relationship, be sure to append the '__r' after the custom relationship name.", errorCode: "INVALID_FIELD" }]) };
     const route = routes.find(([re]) => re.test(q));
     if (!route) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: `no route for ${q}`, errorCode: "TEST" }]) };
     const records = route[1](q);
@@ -40,7 +52,11 @@ const apiFor = (routes, log) => new SfApi({ apiHost: "test.example.com", session
 // A synthetic org for readUserAccess.
 function userRoutes(over = {}) {
   const routes = [
-    [/FROM User WHERE Id/, () => [{ Id: "005A", Name: "Alex Example", Username: "alex@example.com", IsActive: true,
+    [/SELECT CallCenterId FROM User/, () => [{ CallCenterId: "04vCC0000000001AAA" }]],
+    [/FROM CallCenter WHERE Id = '04vCC0000000001AAA'/, () => [{ Id: "04vCC0000000001AAA", Name: "Demo Line", InternalName: "Demo_Line" }]],
+    [/FROM EntityDefinition/, () => []],
+    [/FROM Organization/, () => [{ Id: "00DORG000000001AAA" }]],
+    [/FROM User WHERE Id/, () => [{ Id: "005A", Name: "Alex Example", Username: "alex@example.com", IsActive: true, ProfileId: "00ePROF00000001AAA",
       Profile: { Name: "Sales Standard", UserLicense: { Name: "Salesforce" } }, UserRole: { Name: "Sales Rep", DeveloperName: "Sales_Rep" } }]],
     [/FROM PermissionSetAssignment/, () => [
       { PermissionSetId: "0PS1", PermissionSetGroupId: null, PermissionSet: { Name: "Opportunity_Edit", Label: "Opportunity Edit", NamespacePrefix: null, Type: "Regular", IsOwnedByProfile: false, LicenseId: null } },
@@ -71,6 +87,7 @@ function userRoutes(over = {}) {
     [/FROM UserTerritory2Association/, () => [{ Territory2: { DeveloperName: "North", Name: "North" } }]],
   ];
   for (const [re, fn] of over.routes || []) routes.unshift([re, fn]);
+  routes.describes = over.describes || {};
   return routes;
 }
 
@@ -219,10 +236,10 @@ export async function run(test) {
 
   await test("compareUsers counts only-A, only-B and same, and writes a verdict", () => {
     const r = compareUsers(sample("user_a.json"), sample("user_b.json"));
-    assert.deepEqual(r.counts.queues, { onlyA: 1, onlyB: 0, same: 1, differ: 0, total: 2, totalA: 2, totalB: 1 });
-    assert.deepEqual(r.counts.publicGroups, { onlyA: 1, onlyB: 1, same: 1, differ: 0, total: 3, totalA: 2, totalB: 2 });
-    assert.deepEqual(r.counts.permissionSets, { onlyA: 1, onlyB: 1, same: 2, differ: 1, total: 5, totalA: 4, totalB: 4 });
-    assert.deepEqual(r.counts.territories, { onlyA: 1, onlyB: 0, same: 0, differ: 0, total: 1, totalA: 1, totalB: 0 });
+    assert.deepEqual(r.counts.queues, { onlyA: 1, onlyB: 0, same: 1, differ: 0, unread: 0, total: 2, totalA: 2, totalB: 1 });
+    assert.deepEqual(r.counts.publicGroups, { onlyA: 1, onlyB: 1, same: 1, differ: 0, unread: 0, total: 3, totalA: 2, totalB: 2 });
+    assert.deepEqual(r.counts.permissionSets, { onlyA: 1, onlyB: 1, same: 2, differ: 1, unread: 0, total: 5, totalA: 4, totalB: 4 });
+    assert.deepEqual(r.counts.territories, { onlyA: 1, onlyB: 0, same: 0, differ: 0, unread: 0, total: 1, totalA: 1, totalB: 0 });
     assert.match(r.verdict.text, /Alex Example and Blake Sample each have access the other does not \(\d+ differences in total\)\./);
     const twin = structuredClone(sample("user_a.json"));
     twin.user.username = "alex.two@example.com";
@@ -373,6 +390,454 @@ export async function run(test) {
     assert.deepEqual(orgParts(org, "h.example.com", null).map((p) => p.text), ["Acme", "Sandbox", "h.example.com"]);
     assert.deepEqual(orgParts(org, "", "DEV SERVER").map((p) => p.text), ["Acme", "Sandbox", "DEV SERVER"]);
     for (const p of orgParts(org, null, undefined)) assert.ok(p && p.text && p.text !== "null");
+  });
+
+  // ---- call center and custom settings ----
+  const IDS = { userId: "005USER00000001AAA", profileId: "00ePROF00000001AAA", orgId: "00DORG000000001AAA" };
+  const row = (owner, vals) => ({ SetupOwnerId: owner, ...vals });
+  const boolF = { name: "Bypass__c", label: "Bypass validation rules", type: "boolean" };
+  const numF = { name: "Size__c", label: "Batch size", type: "double" };
+  const textF = { name: "Note__c", label: "Note", type: "string" };
+  const by = (r, n) => r.find((x) => x.name === n);
+
+  await test("hierarchy rule: user beats profile beats org, field by field", () => {
+    const rows = [
+      row(IDS.orgId, { Size__c: 50, Note__c: "org note" }),
+      row(IDS.profileId, { Size__c: 100, Note__c: "profile note" }),
+      row(IDS.userId, { Size__c: 200, Note__c: "user note" }),
+    ];
+    const r = resolveHierarchy([numF, textF], rows, IDS);
+    assert.deepEqual([by(r, "Size__c").value, by(r, "Size__c").source, by(r, "Size__c").orgDefault], [200, "user", 50]);
+    assert.deepEqual([by(r, "Note__c").value, by(r, "Note__c").source], ["user note", "user"]);
+  });
+
+  await test("hierarchy rule: a null at a lower level falls through, per field", () => {
+    const rows = [
+      row(IDS.orgId, { Size__c: 50, Note__c: "org note" }),
+      row(IDS.profileId, { Size__c: 100, Note__c: null }),
+      row(IDS.userId, { Size__c: null, Note__c: null }),
+    ];
+    const r = resolveHierarchy([numF, textF], rows, IDS);
+    assert.deepEqual([by(r, "Size__c").value, by(r, "Size__c").source], [100, "profile"], "user null falls to profile");
+    assert.deepEqual([by(r, "Note__c").value, by(r, "Note__c").source], ["org note", "org"], "both null fall to org");
+    // no user or profile row at all
+    const r2 = resolveHierarchy([numF], [row(IDS.orgId, { Size__c: 50 })], IDS);
+    assert.deepEqual([r2[0].value, r2[0].source], [50, "org"]);
+    // nothing set anywhere
+    const r3 = resolveHierarchy([numF], [], IDS);
+    assert.deepEqual([r3[0].value, r3[0].source, r3[0].orgDefault], [null, null, null]);
+  });
+
+  await test("hierarchy rule: a checkbox false at user level beats true at profile level", () => {
+    const rows = [row(IDS.orgId, { Bypass__c: false }), row(IDS.profileId, { Bypass__c: true }), row(IDS.userId, { Bypass__c: false })];
+    const r = resolveHierarchy([boolF], rows, IDS);
+    assert.deepEqual([r[0].value, r[0].source], [false, "user"]);
+    // the user's false equals the org default, so nothing is shown for this user
+    assert.deepEqual(settingItems({ api: "S__c", label: "S" }, [boolF], rows, IDS), []);
+    // ids of 15 and 18 characters match
+    const r15 = resolveHierarchy([boolF], [row(IDS.profileId.slice(0, 15), { Bypass__c: true })], IDS);
+    assert.equal(r15[0].source, "profile");
+  });
+
+  await test("only fields that differ from the org default are listed", () => {
+    const rows = [
+      row(IDS.orgId, { Bypass__c: false, Size__c: 50, Note__c: "same" }),
+      row(IDS.profileId, { Bypass__c: true, Size__c: 50, Note__c: "same" }),
+      row(IDS.userId, { Bypass__c: false, Size__c: 75, Note__c: null }),
+    ];
+    const items = settingItems({ api: "ns__Auto__c", label: "Automation Settings" }, [boolF, numF, textF], rows, IDS);
+    assert.deepEqual(items.map((i) => i.key), ["ns__Auto__c.Size__c"]);
+    const it = items[0];
+    assert.deepEqual([it.label, it.valueText, it.sourceText, it.orgDefaultText], ["Automation Settings: Batch size", "75", "This user", "50"]);
+    assert.deepEqual([it.setting.api, it.field.api, it.field.label], ["ns__Auto__c", "Size__c", "Batch size"]);
+    // an unchecked checkbox with no org row is the same as the default; checked is not
+    const none = settingItems({ api: "S__c", label: "S" }, [boolF], [row(IDS.userId, { Bypass__c: false })], IDS);
+    assert.equal(none.length, 0);
+    const on = settingItems({ api: "S__c", label: "S" }, [boolF], [row(IDS.profileId, { Bypass__c: true })], IDS);
+    assert.deepEqual([on[0].valueText, on[0].sourceText, on[0].orgDefaultText], ["Checked", "Their profile", "Not checked"]);
+    assert.equal(valueText("string", null), "Not set");
+  });
+
+  const csItem = (api, field, value, source, orgDefault, type = "boolean") => settingItems(
+    { api, label: api.replace("__c", "") }, [{ name: field, label: field.replace("__c", ""), type }],
+    [row(IDS.orgId, { [field]: orgDefault }), row(source === "user" ? IDS.userId : IDS.profileId, { [field]: value })], IDS)[0];
+  const withCs = (name, items, info) => ({ ...mk(name, { customSettings: items }), customSettingsInfo: info });
+
+  await test("secret-like custom setting fields: name rule", () => {
+    assert.equal(isSecretLike({ name: "Profile_Key__c", label: "Profile", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Api_Token__c", label: "x", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Client_Secret__c", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Pw__c", label: "Admin PASSWORD", type: "string" }), true, "label match, any case");
+    assert.equal(isSecretLike({ name: "X__c", label: "Private info", type: "string" }), true);
+    assert.equal(isSecretLike({ name: "Use_Key__c", label: "Use key", type: "boolean" }), false, "checkbox exempt");
+    assert.equal(isSecretLike({ name: "Batch_Size__c", label: "Batch size", type: "double" }), false);
+  });
+
+  await test("a hidden field that differs is listed with the hidden text everywhere and the raw value never appears", () => {
+    const RAW = "RAWSECRET-0123456789-abcdef";
+    const RAW2 = "OTHERSECRET-9876543210-fedcba";
+    const field = { name: "Profile_Key__c", label: "Profile Key", type: "string" };
+    const mkItems = (userVal, orgVal) => settingItems({ api: "S__c", label: "S" }, [field], [row(IDS.orgId, { Profile_Key__c: orgVal }), row(IDS.userId, { Profile_Key__c: userVal })], IDS);
+    const itemsA = mkItems(RAW, "ORGDEFAULT-RAW-VALUE");
+    assert.equal(itemsA.length, 1, "a hidden field that differs is still listed");
+    assert.equal(itemsA[0].valueText, HIDDEN_TEXT);
+    assert.equal(itemsA[0].orgDefaultText, HIDDEN_TEXT);
+    assert.equal(mkItems("ORGDEFAULT-RAW-VALUE", "ORGDEFAULT-RAW-VALUE").length, 0, "equal to the org default is not listed");
+    const a = withCs("Ann", itemsA, { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const b = withCs("Bob", mkItems(RAW2, "ORGDEFAULT-RAW-VALUE"), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const c = withCs("Cy", mkItems(RAW, "ORGDEFAULT-RAW-VALUE"), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const none = withCs("Dee", [], { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    assert.equal(compareUsers(a, b).sections.customSettings[0].status, "differ", "different hidden values still differ");
+    assert.equal(compareUsers(a, c).sections.customSettings[0].status, "same", "equal hidden values are the same");
+    const r = compareUsers(a, none);
+    assert.equal(r.sections.customSettings[0].detailB, `Same as the org default: ${HIDDEN_TEXT}`);
+    const all = JSON.stringify([singleRows(a, "customSettings"), compareUsers(a, b).sections, r.sections, toRows(compareUsers(a, b)), toRows(r, "customSettings"), toRowsSingle(a), toRowsSingle(a, "customSettings"), toCsv(toRows(compareUsers(a, b))), toCsv(toRowsSingle(a)), itemsA]);
+    for (const raw of [RAW, RAW2, "ORGDEFAULT-RAW-VALUE"]) assert.ok(!all.includes(raw), `${raw} must not appear`);
+    assert.ok(singleRows(a, "customSettings")[0].detail.includes(HIDDEN_TEXT));
+    assert.ok(toCsv(toRowsSingle(a)).includes(HIDDEN_TEXT));
+    assert.ok(toCsv(toRows(compareUsers(a, b))).includes(HIDDEN_TEXT));
+  });
+
+  await test("the hidden-values note appears only when something is hidden", () => {
+    const hid = withCs("Ann", settingItems({ api: "S__c", label: "S" }, [{ name: "Api_Token__c", label: "Api Token", type: "string" }], [row(IDS.userId, { Api_Token__c: "x" })], IDS), { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    const plain = withCs("Bob", [csItem("Auto__c", "Bypass__c", true, "user", false)], { found: 1, examined: 1, hierarchy: 1, failed: 0, capped: false });
+    assert.equal(customSettingsHiddenNote(hid), HIDDEN_NOTE);
+    assert.equal(customSettingsHiddenNote(plain), "");
+    assert.equal(customSettingsHiddenNote(plain, hid), HIDDEN_NOTE);
+    const notes = (rows) => rows.filter((r) => r.includes("Note") && r.includes(HIDDEN_NOTE)).length;
+    assert.equal(notes(toRowsSingle(hid)), 1);
+    assert.equal(notes(toRowsSingle(plain)), 0);
+    assert.equal(notes(toRows(compareUsers(hid, plain))), 1);
+    assert.equal(notes(toRows(compareUsers(plain, plain))), 0);
+    assert.equal(notes(toRows(compareUsers(hid, plain), "customSettings")), 1);
+  });
+
+  await test("demo samples show the hidden text for the token field", () => {
+    const a = validateAccess(sample("user_a.json"));
+    const b = validateAccess(sample("user_b.json"));
+    assert.equal(customSettingsHiddenNote(a, b), HIDDEN_NOTE);
+    const r = compareUsers(a, b);
+    const t = r.sections.customSettings.find((x) => x.key === "Integration_Settings__c.Api_Token__c");
+    assert.equal(t.status, "differ");
+    assert.match(t.detailA, /Hidden \(looks like a key\)/);
+  });
+
+  await test("compare matches custom setting values by API name and shows who differs", () => {
+    const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false), csItem("Integ__c", "Size__c", 200, "user", 50, "double")]);
+    const b = withCs("Bob", [csItem("Auto__c", "Bypass__c", true, "profile", false), csItem("Auto__c", "Flows__c", true, "profile", false)]);
+    b.user.id = "005OTHERORG000001"; // Ids never matter
+    const r = compareUsers(a, b);
+    const st = Object.fromEntries(r.sections.customSettings.map((x) => [x.key, x.status]));
+    assert.deepEqual(st, { "Auto__c.Bypass__c": "same", "Auto__c.Flows__c": "onlyB", "Integ__c.Size__c": "onlyA" }, "same value from a different level is the same");
+    assert.deepEqual(r.counts.customSettings, { onlyA: 1, onlyB: 1, same: 1, differ: 0, unread: 0, total: 3, totalA: 2, totalB: 2 });
+    // the user without the row is at the org default, and the row says so
+    const flows = r.sections.customSettings.find((x) => x.key === "Auto__c.Flows__c");
+    assert.equal(flows.detailA, "Same as the org default: Not checked");
+    assert.match(flows.detailB, /Value: Checked\nComes from: their profile\nOrg default: Not checked/);
+    // different values for the same field are "Different"
+    const c = withCs("Cy", [csItem("Auto__c", "Bypass__c", false, "user", true)]);
+    const d = withCs("Di", [csItem("Auto__c", "Bypass__c", true, "profile", false)]);
+    assert.equal(compareUsers(c, d).sections.customSettings[0].status, "differ");
+    assert.match(compareUsers(a, b).verdict.text, /differences in total/);
+    assert.deepEqual(say(userCardLines(r, "customSettings")).slice(0, 3), ["1 custom setting value both have", "1 only Ann has", "1 only Bob has"]);
+  });
+
+  await test("a compare of one user with and one without a call center, matched by internal name", async () => {
+    const a = await readUserAccess(apiFor(userRoutes()), "005A");
+    const b = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: null }]]] })), "005B");
+    b.user.name = "Blake Example";
+    b.user.username = "blake@example.com";
+    const r = compareUsers(a, b);
+    assert.deepEqual(say(userCardLines(r, "callCenter")), [`${a.user.name}: Demo Line`, `${b.user.name}: no call center`]);
+    // the same center under a different Id in another org is the same item
+    const other = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: "04vCC0000000999AAA" }]], [/FROM CallCenter WHERE Id = '04vCC0000000999AAA'/, () => [{ Id: "04vCC0000000999AAA", Name: "Demo Line", InternalName: "Demo_Line" }]]] })), "005C");
+    assert.deepEqual(say(userCardLines(compareUsers(a, other), "callCenter")), ["✓ Same in both: Demo Line"]);
+  });
+
+  await test("count lines use has / have and singular / plural correctly", () => {
+    const withCs = (n, hierarchy) => {
+      const acc = mk("A", {});
+      acc.customSettingsInfo = { found: hierarchy, examined: hierarchy, hierarchy, failed: 0, capped: false };
+      acc.sections.customSettings = Array.from({ length: n }, (_, i) => ({ key: `S${i}__c.F__c`, label: `S${i}`, setting: { api: `S${i}__c` } }));
+      return acc;
+    };
+    assert.match(customSettingsLine(withCs(1, 20)), /^1 of 20 custom settings has a value/);
+    assert.match(customSettingsLine(withCs(2, 20)), /^2 of 20 custom settings have a value/);
+    assert.match(customSettingsLine(withCs(0, 20)), /^0 of 20 custom settings have a value/);
+    assert.match(customSettingsLine(withCs(1, 1)), /^1 of 1 custom setting has a value/);
+    assert.equal(customSettingsFailedNote({ customSettingsInfo: { failed: 1 } }), "1 setting could not be read.");
+    assert.equal(customSettingsFailedNote({ customSettingsInfo: { failed: 2 } }), "2 settings could not be read.");
+    assert.equal(customSettingsSkippedNote({ customSettingsInfo: { skippedFields: 1 } }), "1 field of a special type is not shown.");
+    assert.equal(customSettingsSkippedNote({ customSettingsInfo: { skippedFields: 3 } }), "3 fields of special types are not shown.");
+  });
+
+  await test("the count line says how many custom settings have a value for this user", () => {
+    const items = [csItem("Auto__c", "Bypass__c", true, "user", false), csItem("Auto__c", "Flows__c", true, "profile", false), csItem("Integ__c", "Size__c", 200, "user", 50, "double")];
+    const acc = withCs("Ann", items, { found: 40, examined: 40, hierarchy: 37, failed: 0, capped: false });
+    assert.equal(customSettingsLine(acc), "2 of 37 custom settings have a value for this user or their profile that differs from the org default.");
+    assert.match(customSettingsLine(withCs("A", [], { found: 3, examined: 3, hierarchy: 1, failed: 0, capped: false })), /^0 of 1 custom setting has a value/);
+    assert.equal(customSettingsLine(withCs("A", [], { found: 5, examined: 5, hierarchy: 0, failed: 0, capped: false })), "This org has no custom settings that can differ by user or profile.");
+    assert.match(customSettingsLine(withCs("A", [], { found: 500, examined: 300, hierarchy: 10, failed: 0, capped: true })), /Only the first 300 of 500 custom settings were checked/);
+    assert.equal(customSettingsLine(mk("A", {})), "", "old files have no count line");
+  });
+
+  await test("CSV has rows for call center and custom settings, single and compare", () => {
+    const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false)]);
+    a.sections.callCenter = [{ key: "Demo_Line", label: "Demo Line" }];
+    const b = withCs("Bob", []);
+    const single = toRowsSingle(a);
+    const cc = single.find((r) => r[2] === "Call center");
+    assert.deepEqual([cc[3], cc[4]], ["Demo Line", "Demo_Line"]);
+    const cs = single.find((r) => r[2] === "Custom settings");
+    assert.deepEqual([cs[3], cs[4], cs[5]], ["Auto: Bypass", "Auto__c.Bypass__c", "Value: Checked; Comes from: this user; Org default: Not checked"]);
+    const rows = toRows(compareUsers(a, b));
+    const ccr = rows.find((r) => r[0] === "Call center");
+    assert.deepEqual([ccr[3], ccr[4], ccr[5]], ["Only Ann", "Yes", "No"]);
+    const csr = rows.find((r) => r[0] === "Custom settings");
+    assert.deepEqual([csr[3], csr[4], csr[5]], ["Only Ann", "Value: Checked; Comes from: this user; Org default: Not checked", "Same as the org default: Not checked"]);
+    assert.ok(toRows(compareUsers(a, b), "customSettings").every((r, i) => i === 0 || r[0] === "Custom settings"));
+    assert.ok(rows.flat().every((c) => !String(c).includes("\n")));
+  });
+
+  await test("call center: present, missing, field absent, object unreadable", async () => {
+    const log = [];
+    const have = await readUserAccess(apiFor(userRoutes(), log), "005A");
+    assert.deepEqual(have.sections.callCenter, [{ key: "Demo_Line", label: "Demo Line" }]);
+    assert.equal(have.unavailable.callCenter, undefined);
+    assert.deepEqual(have.warnings, []);
+    assert.ok(log.some((c) => c.q === "SELECT CallCenterId FROM User WHERE Id = '005A'"), "own query, no relationship path");
+    assert.ok(log.some((c) => c.q === "SELECT Id, Name, InternalName FROM CallCenter WHERE Id = '04vCC0000000001AAA'"));
+    assert.ok(!log.some((c) => /CallCenter\./.test(c.q || "")));
+    // no call center: a normal value, no CallCenter read, no message
+    const log2 = [];
+    const none = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: null }]]] }), log2), "005A");
+    assert.deepEqual(none.sections.callCenter, []);
+    assert.equal(none.unavailable.callCenter, undefined);
+    assert.deepEqual(none.warnings, []);
+    assert.ok(!log2.some((c) => /FROM CallCenter/.test(c.q || "")));
+    // the field is not on User in this org
+    const gone = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => ({ fail: "No such column 'CallCenterId' on entity 'User'", code: "INVALID_FIELD" })]] })), "005A");
+    assert.deepEqual(gone.sections.callCenter, []);
+    assert.equal(gone.unavailable.callCenter, "Call centers are not available in this org.");
+    assert.ok(gone.warnings.some((w) => w.includes("Call center")));
+    assert.equal(gone.sections.permissionSets.length, 3, "other areas still read");
+    assert.equal(gone.user.name, "Alex Example");
+    // the CallCenter object cannot be read: plain text, raw error only under warnings (even for INVALID_TYPE)
+    for (const [msg, code] of [["denied", "INSUFFICIENT_ACCESS"], ["sObject type 'CallCenter' is not supported", "INVALID_TYPE"]]) {
+      const denied = await readUserAccess(apiFor(userRoutes({ routes: [[/FROM CallCenter WHERE/, () => ({ fail: msg, code })]] })), "005A");
+      assert.deepEqual(denied.sections.callCenter, []);
+      assert.match(denied.unavailable.callCenter, /^Call center could not be read\. Your user may not have permission/);
+      assert.ok(!denied.unavailable.callCenter.includes(msg));
+      assert.ok(denied.warnings.some((w) => w.includes(msg)));
+    }
+    validateAccess(gone);
+    // compare card
+    const r = compareUsers(mk("Ann", { callCenter: ["East"] }), mk("Bob", {}));
+    assert.deepEqual(say(userCardLines(r, "callCenter")), ["Ann: East", "Bob: no call center"]);
+    assert.deepEqual(say(userCardLines(compareUsers(mk("A", {}), mk("B", {})), "callCenter")), ["✓ Same in both: no call center"]);
+    // an old file without the area still loads
+    const old = sample("user_a.json");
+    delete old.sections.callCenter;
+    delete old.sections.customSettings;
+    assert.deepEqual(validateAccess(old).sections.callCenter, []);
+  });
+
+  const autoDescribe = {
+    fields: [
+      { name: "Id", label: "Record ID", type: "id", custom: false },
+      { name: "Name", label: "Name", type: "string", custom: false },
+      { name: "SetupOwnerId", label: "Location", type: "reference", custom: false },
+      { name: "Bypass_Validation__c", label: "Bypass validation rules", type: "boolean", custom: true },
+      { name: "Secret__c", label: "Secret", type: "encryptedstring", custom: true },
+    ],
+  };
+  const listDescribe = { fields: [{ name: "Id", type: "id", custom: false }, { name: "Name", type: "string", custom: false }, { name: "Code__c", label: "Code", type: "string", custom: true }] };
+
+  await test("custom settings: finds hierarchy settings, skips list settings, applies the hierarchy rule", async () => {
+    const log = [];
+    const routes = userRoutes({
+      describes: { Auto__c: autoDescribe, Codes__c: listDescribe },
+      routes: [
+        [/FROM EntityDefinition/, () => [{ QualifiedApiName: "Auto__c", Label: "Automation Settings" }, { QualifiedApiName: "Codes__c", Label: "Code List" }]],
+        [/FROM Auto__c WHERE SetupOwnerId IN/, (q) => {
+          assert.ok(q.includes("'005A'") && q.includes("'00ePROF00000001AAA'") && q.includes("'00DORG000000001AAA'"), q);
+          assert.ok(!/Secret__c/.test(q), "encrypted fields are not read");
+          return [{ SetupOwnerId: "00DORG000000001AAA", Bypass_Validation__c: false }, { SetupOwnerId: "00ePROF00000001AAA", Bypass_Validation__c: true }];
+        }],
+      ],
+    });
+    const sameApi = apiFor(routes, log);
+    const a = await readUserAccess(sameApi, "005A");
+    assert.equal(a.sections.customSettings.length, 1);
+    const it = a.sections.customSettings[0];
+    assert.deepEqual([it.key, it.valueText, it.source, it.orgDefaultText], ["Auto__c.Bypass_Validation__c", "Checked", "profile", "Not checked"]);
+    assert.deepEqual(a.customSettingsInfo, { found: 2, examined: 2, hierarchy: 1, failed: 0, failedSettings: [], skippedFields: 1, capped: false });
+    assert.equal(customSettingsLine(a), "1 of 1 custom setting has a value for this user or their profile that differs from the org default.");
+    assert.ok(!log.some((c) => /FROM Codes__c/.test(c.q || "")), "list setting is never read");
+    assert.equal(a.unavailable.customSettings, undefined);
+    assert.deepEqual(a.warnings, []);
+    for (const c of log) assert.equal(c.method, "GET");
+    assert.equal(log.filter((c) => /describe/.test(c.path)).length, 2, "one describe per custom setting");
+    // a second user read through the same api reuses the cached describes
+    await readUserAccess(sameApi, "005A");
+    assert.equal(log.filter((c) => /describe/.test(c.path)).length, 2, "no new describe calls for the second user");
+  });
+
+  await test("custom settings: none in the org, and one that cannot be read", async () => {
+    const empty = await readUserAccess(apiFor(userRoutes()), "005A");
+    assert.deepEqual(empty.sections.customSettings, []);
+    assert.deepEqual(empty.customSettingsInfo, { found: 0, examined: 0, hierarchy: 0, failed: 0, failedSettings: [], skippedFields: 0, capped: false });
+    assert.match(customSettingsLine(empty), /no custom settings that can differ/);
+    const routes = userRoutes({
+      describes: { Auto__c: autoDescribe, Bad__c: { fail: "no access" }, Big__c: { fields: [{ name: "SetupOwnerId", type: "reference" }, { name: "X__c", label: "X", type: "string", custom: true }] } },
+      routes: [
+        [/FROM EntityDefinition/, () => [{ QualifiedApiName: "Auto__c", Label: "Automation Settings" }, { QualifiedApiName: "Bad__c", Label: "Broken Setting" }, { QualifiedApiName: "Big__c", Label: "Big Setting" }]],
+        [/FROM Auto__c WHERE/, () => [{ SetupOwnerId: "005A", Bypass_Validation__c: true }, { SetupOwnerId: "00DORG000000001AAA", Bypass_Validation__c: false }]],
+        [/FROM Big__c WHERE/, () => ({ fail: "denied", code: "INSUFFICIENT_ACCESS" })],
+      ],
+    });
+    const a = await readUserAccess(apiFor(routes), "005A");
+    assert.deepEqual(a.sections.customSettings.map((x) => x.key), ["Auto__c.Bypass_Validation__c"], "the rest is kept");
+    assert.equal(a.unavailable.customSettings, undefined, "a partial failure is not 'not available'");
+    assert.deepEqual([...a.customSettingsInfo.failedSettings].sort(), ["Bad__c", "Big__c"]);
+    assert.equal(customSettingsFailedNote(a), "2 settings could not be read.");
+    assert.equal(a.warnings.filter((w) => /Custom setting/.test(w)).length, 2);
+    assert.equal(a.customSettingsInfo.failed, 2);
+    // every setting failing is a total failure
+    const allBad = await readUserAccess(apiFor(userRoutes({ describes: { Bad__c: { fail: "no access" } }, routes: [[/FROM EntityDefinition/, () => [{ QualifiedApiName: "Bad__c", Label: "Broken Setting" }]]] })), "005A");
+    assert.match(allBad.unavailable.customSettings, /^The custom settings could not be read/);
+    // the whole area failing is soft too
+    const off = await readUserAccess(apiFor(userRoutes({ routes: [[/FROM EntityDefinition/, () => ({ fail: "nope", code: "INVALID_TYPE" })]] })), "005A");
+    assert.deepEqual(off.sections.customSettings, []);
+    assert.match(off.unavailable.customSettings, /Custom settings could not be read/);
+    assert.equal(off.customSettingsInfo, undefined);
+    assert.equal(off.sections.callCenter.length, 1, "other areas still read");
+  });
+
+  await test("custom settings: many settings are read with few calls and a cap is reported", async () => {
+    const names = Array.from({ length: 320 }, (_, i) => `S${i}__c`);
+    const describes = Object.fromEntries(names.map((n, i) => [n, i % 4 === 0 ? { fields: [{ name: "SetupOwnerId", type: "reference" }, { name: "F__c", label: "F", type: "double", custom: true }] } : listDescribe]));
+    const log = [];
+    const routes = userRoutes({
+      describes,
+      routes: [
+        [/FROM EntityDefinition/, () => names.map((n) => ({ QualifiedApiName: n, Label: n }))],
+        [/FROM S\d+__c WHERE/, () => []],
+      ],
+    });
+    const progress = [];
+    const a = await readUserAccess(apiFor(routes, log), "005A", { progress: (t) => progress.push(t) });
+    assert.deepEqual(a.customSettingsInfo, { found: 320, examined: 300, hierarchy: 75, failed: 0, failedSettings: [], skippedFields: 0, capped: true });
+    assert.equal(log.filter((c) => /describe/.test(c.path)).length, 300, "one describe per setting, capped");
+    assert.equal(log.filter((c) => /FROM S\d+__c/.test(c.q || "")).length, 75, "one read per hierarchy setting only");
+    assert.ok(progress.some((t) => /Checking custom settings \(300 of 300\)/.test(t)));
+    assert.match(customSettingsLine(a), /Only the first 300 of 320 custom settings were checked/);
+  });
+
+  await test("the sample users have call centers and custom settings, and stay synthetic", () => {
+    const a = validateAccess(sample("user_a.json"));
+    const b = validateAccess(sample("user_b.json"));
+    assert.equal(a.sections.callCenter.length, 1);
+    assert.equal(b.sections.callCenter.length, 0);
+    assert.ok(a.sections.customSettings.some((i) => i.source === "user") && b.sections.customSettings.some((i) => i.source === "profile"));
+    const r = compareUsers(a, b);
+    const st = Object.fromEntries(r.sections.customSettings.map((x) => [x.key, x.status]));
+    assert.equal(st["Automation_Settings__c.Bypass_Validation_Rules__c"], "same");
+    assert.equal(st["Integration_Settings__c.Batch_Size__c"], "onlyA");
+    assert.equal(st["Automation_Settings__c.Bypass_Flows__c"], "onlyB");
+    for (const f of ["user_a.json", "user_b.json"]) {
+      const text = readFileSync(ext("samples", f), "utf-8");
+      assert.ok(!/[\w.]+@(?!example\.com)[\w.-]+/.test(text), "only example.com addresses");
+      for (const id of text.match(/"id": "(\w+)"/g) || []) assert.match(id, /DEMO/, "made-up Ids only");
+      assert.ok(!/00D[A-Za-z0-9]{12}/.test(text), "no real-looking org Id");
+      for (const it of JSON.parse(text).sections.customSettings) assert.match(it.setting.api, /^(Automation|Integration)_Settings__c$/);
+    }
+  });
+
+  // ---- review fixes ----
+
+  const failInfo = (failedSettings, extra = {}) => ({ found: 5, examined: 5, hierarchy: 3, failed: failedSettings.length, failedSettings, skippedFields: 0, capped: false, ...extra });
+
+  await test("partial failure: card, summary and notes show a note, not 'Not available'", () => {
+    const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false)], failInfo(["Bad__c", "Big__c"]));
+    assert.equal(a.unavailable.customSettings, undefined);
+    const r = compareUsers(a, withCs("Bob", [], failInfo([])));
+    assert.ok(say(userCardLines(r, "customSettings")).includes("Ann: 2 settings could not be read."));
+    assert.ok(r.notes.some((n) => /Ann: Custom settings: 2 settings could not be read\./.test(n)));
+    const ui = readFileSync(ext("user-access.js"), "utf-8");
+    assert.match(ui, /customSettingsFailedNote\(access\)/, "summary uses the note");
+  });
+
+  await test("compare: a setting that could not be read for one user is not a difference", () => {
+    const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false), csItem("Integ__c", "Size__c", 200, "user", 50, "double")], failInfo([]));
+    const b = withCs("Blake Sample", [], failInfo(["Auto__c"]));
+    const r = compareUsers(a, b);
+    const st = Object.fromEntries(r.sections.customSettings.map((x) => [x.key, x.status]));
+    assert.deepEqual(st, { "Auto__c.Bypass__c": "unreadB", "Integ__c.Size__c": "onlyA" });
+    assert.deepEqual([r.counts.customSettings.onlyA, r.counts.customSettings.unread], [1, 1]);
+    const row = r.sections.customSettings.find((x) => x.key === "Auto__c.Bypass__c");
+    assert.equal(row.detailB, "Could not be read for Blake Sample");
+    assert.equal(statusText("unreadB", "Ann", "Blake Sample"), "Could not be read for Blake Sample");
+    assert.ok(say(userCardLines(r, "customSettings")).some((l) => /^1 not compared/.test(l)));
+    assert.ok(!say(userCardLines(r, "customSettings")).includes("✓ Same in both"));
+    // a total failure for one user: nothing of the other user's is "only" theirs
+    const c = withCs("Cy", [], failInfo([]));
+    c.unavailable = { customSettings: "x" };
+    assert.ok(compareUsers(a, c).sections.customSettings.every((x) => x.status === "unreadB"));
+    // unread rows do not change the verdict
+    const none = compareUsers(withCs("A1", [csItem("Auto__c", "Bypass__c", true, "user", false)], failInfo([])), withCs("B1", [], failInfo(["Auto__c"])));
+    assert.match(none.verdict.text, /same access/);
+  });
+
+  await test("skipped field types are noted once, and all-skipped settings leave the denominator", async () => {
+    const skipDescribe = { fields: [
+      { name: "SetupOwnerId", type: "reference", custom: false },
+      { name: "Addr__c", label: "Addr", type: "address", custom: true },
+      { name: "Enc__c", label: "Enc", type: "encryptedstring", custom: true },
+      { name: "Loc__c", label: "Loc", type: "location", custom: true },
+    ] };
+    const routes = userRoutes({
+      describes: { Auto__c: autoDescribe, Skip__c: skipDescribe },
+      routes: [
+        [/FROM EntityDefinition/, () => [{ QualifiedApiName: "Auto__c", Label: "Automation Settings" }, { QualifiedApiName: "Skip__c", Label: "Skipped" }]],
+        [/FROM Auto__c WHERE/, () => [{ SetupOwnerId: "005A", Bypass_Validation__c: true }]],
+        [/FROM Skip__c WHERE/, () => ({ fail: "must not be read" })],
+      ],
+    });
+    const a = await readUserAccess(apiFor(routes), "005A");
+    assert.equal(a.customSettingsInfo.hierarchy, 1, "all-skipped setting is not counted");
+    assert.equal(a.customSettingsInfo.failed, 0, "and is not read");
+    assert.equal(a.customSettingsInfo.skippedFields, 4);
+    assert.equal(customSettingsSkippedNote(a), "4 fields of special types are not shown.");
+    assert.equal(customSettingsLine(a), "1 of 1 custom setting has a value for this user or their profile that differs from the org default.");
+    assert.equal(customSettingsSkippedNote(withCs("A", [], failInfo([], { skippedFields: 1 }))), "1 field of a special type is not shown.");
+    assert.equal(customSettingsSkippedNote(mk("A", {})), "");
+    assert.equal(customSettingsSkippedNote(withCs("A", [], failInfo([], { skippedFields: 2 })), withCs("B", [], failInfo([], { skippedFields: 2 }))), "2 fields of special types are not shown.", "once, not per user");
+  });
+
+  await test("territory errors keep their old wording; the new match is for the call center only", async () => {
+    const t = await readUserAccess(apiFor(userRoutes({ routes: [[/FROM UserTerritory2Association/, () => ({ fail: "No such column 'Foo' on entity", code: "INVALID_FIELD" })]] })), "005A");
+    assert.match(t.unavailable.territories, /^Territories could not be read\. Your user may not have permission/);
+    const cc = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => ({ fail: "No such column 'CallCenterId'", code: "INVALID_FIELD" })]] })), "005A");
+    assert.equal(cc.unavailable.callCenter, "Call centers are not available in this org.");
+  });
+
+  await test("CSV carries the custom settings notes, single and compare", () => {
+    const info = failInfo(["Bad__c"], { skippedFields: 3, capped: true, examined: 300, found: 320 });
+    const a = withCs("Ann", [csItem("Auto__c", "Bypass__c", true, "user", false)], info);
+    const b = withCs("Bob", [], failInfo([]));
+    const single = toRowsSingle(a).filter((r) => r[3] === "Note");
+    assert.deepEqual(single.map((r) => r[5]), [customSettingsLine(a), "3 fields of special types are not shown.", "1 setting could not be read."]);
+    assert.ok(single.every((r) => r[2] === "Custom settings" && r[0] === "Ann"));
+    assert.match(single[0][5], /Only the first 300 of 320/, "cap notice");
+    const rows = toRows(compareUsers(a, b), "customSettings").filter((r) => r[1] === "Note");
+    assert.equal(rows.length, 3);
+    assert.equal(rows[0][4], customSettingsLine(a));
+    assert.equal(rows[0][5], customSettingsLine(b));
+    assert.equal(rows[1][4], "3 fields of special types are not shown.");
+    assert.deepEqual([rows[2][4], rows[2][5]], ["1 setting could not be read.", ""]);
+    assert.equal(toRowsSingle(a, "profile").filter((r) => r[3] === "Note").length, 0, "other areas get no note");
+    assert.equal(toRows(compareUsers(mk("A", {}), mk("B", {}))).filter((r) => r[1] === "Note").length, 0, "old files have none");
   });
 
   await test("the new files never use innerHTML, localStorage or chrome.storage", () => {

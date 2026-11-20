@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Salesforce Capability Pack",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Compare permission set groups; user, record and flow lookups; territory and role trees; page details for tickets. Read-only",
   "permissions": ["cookies", "activeTab", "tabs"],
   "host_permissions": [
