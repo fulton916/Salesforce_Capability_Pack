@@ -1,0 +1,10 @@
+{
+  "name": "chrome-extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Salesforce Capability Pack Chrome extension (six read-only tools). This file only tells Node the code is ES modules, for the offline tests.",
+  "type": "module",
+  "scripts": {
+    "test": "node tests/run_tests.mjs"
+  }
+}

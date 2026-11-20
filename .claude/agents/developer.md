@@ -21,7 +21,7 @@ manager. Do that task, nothing more.
 3. Add or update offline tests for what you change. Use synthetic data only.
 4. Run the package's tests before you report:
    - Python packages: `python tests/run_tests.py` (needs `openpyxl`)
-   - sf-psg-compare: `node tests/run_tests.mjs`
+   - chrome-extension: `node tests/run_tests.mjs`
    If you check a page in the browser, start your own dev server with a free `--port` (for
    example 8766 or higher) unless the brief gives one. Stop only the server you started; never
    kill another process on 8765. Before you report a page as checked, look at every view or mode

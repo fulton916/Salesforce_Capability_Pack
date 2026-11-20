@@ -1,0 +1,46 @@
+/* Additions for the "Where is it used in flows?" page. pack.css (shared) is loaded first and does the rest. */
+.findrow .chiprow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; max-width: 700px; }
+.findrow .combo { flex: 1; min-width: 260px; }
+.findrow .hint { margin: 6px 0 10px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 4px 4px 12px; border-radius: 16px; background: var(--a-bg); border: 1px solid var(--a); font-weight: 600; }
+.chip button { border: 0; background: none; padding: 0 8px; font-size: 18px; line-height: 1; color: var(--muted); }
+.chip button:hover:not(:disabled) { color: var(--accent); }
+.psg-list .api { display: block; font: 12px var(--mono); color: var(--muted); }
+.psg-list li.text .nm { color: var(--accent); }
+
+.summary { font-size: 18px; font-weight: 600; margin: 0 0 4px; }
+.searched { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+.toolbar { margin: 10px 0; display: flex; justify-content: flex-end; }
+
+.flows { list-style: none; margin: 10px 0 0; padding: 0; }
+.flows > li { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; background: var(--panel); }
+.flowhead { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
+.flowhead .nm { font-weight: 600; font-size: 16px; overflow-wrap: anywhere; }
+.flowhead .api { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.flowhead .open { margin-left: auto; font-size: 14px; }
+.flowmeta { margin: 4px 0 6px; color: var(--muted); font-size: 14px; }
+.badge.on { color: var(--good); }
+.badge.off { color: var(--muted); }
+.steps { list-style: none; margin: 6px 0 0; padding: 0; }
+.steps li { padding: 3px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.steps li:first-child { border-top: 0; }
+.steps .kind { font-weight: 600; }
+.steps .does { font-weight: 600; }
+.steps .does.sets { color: var(--b); }
+.steps .does.checks { color: var(--a); }
+.steps .via, .steps .snip { color: var(--muted); font-size: 13px; }
+.steps .snip { font-family: var(--mono); }
+.unread .why { margin: 4px 0 0; }
+.unread details { margin-top: 4px; font-size: 12px; }
+.unread details div { margin-top: 4px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* The object view */
+.objsec { margin-top: 18px; }
+.objsec > h2 { font-size: 17px; margin: 0 0 2px; }
+.objsec .none { color: var(--muted); margin: 6px 0 0; }
+.objsec > details { margin-top: 0; }
+.flowhead .pos { display: inline-flex; align-items: center; justify-content: center; height: 24px; padding: 0 10px; border-radius: 12px; white-space: nowrap; background: var(--a-bg); border: 1px solid var(--a); font-weight: 700; font-size: 13px; }
+.flowhead .tag { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 10px; background: var(--line); color: var(--text); }
+li > .flowmeta + .flowmeta, li > .why + .flowmeta { margin-top: 0; }
+.flows > li > p.flowmeta { margin: 2px 0; }
+.flows > li.orderblock { border-style: dashed; background: var(--a-bg); font-size: 14px; }

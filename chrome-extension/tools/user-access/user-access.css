@@ -1,0 +1,20 @@
+/* Additions for the User access page. pack.css (shared) is loaded first and does the rest. */
+.vs.single { grid-template-columns: 1fr; }
+.who-line { color: var(--muted); font-size: 14px; }
+.tag-inactive { color: var(--risk); background: var(--risk-bg); font-size: 11px; font-weight: 700; margin-left: 8px; padding: 0 7px; border-radius: 9px; }
+.tag-active { color: var(--muted); border: 1px solid var(--line, currentColor); font-size: 11px; font-weight: 600; margin-left: 8px; padding: 0 7px; border-radius: 9px; }
+#error details.tech { margin-top: 6px; font-size: 12px; }
+#error details.tech summary { cursor: pointer; }
+#error details.tech div { margin-top: 4px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.psg-list .dev.plain { font: 12px system-ui, sans-serif; }
+.how { color: var(--muted); font-size: 13px; }
+.card .na { color: var(--muted); }
+.card .one { font-weight: 600; }
+.unavail { color: var(--muted); background: var(--warn-bg); border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+.cs-count { color: var(--muted); font-size: 14px; margin-bottom: 10px; }
+.cs-count div + div { margin-top: 4px; }
+.yes { color: var(--good); font-weight: 700; }
+
+/* One fact per line in the detail text (how a permission set is reached, license, muting). */
+.how { white-space: pre-line; }
+.chip.u { color: var(--muted); }

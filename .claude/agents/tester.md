@@ -1,6 +1,6 @@
 ---
 name: tester
-description: Independently checks a change in the Salesforce Capability Pack against its acceptance criteria. Runs offline tests, checks the sf-psg-compare page in the browser pane, and reports PASS or FAIL with evidence to the project-manager. Never edits code.
+description: Independently checks a change in the Salesforce Capability Pack against its acceptance criteria. Runs offline tests, checks the chrome-extension page in the browser pane, and reports PASS or FAIL with evidence to the project-manager. Never edits code.
 model: sonnet
 disallowedTools: Edit, Write, NotebookEdit, Agent
 color: green
@@ -17,16 +17,16 @@ the result.
 
 1. **Tests.** Run the package's offline tests and read the output:
    - Python packages: `python tests/run_tests.py` (needs `openpyxl`)
-   - sf-psg-compare: `node tests/run_tests.mjs`
+   - chrome-extension: `node tests/run_tests.mjs`
 2. **The change itself.** Read `git diff`. Check each acceptance criterion one by one. Look for
    edge cases the tests miss: empty input, very large orgs (thousands of fields), namespaced
    names, missing permissions, a group whose Status is not Updated.
-3. **The extension UI** (when the change touches `sf-psg-compare/extension/`):
+3. **The extension UI** (when the change touches `chrome-extension/`):
    - Start your own dev server on a free port, for example 8766 or higher, unless the brief gives
-     one: `python sf-psg-compare/tools/dev_server.py --no-org --port 8766` (sample data), or
+     one: `python chrome-extension/dev/dev_server.py --no-org --port 8766` (sample data), or
      `--target-org <alias>` only if the manager names an org. Stop only the server you started.
      Never kill another process on 8765; another agent may be using it.
-   - Open `http://127.0.0.1:<port>/psg-compare.html?demo=1` (or `?dev=1` for the live org) in the
+   - Open `http://127.0.0.1:<port>/tools/compare-groups/compare-groups.html?demo=1` (or `?dev=1` for the live org) in the
      browser pane. Use the page as a non-technical admin would: pick two groups with the search
      box, compare, open each tab, search, switch "Only differences / Everything", download.
    - Check the console for errors, phone width (375px), and light and dark mode.
