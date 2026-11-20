@@ -1,5 +1,6 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
 import { recordIdFromUrl } from "./lib/recordaccess.js";
+import { parseUrlContext, contextQuery } from "./lib/urlcontext.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
@@ -26,6 +27,12 @@ const TOOLS = [
     // Needs the record open in this tab: its Id goes in the address of the page.
     needsRecord: true,
     noRecordDescription: "Open a record first, then explain who can see it and why",
+  },
+  {
+    page: "flow-usage.html",
+    title: "Where is it used in flows?",
+    description: "Find the flows that use an object, a field or a record Id",
+    context: true, // the page can start from the object or field of the Salesforce page that is open
   },
 ];
 
@@ -65,7 +72,9 @@ for (const tool of TOOLS) {
   if (inOrg) {
     btn.addEventListener("click", async () => {
       const record = tool.needsRecord && recordId ? `&record=${encodeURIComponent(recordId)}` : "";
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${record}`) });
+      let extra = "";
+      if (tool.context) extra = contextQuery(parseUrlContext(tab?.url)); // object and field only; never the address itself
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${record}${extra ? "&" + extra : ""}`) });
       window.close();
     });
   }

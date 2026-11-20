@@ -1403,7 +1403,7 @@ export async function run(test) {
     assert.ok(!/btn\.disabled = !inOrg \|\| /.test(popup), "the button stays enabled when no record is open");
     assert.match(popup, /btn\.disabled = !inOrg;/);
     const manifest = JSON.parse(readFileSync(ext("manifest.json"), "utf-8"));
-    assert.equal(manifest.version, "0.4.0");
+    assert.equal(manifest.version, "0.5.0");
     assert.match(manifest.description, /why a user can see a record/);
   });
 
