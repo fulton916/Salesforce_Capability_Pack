@@ -29,6 +29,7 @@ await (await import("./user_access_tests.mjs")).run(test);
 await (await import("./feedback_tests.mjs")).run(test);
 await (await import("./hierarchy_tests.mjs")).run(test);
 await (await import("./record_access_tests.mjs")).run(test);
+await (await import("./flow_usage_tests.mjs")).run(test);
 await (await import("./issue_snapshot_tests.mjs")).run(test);
 
 // ---------- fakes ----------

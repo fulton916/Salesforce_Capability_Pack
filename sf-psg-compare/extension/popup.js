@@ -1,5 +1,6 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
 import { recordIdFromUrl } from "./lib/recordaccess.js";
+import { parseUrlContext, contextQuery } from "./lib/urlcontext.js";
 import { cleanUrl } from "./lib/issuesnapshot.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
@@ -27,6 +28,12 @@ const TOOLS = [
     // Needs the record open in this tab: its Id goes in the address of the page.
     needsRecord: true,
     noRecordDescription: "Open a record first, then explain who can see it and why",
+  },
+  {
+    page: "flow-usage.html",
+    title: "Where is it used in flows?",
+    description: "Find the flows that use an object, a field or a record Id",
+    context: true, // the page can start from the object or field of the Salesforce page that is open
   },
   {
     page: "issue-snapshot.html",
@@ -71,11 +78,12 @@ for (const tool of TOOLS) {
   btn.append(title, desc);
   if (inOrg) {
     btn.addEventListener("click", async () => {
-      let query = `host=${encodeURIComponent(host)}`;
+      const record = tool.needsRecord && recordId ? `&record=${encodeURIComponent(recordId)}` : "";
+      let extra = "";
+      if (tool.context) extra = contextQuery(parseUrlContext(tab?.url)); // object and field only; never the address itself
       // Only the path and filterName of the address go along; sid, tokens and the hash never do.
-      if (tool.withPageAddress) query += `&url=${encodeURIComponent(cleanUrl(tab?.url || ""))}`;
-      if (tool.needsRecord && recordId) query += `&record=${encodeURIComponent(recordId)}`;
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?${query}`) });
+      if (tool.withPageAddress) extra = `url=${encodeURIComponent(cleanUrl(tab?.url || ""))}`;
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${record}${extra ? "&" + extra : ""}`) });
       window.close();
     });
   }
