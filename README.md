@@ -2,7 +2,7 @@
 
 Standalone Salesforce admin and translation tools. Each folder is a self-contained package: copy only the one you need. No package imports from another.
 
-**Want the Chrome extension?** Follow [Install the Chrome extension (step by step)](#install-the-chrome-extension-step-by-step).
+**Want the Chrome extension?** Follow [Install the Chrome extension (developer mode, about 2 minutes)](#install-the-chrome-extension-developer-mode-about-2-minutes).
 
 ## What's in the pack
 
@@ -22,38 +22,19 @@ Beyond those two files:
 - `sf-psg-compare` has `extension/`, `tools/` and `tests/` (run with Node: `node tests/run_tests.mjs`), and no `scripts/`.
 - `sf-translation-field-notes` has only `docs/`: no scripts and no tests.
 
-## Install the Chrome extension (step by step)
+## Install the Chrome extension (developer mode, about 2 minutes)
 
-This is for the **Salesforce Capability Pack** extension (the `sf-psg-compare` folder). You do not need to know GitHub or code. It takes a few minutes.
+The **Salesforce Capability Pack** extension (the `sf-psg-compare` folder) adds a toolbar menu to Chrome with read-only Salesforce admin tools, such as comparing permission set groups, checking a user's access and finding where a field is used in flows. It uses the login you already have in Salesforce and never changes anything. You do not need to know GitHub or code.
 
-**Before you start:** this page is private. You can only see it if the owner has invited your GitHub account and you have accepted the invitation (GitHub sends an email, and it also shows at <https://github.com/notifications>). If you see "404 / Page not found", even though the link is right, you are not signed in to GitHub with the invited account yet. Sign in, or ask the owner to invite you. If someone sent you the ZIP file directly, start at step 3.
+1. Get the zip. Open <https://github.com/fulton916/Salesforce_Capability_Pack>, click the green **Code** button, then **Download ZIP**. The page is private: sign in to GitHub with the account the owner invited. A "404 / Page not found" means you are not signed in with that account. If someone sent you the zip, use that instead. Unzip it into a folder you will keep (Windows: right-click, **Extract All**): Chrome loads the extension from that folder, so moving or deleting it removes the extension. The zip holds the whole pack. The folder to pick in step 4 is `Salesforce_Capability_Pack-main\sf-psg-compare\extension`. Windows can nest the name twice (`Salesforce_Capability_Pack-main` inside `Salesforce_Capability_Pack-main`), so keep opening folders until you reach `sf-psg-compare`.
+2. Open `chrome://extensions` in Chrome (in Edge, `edge://extensions`).
+3. Turn on **Developer mode** (top right; in Edge, the menu on the left). On a company-managed browser, IT policy can block Developer mode or **Load unpacked**. If so, ask IT.
+4. Click **Load unpacked** and pick the `extension` folder (the one that holds `manifest.json`). "Manifest file is missing or unreadable" means you picked the folder above it. **Salesforce Capability Pack** now shows in the list.
+5. Pin the extension: puzzle-piece menu, then the pin next to **Salesforce Capability Pack**.
+6. Open a Salesforce tab where you are already logged in.
+7. Click the **Salesforce Capability Pack** icon and pick a tool. It opens in a new tab. If the tools are greyed out, the tab you are on is not a Salesforce page.
 
-1. Open the page in your browser and sign in to GitHub: <https://github.com/fulton916/Salesforce_Capability_Pack>
-2. Click the green **Code** button, then **Download ZIP**. A file named `Salesforce_Capability_Pack-main.zip` goes to your Downloads folder.
-3. Open your Downloads folder (or wherever the ZIP file is) and unzip it:
-   - **Windows:** right-click the ZIP file, choose **Extract All...**, then click **Extract**.
-   - **Mac:** double-click the ZIP file.
-4. Move the unzipped folder `Salesforce_Capability_Pack-main` to a place you will keep, such as your Documents folder. Chrome reads the extension from this folder every time it starts, so do not delete it or leave it in Downloads.
-5. Open the folders until you find `sf-psg-compare`, then open it, then open the folder named `extension`. On Windows the folder name may appear twice (`Salesforce_Capability_Pack-main` inside `Salesforce_Capability_Pack-main`); just keep opening. You have the right folder when you can see a file named `manifest.json` directly inside it. Keep this window open, or remember where this folder is.
-6. In Chrome, type `chrome://extensions` in the address bar and press Enter. (Or click the three dots at the top right, then **Extensions**, then **Manage Extensions**.) In Microsoft Edge, use `edge://extensions` instead.
-7. Turn on the **Developer mode** switch. In Chrome it is at the top right of the page; in Edge it is usually in the menu on the left.
-8. Click **Load unpacked**. A window opens for choosing a folder.
-9. Choose the `extension` folder from step 5 (the one with `manifest.json` inside it) and click **Select Folder**. **Salesforce Capability Pack** now appears in your list of extensions.
-10. Pin it so it is easy to reach: click the puzzle-piece icon in the top right of the browser, then click the pin next to **Salesforce Capability Pack**.
-11. Open a Salesforce page in a tab where you are already logged in (any page in your org). Click the **Salesforce Capability Pack** icon and pick a tool from the menu. It opens in a new tab.
-
-There is nothing to set up in Salesforce. The tools use the login your browser already has, and they only read; they never change anything.
-
-**Update to a newer version**
-1. Download the ZIP again (steps 1 to 3).
-2. Replace the old folder with the new one in the same place (same name, same location).
-3. Go to `chrome://extensions` (Edge: `edge://extensions`) and click the **Reload** button (a circular arrow) on the **Salesforce Capability Pack** card. If you put the new folder somewhere else, click **Remove** on the old card and repeat steps 8 and 9 with the new folder.
-
-**If something does not work**
-- **"Manifest file is missing or unreadable":** you chose the wrong folder. Choose the `extension` folder that has `manifest.json` directly inside it (step 5).
-- **No Developer mode switch, or Load unpacked is missing or greyed out:** your browser is probably managed by your company, which can block this. Ask your IT team.
-- **The tools in the menu are greyed out:** the tab you are on is not a Salesforce page. Switch to a Salesforce tab and click the icon again.
-- **Something else:** see the [extension's own README](sf-psg-compare/README.md) for what each tool does and what access your Salesforce user needs.
+To update to a newer version: download the new zip and unzip it over the same folder (replace the files). Click reload (the circular arrow) on **Salesforce Capability Pack** in `chrome://extensions`; the version shows on its card. Then open the tool again from the icon. Tool tabs left open from before the reload stop working. For what each tool does and what access your Salesforce user needs, see the [extension's README](sf-psg-compare/README.md).
 
 ## Translation packages
 
