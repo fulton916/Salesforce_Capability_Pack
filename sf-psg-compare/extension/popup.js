@@ -1,4 +1,5 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
+import { recordIdFromUrl } from "./lib/recordaccess.js";
 import { cleanUrl } from "./lib/issuesnapshot.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
@@ -11,13 +12,21 @@ const TOOLS = [
   },
   {
     page: "user-access.html",
-    title: "Look up user access",
+    title: "User access summary and comparison",
     description: "See what a user can access, or compare two users",
   },
   {
     page: "hierarchy.html",
     title: "Territory & role hierarchy",
     description: "See the whole territory or role tree; export it for Excel",
+  },
+  {
+    page: "record-access.html",
+    title: "Why can a user see this record?",
+    description: "Explain who can see the record open in this tab, and why",
+    // Needs the record open in this tab: its Id goes in the address of the page.
+    needsRecord: true,
+    noRecordDescription: "Open a record first, then explain who can see it and why",
   },
   {
     page: "issue-snapshot.html",
@@ -36,6 +45,7 @@ let tab = null;
 try {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 } catch { /* not running as an extension */ }
+const recordId = recordIdFromUrl(tab?.url || "");
 let host = null;
 try { host = new URL(tab?.url || "").hostname; } catch { /* not a URL */ }
 
@@ -57,13 +67,14 @@ for (const tool of TOOLS) {
   title.textContent = tool.title;
   const desc = document.createElement("span");
   desc.className = "tool-desc";
-  desc.textContent = tool.description;
+  desc.textContent = tool.needsRecord && !recordId ? tool.noRecordDescription : tool.description;
   btn.append(title, desc);
   if (inOrg) {
     btn.addEventListener("click", async () => {
       let query = `host=${encodeURIComponent(host)}`;
       // Only the path and filterName of the address go along; sid, tokens and the hash never do.
       if (tool.withPageAddress) query += `&url=${encodeURIComponent(cleanUrl(tab?.url || ""))}`;
+      if (tool.needsRecord && recordId) query += `&record=${encodeURIComponent(recordId)}`;
       await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?${query}`) });
       window.close();
     });
