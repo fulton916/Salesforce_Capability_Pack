@@ -5,9 +5,9 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { SfApi } from "../extension/lib/sfconn.js";
-import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, causeInfo, owdText, sfLevel, shareLevel, exactFirst } from "../extension/lib/recordaccess.js";
-import { readRecordContext, readRecordAccess, readMemberRoles, readUserById } from "../extension/lib/recordaccessread.js";
+import { SfApi, SalesforceError } from "../extension/lib/sfconn.js";
+import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../extension/lib/recordaccess.js";
+import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry } from "../extension/lib/recordaccessread.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "../extension", ...p);
@@ -338,14 +338,12 @@ export async function run(test) {
     });
     const res = explain(f, [ID.alice, ID.bob]);
     const [a, b] = res.users;
-    assert.ok(a.routes.some((r) => r.key.startsWith("territory:")), "the user above gets the record-territory route");
+    assert.ok(a.routes.some((r) => r.key.startsWith("shareTerrAbove:")), "the user above gets a route through the territory share row");
+    assert.ok(a.routes.every((r) => !r.key.startsWith("territory:")), "the share-row route already covers the territory, so it is not listed twice");
     assert.ok(b.routes.some((r) => r.key.startsWith("share:")), "the assigned user gets the share-row route");
     assert.doesNotMatch(toPlainText(res), /April Own is not assigned to territory/);
     const terrItem = res.difference.items.find((i) => /territory/.test(i.route));
     assert.match(terrItem.missing[0], /April Own has this route too, but April Own's object permissions limit it to view access/);
-    // the record-in-territory line is one line, not two
-    const r = a.routes.find((x) => x.key.startsWith("territory:"));
-    assert.equal(r.summary, r.steps[0]);
     // the other user's route is the one capped by object permissions, and the note says so
     assert.match(res.difference.levelNote, /April Own has a route that would give edit access, but April Own's object permissions on Accounts hold April Own to view access/);
   });
@@ -820,7 +818,7 @@ export async function run(test) {
     const groups = [grp(ID.gTerr, "Territory", "", ID.t2), grp(ID.gTerrSub, "TerritoryAndSubordinates", "", ID.t2)];
     const rows = [{ who: ID.gTerr, level: "Edit", cause: "TerritoryRule" }, { who: ID.gTerrSub, level: "Edit", cause: "TerritoryRule" }];
     const f = facts({ territories, groups, shares: { available: true, rows }, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] })] });
-    const r = only(explain(f)).routes.find((x) => x.key.startsWith("territory:"));
+    const r = only(explain(f)).routes.find((x) => x.key.startsWith("shareTerrAbove:"));
     assert.ok(r, "the user above the record's territory gets a territory route");
     assert.equal(r.access, "edit");
     assert.equal(only(explain(f)).mismatch, null);
@@ -1179,8 +1177,9 @@ export async function run(test) {
     assert.equal(edit.steps[2], "Alice Smith is assigned to territory 'EMEA'");
     assert.equal(a.mismatch, null);
     // Alice is in EMEA, which is above UK: the "and below" row does not reach her
-    assert.equal(a.routes.length, 1);
-    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'EMEA'.");
+    // ... but the "territory only" row for EMEA is reached by Alice directly, and the "and below" row for UK is reached from above too
+    assert.equal(a.routes.length, 2);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'EMEA' or one above it.");
     // a second user assigned to the territory is never told they lack it
     const g = acctFacts("Opportunity", {
       rows: f.account.rows, groups: f.groups, territories: f.territories,
@@ -1408,6 +1407,354 @@ export async function run(test) {
     assert.ok(manifest.description.length <= 132, "Chrome limits the description to 132 characters");
     assert.match(manifest.description, /record/);
     assert.match(manifest.description, /territory/);
+  });
+
+  // ---------- territories: a user above a territory, a role above a territory member ----------
+
+  const T3 = "0MI000000000003AAA"; // another top-level territory
+  const T4 = "0MI000000000004AAA"; // under UK
+  const terrTree = (record = []) => ({
+    on: true,
+    items: [{ id: ID.t1, parentId: null, name: "EMEA" }, { id: ID.t2, parentId: ID.t1, name: "UK" }, { id: T3, parentId: null, name: "APAC" }, { id: T4, parentId: ID.t2, name: "Scotland" }],
+    record,
+  });
+
+  await test("record access: a record shared with a territory reaches a user assigned to a territory above it", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] })],
+    });
+    const a = only(explain(f));
+    assert.equal(a.routes.length, 1);
+    assert.deepEqual(a.routes[0].steps, ["Shared through territory assignment with territory 'UK'", "Alice Smith is assigned to territory 'EMEA', which is above 'UK'"]);
+    assert.equal(a.routes[0].access, "edit");
+    assert.equal(a.mismatch, null);
+    // the nearest territory above is named when the user has several
+    const g = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1, T3] })] });
+    assert.match(only(explain(g)).routes[0].steps[1], /'EMEA', which is above 'UK'/);
+    // a territory next to it (not above) gives nothing
+    const h = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_NONE, territoryIds: [T3] })] });
+    assert.deepEqual(only(explain(h)).routes, []);
+    // the object permissions cap it like every other route
+    const c = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t1], object: { sets: [PROFILE({ edit: false })] } })] });
+    const cr = only(explain(c)).routes[0];
+    assert.equal(cr.access, "edit");
+    assert.equal(cr.effective, "view");
+    assert.equal(cr.limited, true);
+  });
+
+  for (const object of ["Case", "Opportunity"]) {
+    await test(`record access: ${object === "Case" ? "a" : "an"} ${object.toLowerCase()} is reached through an account shared with a territory below the user's territory`, () => {
+      const many = object === "Case" ? "cases" : "opportunities";
+      const f = acctFacts(object, {
+        rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }],
+        groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+        territories: terrTree(),
+        users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3] })],
+      });
+      const res = explain(f);
+      const a = res.users[0];
+      assert.equal(a.routes.length, 1);
+      assert.deepEqual(a.routes[0].steps, [
+        `The ${object.toLowerCase()} belongs to account 'Contoso (sample)'`,
+        `The account is shared through territory assignment with territory 'UK', which gives edit access to the account's ${many}`,
+        "Alice Smith is assigned to territory 'EMEA', which is above 'UK'",
+      ]);
+      assert.equal(a.mismatch, null);
+      assert.deepEqual(res.users[1].routes, []);
+      assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK' or one above it.");
+      assert.match(res.difference.items[0].change[0], /Assigning Bob Jones to territory 'UK' \(or one above it\)/);
+    });
+  }
+
+  await test("record access: an account in two territories gives a route for each one the user is in or above", () => {
+    const rec = [{ id: ID.t2, cause: "Territory2AssignmentRule" }, { id: T4, cause: "Territory2AssignmentRule" }];
+    // Alice is in UK (the record's territory) and above Scotland (also the record's territory): both routes, no share row needed
+    const f = facts({ territories: terrTree(rec), shares: { available: true, rows: [] }, users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t2] })] });
+    const a = only(explain(f));
+    assert.deepEqual(a.routes.map((r) => r.key).sort(), [`territory:${k15(ID.t2)}`, `territory:${k15(T4)}`].sort());
+    assert.ok(a.routes.some((r) => r.steps.at(-1) === "Alice Smith is assigned to territory 'UK'"));
+    assert.ok(a.routes.some((r) => r.steps.at(-1) === "Alice Smith is assigned to territory 'UK', which is above 'Scotland'"));
+    // a share row to one territory does not hide the route for the other, and the same territory is not listed twice
+    const g = facts({
+      territories: terrTree(rec), groups: [grp(ID.gTerr, "Territory", "", T4)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t2] })],
+    });
+    const b = only(explain(g));
+    assert.deepEqual(b.routes.map((r) => r.key).sort(), [`shareTerrAbove:${k15(ID.gTerr)}:Territory`, `territory:${k15(ID.t2)}`].sort());
+    assert.equal(b.mismatch, null);
+  });
+
+  await test("record access: one user in the territory and one above it are compared by level, not called missing", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] }),
+        user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t1], object: { sets: [PROFILE({ edit: false })] } }), // above, but cannot edit
+      ],
+    });
+    const res = explain(f);
+    const text = toPlainText(res);
+    assert.doesNotMatch(text, /Bob Jones is not assigned to territory/);
+    assert.equal(res.difference.items.length, 1);
+    assert.match(res.difference.items[0].missing[0], /^Bob Jones has this route too, but Bob Jones's object permissions limit it to view access\.$/);
+    // the other way round: the user above has the full level and the one inside is the one with less
+    const g = facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_VIEW, territoryIds: [ID.t2], object: { sets: [PROFILE({ edit: false })] } })] });
+    const d = explain(g).difference;
+    assert.ok(d.items.every((i) => !/not assigned to territory/.test(i.missing.join(" "))), JSON.stringify(d.items));
+    assert.equal(d.items.length, 1);
+  });
+
+  await test("record access: a user in an unrelated territory has no route, and the difference says 'or one above it'", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3, T4] }), // APAC, and Scotland (below UK, not above it)
+      ],
+    });
+    const res = explain(f);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK' or one above it.");
+    assert.equal(res.difference.items[0].change[0], "Assigning Bob Jones to territory 'UK' (or one above it) would change it.");
+    // "and below" groups: the wording covers below and above
+    const g = facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2)], users: [f.users[0], user(ID.bob, "Bob Jones", { sf: SF_NONE, territoryIds: [T3] })] });
+    assert.equal(explain(g).difference.items[0].missing[0], "Bob Jones is not assigned to territory 'UK', one below it or one above it.");
+  });
+
+  await test("record access: a role above a member of a territory the record is shared with is a route ('Manager of Territory Member')", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", count: 3 }], users: 3, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director" }), // no territory at all
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+        user(ID.carl, "Carl Brown", { sf: SF_EDIT, roleId: ID.low, roleName: "UK Rep", territoryIds: [ID.t2] }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const a = res.users[0];
+    const bossRoutes = a.routes.filter((r) => r.key.startsWith("shareBossTerr:")); // (Alice's role is also above the owner's: a different route)
+    assert.equal(bossRoutes.length, 1);
+    assert.deepEqual(bossRoutes[0].steps, [
+      "Shared through territory assignment with territory 'UK'",
+      "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'UK'; 2 other members have a role below this user's too",
+      "Alice Smith's role 'Sales Director' is above 'UK Rep' in the role hierarchy",
+    ]);
+    assert.equal(bossRoutes[0].access, "edit");
+    assert.equal(a.mismatch, null);
+    assert.deepEqual(res.users[1].routes, []);
+    assert.match(res.difference.items.find((i) => /territory 'UK'/.test(i.route)).missing[0], /^Bob Jones is not assigned to territory 'UK', or to a territory above it, and has no role above the role of one of its members\.$/);
+    // someone in the territory and someone whose role is above a member share one topic: compared by level
+    const both = explain(f, [ID.alice, ID.carl]);
+    assert.doesNotMatch(toPlainText(both), /is not assigned to territory/);
+    // a role equal to the member's is not above it
+    const same = explain(facts({ ...f, users: [user(ID.carl, "Carl Brown", { sf: SF_NONE, roleId: ID.low, roleName: "UK Rep" })] }));
+    assert.deepEqual(same.users[0].routes, []);
+    // a user who is also assigned above gets the territory route, not a second one
+    const two = explain(facts({ ...f, users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director", territoryIds: [ID.t1] })] }));
+    assert.deepEqual(two.users[0].routes.map((r) => r.key).filter((x) => /^share/.test(x)), [`shareTerrAbove:${k15(ID.gTerr)}:Territory`]);
+    // "and below" groups name the territories below it
+    const sub = explain(facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2, true)] }));
+    assert.match(sub.users[0].routes.find((r) => r.key.startsWith("shareBossTerr:")).steps[1], /is assigned to territory 'UK' or one below it/);
+    // a walk that was cut says so once
+    const cut = explain(facts({ ...f, memberRoles: { [ID.gTerr]: { roles: [], users: 0, capped: true } } }), [ID.alice]);
+    assert.equal(cut.notes.filter((n) => /also reaches the managers of their members, but it has many members/.test(n)).length, 1);
+  });
+
+  await test("record access: the reader walks the people assigned to a territory group the record is shared with", async () => {
+    const tables = {
+      members: [], groups: [],
+      users: [{ Id: U5(40), Name: "Tia Terr", UserRoleId: ID.low }, { Id: U5(41), Name: "Sam Sub", UserRoleId: ID.mid }],
+      terr: [{ Territory2Id: ID.t2, UserId: U5(40) }, { Territory2Id: T4, UserId: U5(41) }],
+    };
+    const tp = new Map([[ID.t1, null], [ID.t2, ID.t1], [T4, ID.t2]]);
+    const only2 = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "Territory", relatedId: ID.t2 }]]));
+    assert.deepEqual(only2[ID.gTerr].roles.map((r) => r.roleId), [ID.low]);
+    const sub = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "TerritoryAndSubordinates", relatedId: ID.t2 }]]));
+    assert.deepEqual(sub[ID.gTerr].roles.map((r) => r.roleId).sort(), [ID.low, ID.mid].sort());
+  });
+
+  await test("record access: an empty territory under a populated one: managers of the people above it get a route, and the example says where", async () => {
+    // EMEA > UK > Scotland (empty, shared with); APAC is unrelated. Mia is assigned to UK only.
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: ID.t2, count: 1 }], users: 1, capped: false } },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" }), // no territory, role above Mia
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }), // role not above Mia
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:"));
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.equal(r.access, "view");
+    assert.equal(r.steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'UK', which is above 'Scotland'");
+    assert.deepEqual(res.users[1].routes, []);
+    assert.equal(res.difference.items.find((i) => /territory 'Scotland'/.test(i.route)).missing[0],
+      "Bob Jones is not assigned to territory 'Scotland', or to a territory above it, and has no role above the role of one of its members.");
+    // the other user: someone with that role shows the route is in their own facts, so no "lacks" line
+    const alsoBoss = explain(facts({ ...f, users: [f.users[0], user(ID.carl, "Carl Brown", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })] }), [ID.alice, ID.carl]);
+    assert.doesNotMatch(toPlainText(alsoBoss), /is not assigned to territory/);
+    // an example in the shared territory itself keeps the short wording
+    const same = explain(facts({ ...f, memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: T4, count: 1 }], users: 1, capped: false } } }), [ID.alice]);
+    assert.equal(same.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:")).steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'Scotland'");
+    // an example from below ("and below" groups) says so
+    const sub = explain(facts({ ...f, groups: [grp(ID.gTerr, "TerritoryAndSubordinates", "", ID.t2, true)], memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: T4, count: 1 }], users: 1, capped: false } } }), [ID.alice]);
+    assert.equal(sub.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:")).steps[1], "Member 'Mia Member' (role 'UK Rep') is assigned to territory 'Scotland', which is below 'UK'");
+
+    // the reader: people in the shared territory, in every territory above it and (and below) under it; not in an unrelated one
+    const tables = {
+      members: [], groups: [],
+      users: [{ Id: U5(40), Name: "Mia Member", UserRoleId: ID.low }, { Id: U5(41), Name: "Pat Pacific", UserRoleId: ID.mid }],
+      terr: [{ Territory2Id: ID.t2, UserId: U5(40) }, { Territory2Id: T3, UserId: U5(41) }],
+    };
+    const tp = new Map([[ID.t1, null], [ID.t2, ID.t1], [T4, ID.t2], [T3, null]]);
+    const found = await readMemberRoles(memberOrg(tables), [ID.gTerr], new Map(), tp, new Map([[ID.gTerr, { type: "Territory", relatedId: T4 }]]));
+    assert.deepEqual(found[ID.gTerr].roles.map((x) => [x.roleId, x.example, x.terrId]), [[ID.low, "Mia Member", ID.t2]]);
+    assert.equal(found[ID.gTerr].capped, false);
+  });
+
+  await test("record access: two share rows to one territory group with two territory causes give two differently worded routes", () => {
+    const f = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Edit", cause: "Territory" }, { who: ID.gTerr, level: "Edit", cause: "Territory2AssociationManual" }, { who: ID.gTerr, level: "Edit", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, territoryIds: [ID.t2] })],
+    });
+    const rs = explain(f, [ID.alice]).users[0].routes.filter((x) => x.key.startsWith("shareTerrAbove:"));
+    assert.equal(rs.length, 2);
+    assert.notEqual(rs[0].steps[0], rs[1].steps[0]);
+    assert.ok(rs.some((x) => /^Shared through territory assignment with/.test(x.steps[0])));
+    assert.ok(rs.some((x) => /^Shared through manual territory assignment .*with/.test(x.steps[0])));
+  });
+
+  await test("record access: reading a record shared with a territory group looks up who is assigned to it, and a role above them gets a route", async () => {
+    const { api, log } = fakeOrg();
+    const orig = api.query.bind(api);
+    api.query = async (q, o) => {
+      if (/FROM Territory2 WHERE/.test(q)) return { records: [{ Id: ID.t1, Name: "EMEA", ParentTerritory2Id: null }, { Id: ID.t2, Name: "UK", ParentTerritory2Id: ID.t1 }] };
+      if (/FROM ObjectTerritory2Association/.test(q)) return { records: [] };
+      if (/FROM AccountShare/.test(q)) return { records: [{ UserOrGroupId: ID.gTerr, AccountAccessLevel: "Edit", RowCause: "Territory" }] };
+      if (/FROM Group WHERE Id IN \('00G000000000005AAA'\)/.test(q)) return { records: [{ Id: ID.gTerr, Name: "", DeveloperName: "", Type: "Territory", RelatedId: ID.t2, DoesIncludeBosses: true }] };
+      if (/FROM UserTerritory2Association WHERE UserId/.test(q)) return { records: [] };
+      if (/FROM UserTerritory2Association WHERE Territory2Id IN/.test(q)) return { records: [{ UserId: U5(40), Territory2Id: ID.t2 }] };
+      if (/FROM User WHERE Id IN \('005000000000040AAA'\)/.test(q)) return { records: [{ Id: U5(40), Name: "Tia Terr", UserRoleId: ID.low }] };
+      return orig(q, o);
+    };
+    const ctx = await readRecordContext(api, ID.rec);
+    const f = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(f.memberRoles[ID.gTerr].roles[0].roleId, ID.low);
+    const res = explain(f);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("shareBossTerr:"));
+    assert.ok(r, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.match(r.steps[1], /Member 'Tia Terr' \(role 'UK Rep'\) is assigned to territory 'UK'/);
+    assert.ok(log.every((l) => l.method === "GET"));
+  });
+
+  // ---------- a read that failed for a passing reason is tried again ----------
+
+  /** An api whose get fails with the given errors, one after the other, then answers. */
+  function flaky(errors) {
+    const api = new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl: async () => { throw new Error("unused"); } });
+    let n = 0;
+    api.get = async () => {
+      api.calls++;
+      if (n < errors.length) throw errors[n++];
+      return { done: true, totalSize: 1, records: [{ Id: "x" }] };
+    };
+    return api;
+  }
+  const httpErr = (status, errorCode) => new SalesforceError(`HTTP ${status}`, { status, errorCode });
+  const noWait = { delays: [0, 0], sleep: async () => {} };
+
+  await test("record access: one 502 or a dropped connection is tried again and the answer is kept", async () => {
+    for (const first of [httpErr(502), httpErr(503, "SERVER_UNAVAILABLE"), new TypeError("Failed to fetch")]) {
+      const api = flaky([first]);
+      const r = await withRetry(api, noWait).query("SELECT Id FROM Account");
+      assert.deepEqual(r.records, [{ Id: "x" }]);
+      assert.equal(api.calls, 2);
+    }
+    // through a whole read: a 502 on Salesforce's own answer is not shown to the person
+    const { api } = fakeOrg();
+    const real = api.get.bind(api);
+    let failed = false;
+    api.get = async (p) => { if (!failed && /UserRecordAccess/.test(decodeURIComponent(p))) { failed = true; throw httpErr(502); } return real(p); };
+    const wrapped = withRetry(api, noWait);
+    const ctx = await readRecordContext(wrapped, ID.rec);
+    const facts2 = await readRecordAccess(wrapped, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(failed, true);
+    assert.equal(facts2.users[0].sf.edit, true);
+    assert.ok(!facts2.notes.some((n) => /access answer/.test(n)), facts2.notes.join("\n"));
+    assert.ok(!facts2.warnings.some((w) => /access answer/.test(w)), facts2.warnings.join(" | "));
+  });
+
+  await test("record access: a read that keeps failing is tried twice more, then left out with the usual note", async () => {
+    const api = flaky([httpErr(502), httpErr(502), httpErr(502), httpErr(502)]);
+    await assert.rejects(withRetry(api, noWait).query("SELECT Id FROM Account"), /HTTP 502/);
+    assert.equal(api.calls, 3, "one try and two more");
+    const { api: org } = fakeOrg();
+    const real = org.get.bind(org);
+    org.get = async (p) => { if (/UserRecordAccess/.test(decodeURIComponent(p))) throw httpErr(502); return real(p); };
+    const wrapped = withRetry(org, noWait);
+    const ctx = await readRecordContext(wrapped, ID.rec);
+    const facts2 = await readRecordAccess(wrapped, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(facts2.users[0].sf, null);
+    assert.ok(facts2.notes.some((n) => /Salesforce's own access answer could not be read/.test(n)));
+    assert.equal(explain(facts2).users[0].sfText, "Salesforce's answer could not be read");
+  });
+
+  await test("record access: an expired session, a bad request and query errors are never tried again", async () => {
+    for (const err of [httpErr(401), httpErr(400, "INVALID_FIELD"), httpErr(400, "MALFORMED_QUERY"), httpErr(400, "INVALID_TYPE"), httpErr(403, "INSUFFICIENT_ACCESS"), httpErr(404, "NOT_FOUND"), httpErr(400, "SERVER_UNAVAILABLE"), httpErr(429, "SERVER_UNAVAILABLE")]) {
+      const api = flaky([err, err]);
+      await assert.rejects(withRetry(api, noWait).query("SELECT Id FROM Account"), (e) => e === err);
+      assert.equal(api.calls, 1, `${err.status} ${err.errorCode || ""}`);
+    }
+    // the caller's api is left as it was, and the page wraps its own connection
+    const api = flaky([]);
+    const w = withRetry(api);
+    assert.notEqual(w, api);
+    assert.equal(Object.getPrototypeOf(w), api);
+    const page = readFileSync(ext("record-access.js"), "utf-8");
+    assert.match(page, /withRetry\(new SfApi\(session\)\)/);
+    assert.equal(readFileSync(ext("lib", "sfconn.js"), "utf-8").includes("withRetry"), false, "the shared connection code is unchanged");
+  });
+
+  // ---------- "Why the difference" says the same as the person's card ----------
+
+  await test("record access: a difference item held back by object permissions says so the same way as the card, on the page and in the copied text", () => {
+    const f = facts({
+      groups: [grp(ID.gUk, "Regular", "UK Sales"), grp(ID.gEmea, "Regular", "EMEA Sales")],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Edit", cause: "Rule" }, { who: ID.gEmea, level: "Read", cause: "Rule" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, object: { sets: [PROFILE({ edit: false })] }, memberOf: [{ groupId: ID.gUk, memberId: ID.alice }, { groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    const [lim, plain] = [res.difference.items.find((i) => /UK Sales/.test(i.route)), res.difference.items.find((i) => /EMEA Sales/.test(i.route))];
+    assert.equal(lim.limited, true);
+    assert.equal(lim.effective, "view");
+    assert.equal(givesText(lim), "Would give edit access, limited to view by object permissions");
+    assert.equal(plain.limited, false);
+    assert.equal(givesText(plain), "Gives view access");
+    // the card words it the same way
+    const card = res.users[0].routes.find((r) => /UK Sales/.test(r.summary));
+    assert.equal(`Would give ${card.access} access, limited to ${card.effective} by object permissions`, givesText(lim));
+    const text = toPlainText(res);
+    assert.match(text, /UK Sales.*\(would give edit access, limited to view by object permissions\)/);
+    assert.match(text, /EMEA Sales.*\(gives view access\)/);
+    // an unknown level says nothing new
+    assert.equal(givesText({ gives: null, limited: false }), "");
+    // the page uses the same words
+    const page = readFileSync(ext("record-access.js"), "utf-8");
+    assert.match(page, /givesText\(it\)/);
+    assert.ok(!/`Gives \$\{it\.gives\}`/.test(page));
   });
 }
 
