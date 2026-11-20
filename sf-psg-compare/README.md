@@ -210,6 +210,8 @@ Try it: `python tools/dev_server.py --no-org`, then open
 
 ## Install (unpacked, for your own browser)
 
+New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-step-by-step) in the main README.
+
 1. Copy this folder anywhere.
 2. Chrome or Edge: open `chrome://extensions` (Edge: `edge://extensions`).
 3. Turn on **Developer mode**.
@@ -385,8 +387,8 @@ different record, paste its link or Id into the box and click "Use this record".
   gives no access to its cases or opportunities, there is no route. Salesforce's own View Sharing
   Hierarchy page may list more reasons for a user than this page does.
 
-Not covered, and the page does not say it cannot exist: access as the manager of a territory member,
-contacts, restriction and scoping rules, and Experience Cloud sharing sets.
+Not covered, and the page does not say it cannot exist: contacts, restriction and scoping rules, and
+Experience Cloud sharing sets.
 
 Routes it looks for: no Read on the object at all (then nothing else matters, but never when
 Salesforce says the user can see the record, and not for Task and Event, which have no object
@@ -397,9 +399,18 @@ to the user, to a public group (nested, loops are safe), role, role and subordin
 territory and subordinates, queue, or all internal users, and to someone below the user in the role
 hierarchy; a share to a public group that "grants access using hierarchies" (members found down
 through groups inside groups, role groups and territory groups, up to 3000 members, then the page
-says it stopped), where the user's role is above a member's role; the record's territories against the user's territories (Accounts); child records the
+says it stopped), where the user's role is above a member's role; a share to a territory (and, for Cases and Opportunities,
+the account's share to a territory) reached by a user assigned to a territory above it, or by a user whose role is
+above the role of someone assigned to that territory, to any territory above it (and, for "and below" shares, to
+territories under it), so an empty territory under a populated one still has managers ("Manager of Territory Member" in Salesforce's View Sharing
+Hierarchy page); the record's territories against the user's territories, one route for each territory the user is
+in or above (Accounts); child records the
 user owns (Accounts); the org-wide default; the parent record; "View All" / "Modify All" on the
 object; "View All Data" / "Modify All Data".
+
+A read that fails for a passing reason (the connection drops, or Salesforce answers 500, 502, 503, 504 or
+"server unavailable") is tried again up to twice, after 0.3 and 1 second. An expired session, a bad request, no
+permission and query errors are not tried again. Only reads are repeated, so nothing changes in the org.
 
 Not checked (also listed in the page's Notes): restriction rules and scoping rules, Experience Cloud
 sharing sets, field-level access, and which specific sharing rule gave access (Salesforce's share row
@@ -445,6 +456,12 @@ Why can a user see this record?:
   permissions, each now explained and agreeing with Salesforce's answer.
 - The account rules (Cases and Opportunities) were checked by read-only queries on a sandbox against
   Salesforce's own access answer (UserRecordAccess) on a case and two opportunities.
+- Manager of a territory member (read-only queries on a sandbox, against Salesforce's View Sharing Hierarchy
+  page and UserRecordAccess): a user assigned to a territory above a territory the record's account is shared
+  with, whose role was not above anyone in it, can edit an opportunity, while a user with the same role and profile
+  and no territory cannot. Users with no territory at all, whose role is above people assigned to the territories
+  an account is shared with, are listed by Salesforce as "Manager of Territory Member". Both are now routes. The
+  "and below" territory groups are assumed to work the same way upward (not tested on its own).
 - Offline tests: the route reasoning (owner, queue owner, role hierarchy, manual share, sharing
   rule to nested groups with loops, role and territory groups, team, org-wide default, parent, View
   All, no object Read), the mismatch with Salesforce's answer both ways, the two-user difference, the

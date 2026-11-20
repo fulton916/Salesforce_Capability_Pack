@@ -166,7 +166,8 @@ export function causeInfo(code, objectApi) {
     case "ImplicitChild": return { kind: "implicit", phrase: "Shared implicitly", why: "through access to a child record of this record" };
     case "ImplicitParent": return { kind: "implicit", phrase: "Shared implicitly", why: "through access to a related record (the parent of this record)" };
     default:
-      if (/territor/i.test(c)) return { kind: "territory", phrase: "Shared through territory assignment" };
+      // Two territory causes can sit on one record (for example Territory and Territory2AssociationManual): word them apart.
+      if (/territor/i.test(c)) return { kind: "territory", phrase: /manual/i.test(c) ? "Shared through manual territory assignment (added to the territory by hand)" : "Shared through territory assignment" };
       if (/__c$/.test(c)) return { kind: "apex", phrase: `Shared by the Apex sharing reason '${c.replace(/__c$/, "").replace(/_/g, " ")}'` };
       return { kind: "unknown", phrase: `Shared (reason code '${c}')` };
   }
@@ -396,6 +397,23 @@ const memberStep = (hit, where, ctx) =>
   `Member '${hit.example.example || "a user"}' (role '${ctx.roleName(hit.example.roleId)}') is in ${where}, directly or through other groups` +
   (hit.total > 1 ? `; ${plural(hit.total - 1, "other member has", "other members have")} a role below this user's too` : "");
 
+/** The user's own territory that sits above territory `rel` (the nearest one), or null. */
+function territoryAbove(u, rel, ctx) {
+  const mine = new Set((u.territoryIds || []).map(k));
+  for (const a of above(ctx.terrs, rel)) if (mine.has(a)) return a;
+  return null;
+}
+
+/** Does the user reach this territory group: assigned to its territory (or one below it, for "and below"), assigned to
+ *  a territory above it, or holding a role above a member's role (territory groups also reach the managers of their members)? */
+function reachesTerritoryGroup(g, u, ctx) {
+  const rel = k(g.relatedId);
+  const mine = (u.territoryIds || []).map(k);
+  if (mine.includes(rel) || territoryAbove(u, rel, ctx)) return true;
+  if (g.type === "TerritoryAndSubordinates" && mine.some((t) => above(ctx.terrs, t).includes(rel))) return true;
+  return !!(g.includeBosses && ctx.hierarchy && u.roleId && membersBelow(u, g.id, ctx));
+}
+
 /** Routes that share a topic are the same way in (a group's share row reached as a member or as a manager,
  *  the record's territory reached through a share row or through the territory list), so the other user
  *  is only called "missing" it when they have none of them. */
@@ -482,7 +500,7 @@ function routesFor(u, name, ctx, sf) {
   }
 
   // Share rows: the record's own, then (Cases and Opportunities) the rows of its account.
-  const sharedTerritoryRoute = { found: false };
+  let cappedTerritories = 0;
   const acct = acctScope(ctx);
   const shareRows = (rows, sc) => {
     const teamRole = sc ? u.accountTeamRole || null : u.teamRole || null;
@@ -505,7 +523,6 @@ function routesFor(u, name, ctx, sf) {
           const parts = childParts(u.childCounts);
           if (parts.length) steps = [`${name} owns ${parts.join(", ")} on this ${ctx.label.toLowerCase()}, so Salesforce gives ${name} implicit access to it`];
         }
-        if (!sc && info.kind === "territory") sharedTerritoryRoute.found = true;
         add({ key: `${P}share:${who}:${row.cause}`, topic: `${P}shareUser:${row.cause}`, kind: info.kind, access: level, summary: withWho(name), steps: lead(steps), detail: { type: "shareUser", cause: info.kind, ...extra } });
         continue;
       }
@@ -523,12 +540,46 @@ function routesFor(u, name, ctx, sf) {
       }
       const gk = k(target.id);
       if (via.has(gk)) {
-        if (!sc && info.kind === "territory") sharedTerritoryRoute.found = true;
         add({
           key: `${P}share:${gk}:${row.cause}`, topic: P + shareTopic(target, gk, row.cause), kind: info.kind, access: level, summary: withWho(groupLabel(target, ctx)),
           steps: lead([withWho(groupLabel(target, ctx)), ...chainSteps(gk, u, name, via, ctx)]),
           detail: { type: "shareGroup", group: target, cause: info.kind, ...extra },
         });
+      } else if (/^Territory/.test(target.type) && target.relatedId && territoryAbove(u, target.relatedId, ctx)) {
+        // Access follows the territory hierarchy upward: someone assigned above a territory the record is shared with gets it too.
+        const mineT = territoryAbove(u, target.relatedId, ctx);
+        add({
+          key: `${P}shareTerrAbove:${gk}:${row.cause}`, topic: P + shareTopic(target, gk, row.cause), kind: info.kind, access: level,
+          summary: `${withWho(groupLabel(target, ctx))}, and ${name} is assigned to a territory above it`,
+          steps: lead([withWho(groupLabel(target, ctx)), `${name} is assigned to territory '${ctx.terrName(mineT)}', which is above '${ctx.terrName(target.relatedId)}'`]),
+          detail: { type: "shareGroup", group: target, cause: info.kind, above: true, ...extra },
+        });
+      } else if (/^Territory/.test(target.type) && target.relatedId && target.includeBosses) {
+        // Territory groups also reach the managers (by role) of the people assigned to them: "Manager of Territory Member".
+        const hit = ctx.hierarchy ? membersBelow(u, gk, ctx) : null;
+        if (hit) {
+          const r = ctx.roleName(hit.example.roleId);
+          // Where the example member is assigned: in the shared territory, above it, or (for "and below") under it.
+          const sharedName = groupName(target, ctx);
+          const tid = hit.example.terrId;
+          const where = tid && k(tid) !== k(target.relatedId) && ctx.terrs.has(k(tid))
+            ? (above(ctx.terrs, target.relatedId).includes(k(tid))
+              ? `territory '${ctx.terrName(tid)}', which is above '${sharedName}'`
+              : `territory '${ctx.terrName(tid)}', which is below '${sharedName}'`)
+            : `territory '${sharedName}'${!tid && target.type === "TerritoryAndSubordinates" ? " or one below it" : ""}`;
+          add({
+            key: `${P}shareBossTerr:${gk}:${row.cause}`, topic: P + shareTopic(target, gk, row.cause), kind: "hierarchy", access: level,
+            summary: `${withWho(groupLabel(target, ctx))}, and ${name}'s role is above one of its members`,
+            steps: lead([
+              withWho(groupLabel(target, ctx)),
+              `Member '${hit.example.example || "a user"}' (role '${r}') is assigned to ${where}` + (hit.total > 1 ? `; ${plural(hit.total - 1, "other member has", "other members have")} a role below this user's too` : ""),
+              `${name}'s role '${u.roleName || ctx.roleName(u.roleId)}' is above '${r}' in the role hierarchy`,
+            ]),
+            detail: { type: "shareBossTerritory", group: target, ...extra },
+          });
+        } else if (ctx.memberRoles.get(gk)?.capped && u.roleId) {
+          cappedTerritories++;
+        }
       } else if (/^Role/.test(target.type) && ctx.hierarchy && u.roleId && above(ctx.roles, target.relatedId).includes(k(u.roleId))) {
         const r = ctx.roleName(target.relatedId);
         add({
@@ -587,10 +638,17 @@ function routesFor(u, name, ctx, sf) {
     }
   }
 
-  // Territory (Accounts): the record is in a territory the user is assigned to, or one above it.
-  if (!sharedTerritoryRoute.found && ctx.facts.territories?.on) {
+  if (cappedTerritories) {
+    notes.push(`${cappedTerritories === 1 ? "A territory" : `${cappedTerritories} territories`} this ${acct ? "record or its account" : "record"} is shared with also reach${cappedTerritories === 1 ? "es" : ""} the managers of their members, but ${cappedTerritories === 1 ? "it has" : "they have"} many members, so only some were checked for ${name}. A manager route may have been missed.`);
+  }
+
+  // Territory (Accounts): the record is in a territory the user is assigned to, or one above it. One route per territory;
+  // a territory that a share row of the record already reaches is not listed a second time.
+  if (ctx.facts.territories?.on) {
     for (const rt of ctx.facts.territories.record || []) {
       const chain = [k(rt.id), ...above(ctx.terrs, rt.id)];
+      const covered = routes.some((r) => r.topic === `territory:Territory:${k(rt.id)}` || chain.some((a) => r.topic === `territory:TerritoryAndSubordinates:${a}`));
+      if (covered) continue;
       const mine = (u.territoryIds || []).map(k).find((t) => chain.includes(t));
       if (!mine) continue;
       const how = /rule/i.test(rt.cause || "") ? "by an assignment rule" : /manual/i.test(rt.cause || "") ? "added manually" : null;
@@ -810,15 +868,20 @@ function missingFor(route, y, yName, ctx) {
         case "RoleAndSubordinates": case "RoleAndSubordinatesInternal":
           return { missing: u.roleId ? `${yName}'s role '${yRole}' is not '${rel}' or below it.` : `${yName} has no role.`, change: `${yName} would need the role '${rel}' or a role below it.` };
         case "Territory":
-          return { missing: `${yName} is not assigned to territory '${rel}'.`, change: `Assigning ${yName} to territory '${rel}' would change it.` };
+          return { missing: `${yName} is not assigned to territory '${rel}' or one above it.`, change: `Assigning ${yName} to territory '${rel}' (or one above it) would change it.` };
         case "TerritoryAndSubordinates":
-          return { missing: `${yName} is not assigned to territory '${rel}' or one below it.`, change: `Assigning ${yName} to territory '${rel}' or one below it would change it.` };
+          return { missing: `${yName} is not assigned to territory '${rel}', one below it or one above it.`, change: `Assigning ${yName} to territory '${rel}', or one below or above it, would change it.` };
         case "Organization":
           return { missing: `${yName} is not an internal user.`, change: "The record would have to be shared with a group that includes them." };
         default:
           return { missing: `${yName} is not in ${label}.`, change: `${yName} would have to be in ${label}.` };
       }
     }
+    case "shareBossTerritory":
+      return {
+        missing: `${yName} is not assigned to ${groupLabel(d.group, ctx)}, or to a territory above it, and has no role above the role of one of its members.`,
+        change: `Assigning ${yName} to that territory (or one above it), or giving ${yName} a role above its members, would change it.`,
+      };
     case "owd":
       return { missing: `The org-wide default does not give ${yName} this access.`, change: "The org-wide default would have to change." };
     case "parent":
@@ -844,8 +907,7 @@ function hasInFacts(route, y, ctx) {
   if (d.type === "owner") return ctx.rec.ownerKind === "user" && k(ctx.rec.ownerId) === k(u.id);
   const mine = (u.territoryIds || []).map(k);
   if (d.type === "territory") return mine.some((t) => [d.id, ...above(ctx.terrs, d.id)].includes(t));
-  if (d.type === "shareGroup" && d.group && d.group.type === "Territory") return mine.includes(k(d.group.relatedId));
-  if (d.type === "shareGroup" && d.group && d.group.type === "TerritoryAndSubordinates") return mine.some((t) => [t, ...above(ctx.terrs, t)].includes(k(d.group.relatedId)));
+  if ((d.type === "shareGroup" || d.type === "shareBossTerritory") && d.group && /^Territory/.test(d.group.type)) return reachesTerritoryGroup(d.group, u, ctx);
   if (d.type === "shareGroup" && d.group) return computeReach(u, ctx).has(k(d.group.id));
   if (d.type === "parent") return !!u.parentSf && sfLevel(u.parentSf) !== "none";
   // Routes that go through a person or group y is part of: y already has the direct form of that route.
@@ -869,6 +931,20 @@ function viaOther(route, x, y, ctx) {
   return null;
 }
 
+/** What the difference item says about the level, the same way the person's card does: `limited` (object permissions hold
+ *  the route back to `effective`), `inactive` (the user has no answer from Salesforce, so the route only "would" give). */
+function levelFields(r, x) {
+  return { limited: !!r.limited, effective: r.limited ? r.effective : null, inactive: x.inactive === true };
+}
+
+/** The start of a difference item: "Gives edit access", "Would give edit access, limited to view access by object
+ *  permissions". Nothing when the level is not known. */
+export function givesText(it) {
+  if (!it.gives) return "";
+  if (it.limited) return `Would give ${it.gives}, limited to ${it.effective} by object permissions`;
+  return `${it.inactive ? "Would give" : "Gives"} ${it.gives}`;
+}
+
 function difference(x, y, ctx, via) {
   const items = [];
   const topicOf = (r) => r.topic || r.key;
@@ -878,7 +954,7 @@ function difference(x, y, ctx, via) {
       const mine = y.routes.filter((q) => topicOf(q) === topicOf(r)).reduce((m, q) => (rank(q.effective) > rank(m.effective) ? q : m));
       if (rank(mine.effective) >= rank(r.effective)) continue;
       items.push({
-        route: r.summary, gives: r.access ? GIVES[r.access] : null,
+        route: r.summary, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x),
         missing: [mine.limited
           ? `${y.name} has this route too, but ${y.name}'s object permissions limit it to ${GIVES[mine.effective] || "no access"}.`
           : `${y.name} has this route too, but it gives only ${GIVES[mine.effective] || "no access"}.`], change: [],
@@ -887,7 +963,7 @@ function difference(x, y, ctx, via) {
     }
     if (hasInFacts(r, y, ctx)) { const v = viaOther(r, x, y, ctx); if (v && via) via.push(v); continue; } // y has it after all (for example it was left out of y's routes): never say they lack it
     const m = missingFor(r, y, y.name, ctx);
-    items.push({ route: r.summary, gives: r.access ? GIVES[r.access] : null, missing: [m.missing], change: m.change ? [m.change] : [] });
+    items.push({ route: r.summary, gives: r.access ? GIVES[r.access] : null, ...levelFields(r, x), missing: [m.missing], change: m.change ? [m.change] : [] });
   }
   return items;
 }
@@ -957,7 +1033,7 @@ export function explain(facts, userIds) {
     ...(users.some((u) => u.mismatch) ? ["Salesforce's answer is the one shown at the top. Routes are our explanation, and they did not match it for everyone (see the lists above)."] : []),
     "Not checked: restriction rules and scoping rules, Experience Cloud sharing sets, field-level access, and which specific sharing rule gave access (Salesforce only says 'a sharing rule').",
     ...(acctScope(ctx) ? [
-      `Access through the account is checked for ${ctx.plural.toLowerCase()}: the account's own sharing (sharing rules, manual shares, the account team, territories) and the account owner, including people above them in the role hierarchy. Not checked: contacts, and managers of territory members. Salesforce's "View Sharing Hierarchy" page is the place to confirm a route we could not explain.`,
+      `Access through the account is checked for ${ctx.plural.toLowerCase()}: the account's own sharing (sharing rules, manual shares, the account team, territories) and the account owner, including people above them in the role hierarchy. Not checked: contacts. Salesforce's "View Sharing Hierarchy" page is the place to confirm a route we could not explain.`,
       ...(ctx.facts.account?.truncated ? ["The account has a very long list of sharing rows. Only the first part was read, so a route through the account may be missing."] : []),
     ] : []),
     "Not checked: manager groups (groups made of a user's manager). People above a group's members in the role hierarchy are checked for groups that give access to managers, but only up to a limit on members.",
@@ -1014,7 +1090,7 @@ export function toPlainText(res) {
     if (d.gate) L.push(`  ${d.gate}`);
     if (d.levelNote) L.push(`  ${d.levelNote}`);
     for (const it of d.items) {
-      L.push(`  - ${it.route}${it.gives ? ` (gives ${it.gives})` : ""}`);
+      L.push(`  - ${it.route}${it.gives ? ` (${givesText(it).replace(/^(\w)/, (c) => c.toLowerCase())})` : ""}`);
       for (const m of it.missing) L.push(`      Missing: ${m}`);
       for (const c of it.change) L.push(`      What would change it: ${c}`);
     }

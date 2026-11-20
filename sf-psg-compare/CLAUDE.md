@@ -133,8 +133,7 @@ takes a pasted link or Id, which is also how the dev server is used).
   Manual, Rule, Territory and Territory2AssociationManual rows carry their own levels; ImplicitParent
   rows are None. Consistent with the data but not proven: people above an account holder or the account
   owner in the role hierarchy get the same level. Not tested: that role-above route for Cases.
-- Still not covered: contacts through the account, "manager of a territory member" and territory groups
-  that include bosses, restriction and scoping rules, Experience Cloud sharing sets, which specific
+- Still not covered: contacts through the account, restriction and scoping rules, Experience Cloud sharing sets, which specific
   sharing rule. Access through the account is only as complete as the account's first 2000 share rows.
 - Routes may carry a `topic` (same way in reached differently: a territory through a share row or the
   territory list, one group share as member or as manager, the owner queue as member or as boss, a
@@ -144,8 +143,33 @@ takes a pasted link or Id, which is also how the dev server is used).
   counts as held by them; `viaOther` then says "X is above Y" (`difference.via`) instead of a missing line.
   Territory names that repeat are shown with their parent ("EM (under EMEA Region)"), never by name alone.
   A team route that only restates the owner is dropped. "Explain the parent record" passes `a=` and `b=`
-  (user Ids) in the address; `readUserById` puts them back. Not built, and the page must not deny it:
-  "manager of a territory member" routes.
+  (user Ids) in the address; `readUserById` puts them back.
+- Territory routes (in `shareRows`, so they work for the record's own rows and the account's rows): a share to a
+  Territory (or TerritoryAndSubordinates) group is reached by (1) a user assigned to it (computeReach, as before), (2)
+  a user assigned to a territory ABOVE it (`territoryAbove`; key `shareTerrAbove:`, `detail.above`), or (3) a user
+  whose role is above the role of someone assigned to it (key `shareBossTerr:`, detail type `shareBossTerritory`;
+  territory groups all have `DoesIncludeBosses` true; members come from `readMemberRoles`, which takes
+  `targetInfo` so a territory group's members are the people assigned to its territory, to EVERY territory above it
+  (they get the access by route 2, so their managers do too; an empty territory under a populated one still has
+  managers), and, for "and below", to the territories under it. Each role entry carries `terrId` (where its example
+  member is assigned) so the step can say "assigned to territory 'P', which is above 'G'"; without `terrId` the old
+  wording is used). Two territory causes (for example `Territory` and `Territory2AssociationManual`) give separate
+  routes worded by cause (`causeInfo`: "manual territory assignment" for the manual one); same cause and level is one route.
+  All three share the topic `territory:<type>:<territory>`, so one user in the territory and one above it compare by
+  level. (2) wins over (3) for the same row. The Account territory-list route (ObjectTerritory2Association) is now
+  one route per record territory and is skipped for a territory a share route already covers (topic
+  `territory:Territory:<id>`, or a T&S one at or above it). `reachesTerritoryGroup` feeds `hasInFacts`, and
+  `missingFor` says "or one above it". Confirmed live (sandbox, read-only): a user in a territory above a territory
+  the account is shared with, role not above any member, gets Edit on the opportunity, and an identical user not in
+  the territory gets nothing; users with no territory whose role is above territory members are the "Manager of
+  Territory Member" rows Salesforce lists (the five missing rows of one case were exactly the five territory rows on
+  its account). Not proven: that "and below" groups also give access upward (assumed).
+- Reads in this tool go through `withRetry(api)` (recordaccessread.js, used by record-access.js only; sfconn.js is
+  unchanged): GET failures that are a dropped connection or HTTP 500/502/503/504 or errorCode SERVER_UNAVAILABLE (only with a 5xx
+  status or none) are retried twice (300 ms, 1 s; delays and sleep are injectable for tests). Any 4xx is never retried,
+  whatever its errorCode; nor are query errors.
+- A difference item carries `limited` and `effective` like the person's card; `givesText(item)` words it ("Would give
+  edit access, limited to view by object permissions"), for the page and the copied text.
 - Tasks and events (WhatId and WhoId): the parent is WhatId and the person is WhoId (`whoId`, user
   `whoSf`). The parent route is only added when Salesforce says the user can see the record; otherwise
   `parentLine` says the parent condition is met but not enough, with the unseen person as the likely

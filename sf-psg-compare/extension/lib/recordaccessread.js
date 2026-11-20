@@ -37,6 +37,38 @@ async function soft(out, what, fn, fallback, { quietIfOff = false } = {}) {
 
 const blank = () => ({ notes: [], warnings: [] });
 
+// ---------- retry a read that failed for a passing reason ----------
+
+const RETRY_STATUS = new Set([500, 502, 503, 504]);
+const RETRY_CODES = new Set(["SERVER_UNAVAILABLE"]); // only with a 5xx status (or none)
+
+/** Is this failure one that is worth trying again (the network dropped, or Salesforce or a proxy was briefly unavailable)?
+ *  A session that ran out (401), a bad request, no permission, no such thing and every query error are not. */
+export function isTransient(e) {
+  if (!e) return false;
+  if (e.status === undefined || e.status === null) return !e.errorCode; // fetch itself failed: no answer at all
+  if (e.status >= 400 && e.status < 500) return false; // any 4xx is never retried, whatever the errorCode
+  return RETRY_STATUS.has(e.status) || RETRY_CODES.has(e.errorCode);
+}
+
+/** The same api, but each GET is tried again after a short wait when it failed for a passing reason: at most
+ *  `delays.length` more tries (default two: 300 ms, then 1 s). Reads only, so trying again changes nothing in the org.
+ *  `sleep` is injectable so tests do not wait. The caller's api object is left as it is. */
+export function withRetry(api, { delays = [300, 1000], sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  const wrapped = Object.create(api);
+  wrapped.get = async (...args) => {
+    for (let i = 0; ; i++) {
+      try {
+        return await api.get(...args);
+      } catch (e) {
+        if (i >= delays.length || !isTransient(e)) throw e;
+        await sleep(delays[i]);
+      }
+    }
+  };
+  return wrapped;
+}
+
 // ---------- the record ----------
 
 /** Name of the share object and its two field names, from describe. null when the object has no share table. */
@@ -271,15 +303,24 @@ function withBelow(parentMap, id) {
   return out;
 }
 
+/** Ids strictly above `id` in a parent map (nearest first), cycle-safe. */
+function withAbove(parentMap, id) {
+  const out = [];
+  const seen = new Set([id]);
+  let cur = parentMap.get(id);
+  while (cur && !seen.has(cur)) { seen.add(cur); out.push(cur); cur = parentMap.get(cur); }
+  return out;
+}
+
 /** For groups that give access to managers (and for a queue that owns the record): which roles the members
  *  have, going down through groups inside groups, role groups, role-and-subordinates groups and territory
  *  groups. Loops are safe. Returns {[groupId]: {roles: [{roleId, example, count}], users, capped}}.
  *  At most MAX_MEMBER_USERS members are looked at in total; `capped` says so. */
-export async function readMemberRoles(api, targets, roleParent, terrParent) {
+export async function readMemberRoles(api, targets, roleParent, terrParent, targetInfo = new Map()) {
   const children = new Map(); // group -> member ids
   const meta = new Map(); // group -> {type, relatedId}
   let capped = false;
-  let frontier = [...targets];
+  let frontier = targets.filter((t) => !targetInfo.has(t)); // territory groups have no member rows
   const seen = new Set(frontier);
   for (let depth = 0; frontier.length; depth++) {
     if (depth >= MAX_DEPTH || seen.size > MAX_MEMBER_GROUPS) { capped = true; break; }
@@ -300,10 +341,19 @@ export async function readMemberRoles(api, targets, roleParent, terrParent) {
     frontier = next.filter((id) => !/^(Role|Territory|Organization)/.test(meta.get(id)?.type || ""));
   }
 
-  // Walk each target's tree.
+  // Walk each target's tree. A territory group has no member rows: its members are the people assigned to the territory
+  // (and, for "and below", to the territories under it). `targetInfo` says which targets are territory groups.
   const per = new Map(); // target -> {userIds, roleIds, terrIds}
   for (const t of targets) {
     const acc = { userIds: new Set(), roleIds: new Set(), terrIds: new Set() };
+    const ti = targetInfo.get(t);
+    if (ti?.relatedId && /^Territory/.test(ti.type)) {
+      // The shared territory first, then each one above it (their people get the access too, so their managers do),
+      // and for "and below" the ones under it. The order decides which member is named as the example.
+      acc.terrIds.add(ti.relatedId);
+      for (const r of withAbove(terrParent, ti.relatedId)) acc.terrIds.add(r);
+      if (ti.type === "TerritoryAndSubordinates") for (const r of withBelow(terrParent, ti.relatedId)) acc.terrIds.add(r);
+    }
     const visited = new Set();
     const stack = [t];
     while (stack.length) {
@@ -362,15 +412,15 @@ export async function readMemberRoles(api, targets, roleParent, terrParent) {
   for (const [t, acc] of per) {
     const byRole = new Map(); // role id -> {roleId, example, count}
     const seenUsers = new Set();
-    const addUser = (id, name, roleId) => {
+    const addUser = (id, name, roleId, terrId) => {
       if (seenUsers.has(id) || !roleId) return;
       seenUsers.add(id);
       const e = byRole.get(roleId);
-      if (e) e.count++; else byRole.set(roleId, { roleId, example: name, count: 1 });
+      if (e) e.count++; else byRole.set(roleId, { roleId, example: name, ...(terrId ? { terrId } : {}), count: 1 }); // terrId: where the example is assigned (territory groups)
     };
     for (const id of acc.userIds) { const u = users.get(id); if (u) addUser(id, u.name, u.roleId); }
     for (const r of acc.roleIds) for (const u of roleUsers.get(r) || []) addUser(u.id, u.name, r);
-    for (const tid of acc.terrIds) for (const id of terrUsers.get(tid) || []) { const u = users.get(id); if (u) addUser(id, u.name, u.roleId); }
+    for (const tid of acc.terrIds) for (const id of terrUsers.get(tid) || []) { const u = users.get(id); if (u) addUser(id, u.name, u.roleId, tid); }
     out[t] = { roles: [...byRole.values()], users: seenUsers.size, capped };
   }
   return out;
@@ -537,13 +587,15 @@ export async function readRecordAccess(api, ctx, users, { progress = () => {} } 
 
   // Groups that give access to managers, and a queue that owns the record: which roles their members have.
   const memberRoles = {};
+  const isTerrGroup = (g) => /^Territory/.test(g.type) && g.relatedId && g.includeBosses;
   const bossTargets = uniq([
-    ...[...groups.values()].filter((g) => g.type === "Regular" && g.includeBosses && allRows.some((r) => r.who === g.id)).map((g) => g.id),
+    ...[...groups.values()].filter((g) => (g.type === "Regular" || isTerrGroup(g)) && g.includeBosses && allRows.some((r) => r.who === g.id)).map((g) => g.id),
     rec.ownerKind === "queue" ? rec.ownerId : null,
   ]);
+  const targetInfo = new Map([...groups.values()].filter(isTerrGroup).map((g) => [g.id, { type: g.type, relatedId: g.relatedId }]));
   if (bossTargets.length && roles.length) {
     progress("Reading the members of groups that give access to managers");
-    const found = await soft(out, "The members of the groups that give access to managers", () => readMemberRoles(api, bossTargets, roleParent, terrParent), null);
+    const found = await soft(out, "The members of the groups that give access to managers", () => readMemberRoles(api, bossTargets, roleParent, terrParent, targetInfo), null);
     if (found) Object.assign(memberRoles, found);
   }
 
