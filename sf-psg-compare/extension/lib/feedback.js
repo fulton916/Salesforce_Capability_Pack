@@ -13,6 +13,8 @@ export const FEEDBACK_TOOLS = {
   access: "User access (extension)",
   hierarchy: "Territory & role hierarchy (extension)",
   record: "Why can a user see this record? (extension)",
+  flows: "Where is it used in flows (extension)",
+  snapshot: "Page details for a ticket (extension)",
   menu: "Extension menu / other",
 };
 
