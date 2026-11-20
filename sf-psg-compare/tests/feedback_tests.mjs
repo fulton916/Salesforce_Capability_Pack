@@ -57,7 +57,7 @@ export async function run(test) {
   });
 
   await test("feedback: the files use no innerHTML, localStorage, chrome.storage or fetch", () => {
-    for (const f of ["lib/feedback.js", "popup.js", "popup.html", "psg-compare.js", "user-access.js", "hierarchy.js", "psg-compare.html", "user-access.html", "hierarchy.html"]) {
+    for (const f of ["lib/feedback.js", "popup.js", "popup.html", "psg-compare.js", "user-access.js", "hierarchy.js", "record-access.js", "psg-compare.html", "user-access.html", "hierarchy.html", "record-access.html"]) {
       const text = read(ext(f));
       for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "localStorage", "chrome.storage"]) assert.ok(!text.includes(bad), `${f} uses ${bad}`);
     }
@@ -93,13 +93,13 @@ export async function run(test) {
   });
 
   await test("feedback: every extension script parses and imports do not clash with own declarations", () => {
-    const files = ["popup.js", "psg-compare.js", "user-access.js", "hierarchy.js"].map((f) => ext(f));
+    const files = ["popup.js", "psg-compare.js", "user-access.js", "hierarchy.js", "record-access.js"].map((f) => ext(f));
     for (const f of readdirSync(ext("lib"))) if (f.endsWith(".js")) files.push(ext("lib", f));
     for (const f of files) {
       // --check parses ES modules too; a name both imported and declared fails here.
       execFileSync(process.execPath, ["--check", f], { stdio: "pipe" });
     }
-    for (const f of ["popup.js", "psg-compare.js", "user-access.js", "hierarchy.js"]) {
+    for (const f of ["popup.js", "psg-compare.js", "user-access.js", "hierarchy.js", "record-access.js"]) {
       const text = read(ext(f));
       const imported = [];
       for (const m of text.matchAll(/^import\s*\{([^}]*)\}/gm)) {

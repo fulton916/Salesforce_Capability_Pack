@@ -1,0 +1,232 @@
+{
+ "schema": "sf-record-access/1",
+ "record": {
+  "id": "001000000000001AAA",
+  "object": "Account",
+  "name": "Northwind Traders (sample)",
+  "ownerId": "005000000000003AAA",
+  "ownerKind": "user",
+  "ownerName": "Maria Keller",
+  "ownerRoleId": "00E000000000004AAA",
+  "parentId": null,
+  "parentObject": null,
+  "parentObjectLabel": "",
+  "parentName": ""
+ },
+ "owd": {
+  "internal": "Private",
+  "external": "Private"
+ },
+ "object": {
+  "api": "Account",
+  "label": "Account",
+  "plural": "Accounts",
+  "custom": false,
+  "grantByHierarchy": null
+ },
+ "roles": [
+  {
+   "id": "00E000000000001AAA",
+   "parentId": null,
+   "name": "Global Sales VP"
+  },
+  {
+   "id": "00E000000000002AAA",
+   "parentId": "00E000000000001AAA",
+   "name": "EMEA Sales Director"
+  },
+  {
+   "id": "00E000000000003AAA",
+   "parentId": "00E000000000002AAA",
+   "name": "UK Sales Manager"
+  },
+  {
+   "id": "00E000000000004AAA",
+   "parentId": "00E000000000003AAA",
+   "name": "UK Sales Rep"
+  },
+  {
+   "id": "00E000000000005AAA",
+   "parentId": "00E000000000002AAA",
+   "name": "France Sales Manager"
+  },
+  {
+   "id": "00E000000000006AAA",
+   "parentId": "00E000000000005AAA",
+   "name": "France Sales Rep"
+  }
+ ],
+ "territories": {
+  "on": false,
+  "items": [],
+  "record": []
+ },
+ "shares": {
+  "available": true,
+  "truncated": false,
+  "rows": [
+   {
+    "who": "005000000000003AAA",
+    "level": "All",
+    "cause": "Owner"
+   },
+   {
+    "who": "00G000000000001AAA",
+    "level": "Read",
+    "cause": "Rule"
+   }
+  ]
+ },
+ "groups": [
+  {
+   "id": "00G000000000001AAA",
+   "name": "EMEA Sales",
+   "type": "Regular",
+   "relatedId": null,
+   "includeBosses": false
+  },
+  {
+   "id": "00G000000000002AAA",
+   "name": "UK Sales",
+   "type": "Regular",
+   "relatedId": null,
+   "includeBosses": false
+  },
+  {
+   "id": "00G000000000003AAA",
+   "name": "",
+   "type": "RoleAndSubordinates",
+   "relatedId": "00E000000000003AAA",
+   "includeBosses": false
+  },
+  {
+   "id": "00G000000000004AAA",
+   "name": "France Sales",
+   "type": "Regular",
+   "relatedId": null,
+   "includeBosses": false
+  },
+  {
+   "id": "00G000000000005AAA",
+   "name": "",
+   "type": "RoleAndSubordinates",
+   "relatedId": "00E000000000005AAA",
+   "includeBosses": false
+  }
+ ],
+ "shareUsers": [
+  {
+   "id": "005000000000003AAA",
+   "name": "Maria Keller",
+   "roleId": "00E000000000004AAA"
+  }
+ ],
+ "users": [
+  {
+   "id": "005000000000001AAA",
+   "name": "Alice Smith",
+   "username": "alice.smith@example.invalid",
+   "isActive": true,
+   "userType": "Standard",
+   "profile": "Sales User",
+   "roleId": "00E000000000003AAA",
+   "roleName": "UK Sales Manager",
+   "sf": {
+    "read": true,
+    "edit": true,
+    "delete": true,
+    "transfer": true,
+    "all": false,
+    "max": "Transfer"
+   },
+   "parentSf": null,
+   "object": {
+    "sets": [
+     {
+      "kind": "profile",
+      "name": "Sales User",
+      "read": true,
+      "create": true,
+      "edit": true,
+      "delete": false,
+      "viewAll": false,
+      "modifyAll": false,
+      "viewAllData": false,
+      "modifyAllData": false
+     }
+    ]
+   },
+   "memberOf": [
+    {
+     "groupId": "00G000000000002AAA",
+     "memberId": "00G000000000003AAA"
+    },
+    {
+     "groupId": "00G000000000001AAA",
+     "memberId": "00G000000000002AAA"
+    },
+    {
+     "groupId": "00G000000000002AAA",
+     "memberId": "00G000000000001AAA"
+    }
+   ],
+   "territoryIds": [],
+   "teamRole": null,
+   "childCounts": {
+    "Opportunity": 0,
+    "Case": 0,
+    "Contact": 0
+   }
+  },
+  {
+   "id": "005000000000002AAA",
+   "name": "Bob Jones",
+   "username": "bob.jones@example.invalid",
+   "isActive": true,
+   "userType": "Standard",
+   "profile": "Sales User",
+   "roleId": "00E000000000006AAA",
+   "roleName": "France Sales Rep",
+   "sf": {
+    "read": false,
+    "edit": false,
+    "delete": false,
+    "transfer": false,
+    "all": false,
+    "max": "None"
+   },
+   "parentSf": null,
+   "object": {
+    "sets": [
+     {
+      "kind": "profile",
+      "name": "Sales User",
+      "read": true,
+      "create": true,
+      "edit": true,
+      "delete": false,
+      "viewAll": false,
+      "modifyAll": false,
+      "viewAllData": false,
+      "modifyAllData": false
+     }
+    ]
+   },
+   "memberOf": [
+    {
+     "groupId": "00G000000000004AAA",
+     "memberId": "005000000000002AAA"
+    }
+   ],
+   "territoryIds": [],
+   "teamRole": null,
+   "childCounts": {
+    "Opportunity": 0,
+    "Case": 0,
+    "Contact": 0
+   }
+  }
+ ],
+ "notes": [],
+ "warnings": []
+}
