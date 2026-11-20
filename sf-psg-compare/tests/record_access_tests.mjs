@@ -1404,8 +1404,10 @@ export async function run(test) {
     assert.ok(!/btn\.disabled = !inOrg \|\| /.test(popup), "the button stays enabled when no record is open");
     assert.match(popup, /btn\.disabled = !inOrg;/);
     const manifest = JSON.parse(readFileSync(ext("manifest.json"), "utf-8"));
-    assert.equal(manifest.version, "0.5.0");
-    assert.match(manifest.description, /why a user can see a record/);
+    assert.match(manifest.version, /^0\.([5-9]|\d\d)\.\d+$/);
+    assert.ok(manifest.description.length <= 132, "Chrome limits the description to 132 characters");
+    assert.match(manifest.description, /record/);
+    assert.match(manifest.description, /territory/);
   });
 }
 

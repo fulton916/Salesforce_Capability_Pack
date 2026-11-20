@@ -1118,8 +1118,8 @@ export async function run(test) {
     assert.match(page, /FEEDBACK_TOOLS\.flows/);
     assert.match(page, /isSalesforceHost\(HOST\)/);
     assert.match(page, /builder_platform_interaction\/flowBuilder\.app\?flowId=/);
-    assert.equal(JSON.parse(text("manifest.json")).version, "0.5.0");
-    assert.match(JSON.parse(text("manifest.json")).description, /flows/);
+    assert.match(JSON.parse(text("manifest.json")).version, /^0\.([5-9]|\d\d)\.\d+$/);
+    assert.match(JSON.parse(text("manifest.json")).description, /flow/);
     const run = readFileSync(path.join(here, "run_tests.mjs"), "utf-8");
     assert.ok(run.includes("flow_usage_tests.mjs"));
   });

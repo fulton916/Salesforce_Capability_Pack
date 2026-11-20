@@ -1,7 +1,8 @@
 # sf-psg-compare
 
-A Chrome extension with five read-only tools: **Compare permission set groups**, **User access summary and comparison**,
-**Territory & role hierarchy**, **Why can a user see this record?** and **Where is it used in flows?**.
+A Chrome extension with six read-only tools: **Compare permission set groups**, **User access summary and
+comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**
+and **Page details for a ticket**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -30,6 +31,9 @@ Where is it used in flows?:
 - I am about to change how Account records work. Which flows run when one is created, updated or deleted, in what order, and which other flows change or read Account records?
 - I am about to change a field. Which flows use it, what does each one do with it (set it, check it, or just use it), and can I get the list into Excel?
 - Which flows contain this text, or this record Id?
+
+Page details for a ticket:
+- Who am I, which org is this, and which page was I on, in a form I can paste into a support ticket?
 
 ## Known limits
 
@@ -167,6 +171,42 @@ Checked against a live sandbox (read-only, through the dev server): the flow lis
 real flows (about 260 readable flows, read in about a minute), and the object view's list of triggered flows for Account.
 Not checked: the toolbar button inside Chrome, opening the CSV in Excel, the "Open in Flow Builder" links, Process Builder (the sandbox has none).
 
+## Page details for a ticket
+
+Use it when something goes wrong and you need to raise a ticket. On any Salesforce page, click the
+extension icon, then **Page details for a ticket**. A page opens with plain labelled lines:
+
+- **When**: your local time with time zone, and UTC.
+- **Org**: org name, Org Id, production or sandbox (and the sandbox name when the address shows it),
+  instance and My Domain host.
+- **You**: name, username, profile, role, language, locale, time zone and user type.
+- **Page**: record page, list view, Setup page, home or other; the object, and for a record page the
+  record Id, name, record type, owner, and who last changed it and when. For a list view, its name.
+- **Browser and extension**: browser and extension version.
+
+Type what happened in the box at the top (optional; it goes first in the text), then click **Copy**
+or **Download (.txt)** and paste or attach it in your ticket. If one part cannot be read (for example
+you are not allowed to see the record), the rest still shows, that part says why, and the raw message
+is under "Technical details" on the page only.
+
+What it never includes: the session id, cookies, the page contents, or any address parameter other
+than the list view name. Only the page's path is used, so tokens and login parameters in the address
+are dropped. No field values are read beyond the record's name, type, owner and change dates.
+Nothing is sent anywhere and nothing is saved; the note is not kept.
+
+Your own note is left as you typed it, except that anything shaped like a login session id or token
+(a `00D...!...` session id, `Bearer ...`, `sid=`, `access_token=` and similar) is removed, and a line
+near the buttons says so. Text like "error code=5" is kept. Older addresses of the form
+`/one/one.app#/...` hide which record you were on (the part after `#` is never used), so the Page area
+says so and asks you to open the record again and use the button from there.
+
+**Privacy note:** the text contains your org's details (org name and Id, your username, record names).
+Paste it only into your company's own ticket system.
+
+Try it: `python tools/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/issue-snapshot.html?demo=1> (made-up details). The popup opens it as
+`issue-snapshot.html?host=<org host>&url=<cleaned address>`. Checked read-only against a sandbox (org, user, record pages, a list view, a Setup page and home). Not checked: opening it from the toolbar button in Chrome, and the real clipboard.
+
 ## Install (unpacked, for your own browser)
 
 1. Copy this folder anywhere.
@@ -191,12 +231,13 @@ push it by policy.
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
-   and five buttons: **Compare permission set groups** ("Find out how two permission set groups
+   and six buttons: **Compare permission set groups** ("Find out how two permission set groups
    differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
-   **Why can a user see this record?** ("Explain who can see the record open in this tab, and why") and
-   **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id").
-   On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
+   **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
+   **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id") and
+   **Page details for a ticket** ("Copy who you are, which org and which page, to paste into a
+   ticket"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
    The record button reads the record Id from the address of the tab. On a Salesforce tab with no
    record open it stays enabled, says "Open a record first", and the page opens with an empty record
    box.
@@ -469,7 +510,7 @@ keep the old `licence` spelling so saved files still load. Saved group files use
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.5.0", and all five tool pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.6.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -532,6 +573,8 @@ Open <http://127.0.0.1:8765/psg-compare.html?dev=1> or `user-access.html?dev=1`,
 | `extension/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `psg-compare.css`) |
 | `extension/lib/useraccess.js` | Reads one user's access from the org (`searchUsers`, `readUserAccess`) |
 | `extension/lib/usercompare.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
+| `extension/issue-snapshot.*` | The Page details for a ticket page (html, js, extra css) |
+| `extension/lib/issuesnapshot.js`, `issuesnapshotread.js` | The ticket text, address cleaning and page kinds (pure), and the org reads (`SELECT`/describe/GET only) |
 | `extension/hierarchy.*` | The Territory & role hierarchy page (html, js, and extra css on top of `psg-compare.css`) |
 | `extension/lib/hierarchy.js` | Builds, searches and exports a hierarchy (tree, branch, Excel layout). Pure, no browser APIs |
 | `extension/lib/hierarchyread.js` | Reads territory models, territories and roles from the org (`SELECT` only) |

@@ -1,0 +1,37 @@
+{
+  "_note": "Made-up org, user and record for the demo page and the tests. Nothing here comes from a real org.",
+  "host": "example-co--uat.sandbox.my.salesforce.com",
+  "url": "/lightning/r/Account/001000000000001AAA/view",
+  "org": {
+    "name": "Example Co (demo)",
+    "id": "00D000000000001AAA",
+    "kind": "Sandbox",
+    "edition": "Enterprise Edition",
+    "sandboxName": "uat",
+    "instance": "CS99",
+    "host": "example-co--uat.sandbox.my.salesforce.com"
+  },
+  "user": {
+    "id": "005000000000001AAA",
+    "name": "Alex Example",
+    "username": "alex.example@example.com.uat",
+    "profile": "Standard User",
+    "role": "Sales Manager",
+    "language": "English (en_US)",
+    "locale": "English (United States) (en_US)",
+    "timeZone": "America/Los_Angeles",
+    "userType": "Standard"
+  },
+  "page": {
+    "kind": "record",
+    "url": "/lightning/r/Account/001000000000001AAA/view",
+    "objectApi": "Account",
+    "objectLabel": "Account",
+    "recordId": "001000000000001AAA",
+    "recordName": "Sample Account Ltd",
+    "recordType": "Customer",
+    "owner": "Jordan Sample",
+    "modifiedBy": "Sam Demo",
+    "modifiedAt": "2026-11-18 09:12:30 UTC"
+  }
+}

@@ -1,6 +1,7 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
 import { recordIdFromUrl } from "./lib/recordaccess.js";
 import { parseUrlContext, contextQuery } from "./lib/urlcontext.js";
+import { cleanUrl } from "./lib/issuesnapshot.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
@@ -33,6 +34,12 @@ const TOOLS = [
     title: "Where is it used in flows?",
     description: "Find the flows that use an object, a field or a record Id",
     context: true, // the page can start from the object or field of the Salesforce page that is open
+  },
+  {
+    page: "issue-snapshot.html",
+    title: "Page details for a ticket",
+    description: "Copy who you are, which org and which page, to paste into a ticket",
+    withPageAddress: true,
   },
 ];
 
@@ -74,6 +81,8 @@ for (const tool of TOOLS) {
       const record = tool.needsRecord && recordId ? `&record=${encodeURIComponent(recordId)}` : "";
       let extra = "";
       if (tool.context) extra = contextQuery(parseUrlContext(tab?.url)); // object and field only; never the address itself
+      // Only the path and filterName of the address go along; sid, tokens and the hash never do.
+      if (tool.withPageAddress) extra = `url=${encodeURIComponent(cleanUrl(tab?.url || ""))}`;
       await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${record}${extra ? "&" + extra : ""}`) });
       window.close();
     });
