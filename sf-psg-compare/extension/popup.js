@@ -1,4 +1,5 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
+import { cleanUrl } from "./lib/issuesnapshot.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
@@ -17,6 +18,12 @@ const TOOLS = [
     page: "hierarchy.html",
     title: "Territory & role hierarchy",
     description: "See the whole territory or role tree; export it for Excel",
+  },
+  {
+    page: "issue-snapshot.html",
+    title: "Page details for a ticket",
+    description: "Copy who you are, which org and which page, to paste into a ticket",
+    withPageAddress: true,
   },
 ];
 
@@ -54,7 +61,10 @@ for (const tool of TOOLS) {
   btn.append(title, desc);
   if (inOrg) {
     btn.addEventListener("click", async () => {
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}`) });
+      let query = `host=${encodeURIComponent(host)}`;
+      // Only the path and filterName of the address go along; sid, tokens and the hash never do.
+      if (tool.withPageAddress) query += `&url=${encodeURIComponent(cleanUrl(tab?.url || ""))}`;
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?${query}`) });
       window.close();
     });
   }

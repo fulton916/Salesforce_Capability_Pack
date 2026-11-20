@@ -12,6 +12,7 @@ export const FEEDBACK_TOOLS = {
   psg: "PSG Compare (extension)",
   access: "User access (extension)",
   hierarchy: "Territory & role hierarchy (extension)",
+  snapshot: "Page details for a ticket (extension)",
   menu: "Extension menu / other",
 };
 
