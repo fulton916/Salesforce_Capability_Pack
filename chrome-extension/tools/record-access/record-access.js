@@ -3,7 +3,7 @@ import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../user-access/user-access-read.js";
 import { matchUsers } from "../user-access/user-access-logic.js";
 import { recordIdFromUrl, explain, toPlainText, owdText, exactFirst, givesText, LEVEL_PHRASE } from "./record-access-logic.js";
-import { readRecordContext, readRecordAccess, searchUsersExactFirst, readUserById, withRetry } from "./record-access-read.js";
+import { readRecordContext, readRecordAccess, searchUsersExactFirst, readUserById, withRetry, createReadCache, clearRecordFacts } from "./record-access-read.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
 
@@ -36,7 +36,9 @@ const state = {
   demo: null, // demo mode: the sample facts
   ctx: null, // the record, its object and org-wide default
   sides: { a: { user: null }, b: { user: null } },
+  cache: createReadCache(), // what was read for this page: roles and territories, and the facts of the record being explained (page memory only)
   result: null,
+  keptAt: null, // when the record facts used by the shown result were first read, if they were kept from an earlier Explain
   busy: false,
   run: 0,
 };
@@ -126,6 +128,7 @@ async function useRecord(input) {
   }
   showError("");
   clearResult();
+  clearRecordFacts(state.cache); // a new look at a record reads its facts again
   state.ctx = null;
   $("#explain").disabled = true;
   $("#recordCard").textContent = "Reading the record…";
@@ -305,6 +308,7 @@ for (const side of ["a", "b"]) setupCombo(side);
 
 function clearResult() {
   state.result = null;
+  state.keptAt = null;
   $("#results").hidden = true;
 }
 
@@ -316,9 +320,10 @@ async function run() {
   updateExplain();
   showError("");
   try {
-    const facts = DEMO ? state.demo : await readRecordAccess(state.api, state.ctx, picks, { progress: setProgress });
+    const facts = DEMO ? state.demo : await readRecordAccess(state.api, state.ctx, picks, { progress: setProgress, cache: state.cache });
     if (token !== state.run) return;
     state.result = explain(facts, picks.map((p) => p.id));
+    state.keptAt = facts.kept?.at ?? null;
     renderResult();
   } catch (e) {
     showError(e?.status ? plainError(e, "Could not read from the org. If you have been away a while, reload the Salesforce tab and try again.") : e?.message || "Something went wrong.", e?.status ? rawOf(e) : "");
@@ -333,13 +338,16 @@ $("#explain").addEventListener("click", run);
 
 // ---------- results ----------
 
+/** Salesforce's own word for the reason (as the View Sharing Hierarchy page words it), small and quiet. */
+const sfLabelNode = (label) => (label ? el("span", { class: "sf-label", title: "The reason as Salesforce words it on its View Sharing Hierarchy page", text: `Salesforce: ${label}` }) : null);
+
 function routeNode(r, inactive) {
   let gives;
   if (!r.access) gives = el("span", { class: "gives unknown", text: "Gives access (how much is not known)" });
   else if (r.limited) gives = el("span", { class: "gives limited", text: `Would give ${r.access} access, limited to ${r.effective} by object permissions` });
   else gives = el("span", { class: "gives", text: `${inactive ? "Would give" : "Gives"} ${r.access} access` });
   return el("li", { class: "route" },
-    el("div", { class: "route-head" }, gives, r.summary === r.steps[0] ? null : el("span", { text: r.summary })),
+    el("div", { class: "route-head" }, gives, sfLabelNode(r.sfLabel), r.summary === r.steps[0] ? null : el("span", { text: r.summary })),
     el("ol", { class: "chain" }, r.steps.map((s) => el("li", { text: s }))));
 }
 
@@ -358,9 +366,29 @@ function personNode(u) {
   return el("div", { class: `panel person ${u.key}` }, nodes);
 }
 
+/** The quiet line shown when the record's sharing facts were kept from an earlier Explain (not read just now). */
+function renderKept() {
+  const box = $("#kept");
+  box.replaceChildren();
+  box.hidden = state.keptAt === null || state.keptAt === undefined;
+  if (box.hidden) return;
+  const time = new Date(state.keptAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  box.append(
+    `Who this record is shared with was read at ${time}, the first time you explained it on this page. `,
+    el("button", { class: "link", text: "Read it again", onclick: readAgain }),
+  );
+}
+
+/** Forget the kept facts of the record and explain again with the same users. */
+function readAgain() {
+  clearRecordFacts(state.cache);
+  run();
+}
+
 function renderResult() {
   const res = state.result;
   $("#results").hidden = false;
+  renderKept();
   $("#verdict").textContent = res.verdict;
   $("#copied").textContent = "";
   $("#mismatches").replaceChildren(...res.users.filter((u) => u.mismatch).map((u) => el("div", { class: "mismatch" },
@@ -378,7 +406,7 @@ function renderResult() {
     if (d.items.length) parts.push(el("p", { class: "hint", text: `The routes ${d.more} has that ${d.less} is missing:` }));
     for (const it of d.items) {
       parts.push(el("div", { class: "diffitem" },
-        el("div", { class: "route-head" }, it.gives ? el("span", { class: it.limited ? "gives limited" : "gives", text: givesText(it) }) : null, el("span", { text: it.route })),
+        el("div", { class: "route-head" }, it.gives ? el("span", { class: it.limited ? "gives limited" : "gives", text: givesText(it) }) : null, sfLabelNode(it.sfLabel), el("span", { text: it.route })),
         ...it.missing.map((m) => el("p", { class: "miss", text: m })),
         ...it.change.map((m) => el("p", { class: "change", text: `What would change it: ${m}` }))));
     }

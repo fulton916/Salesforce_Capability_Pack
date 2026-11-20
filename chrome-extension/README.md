@@ -361,6 +361,12 @@ different record, paste its link or Id into the box and click "Use this record".
   user's object permissions limit it. Like Salesforce, full access to a record needs Read, Edit and
   Delete on the object (or Modify All); Read and Edit without Delete is "edit", Read alone is "view".
   Territories that share a name are told apart by where they sit, for example "EM (under EMEA Region)".
+- Where Salesforce's own View Sharing Hierarchy page words the reason, a small grey tag such as
+  "Salesforce: Manager of Territory Member" sits next to the route (and is in the copied text), so the two pages
+  can be compared. Our wording stays as it is. Tags are shown only for reasons checked on that page
+  ("Manager of Territory Member", "Manager of Group Member", "Manager of User", "Manager of Queue Member"); other routes have no tag.
+- When you explain the same record again on the page, who it is shared with is not read again. The results then say
+  so in one small line ("Who this record is shared with was read at 14:32 ... Read it again"); "Read it again" reads it afresh.
 - With two users, "Why the difference" lists, for each route the user with more access has, what the
   other user is missing and what would change it.
 - If the routes we found do not match Salesforce's answer (access but no route, or a route but no
@@ -518,6 +524,12 @@ the account owner and the owner's role settings, and `AccountTeamMember`, `Group
 `PermissionSetGroup`, `ObjectPermissions`, `UserRecordAccess`, the team member objects and `COUNT()`
 of child records. The groups a user is in are worked out upward, level by level, with a visited set
 and a depth cap of 10, so loops cannot hang it.
+The reads that do not need each other run together (at most 6 requests at a time; the two users are read at
+the same time), and what does not change between two users is kept in the page's memory while the page is
+open: the roles and territories, and the record's own sharing, account sharing, group names and permission
+count. A second Explain on the same record, with other users, reads only the user-specific parts. Choosing
+another record empties the record's part; reload the page to read everything again. Nothing is stored
+in the browser or on disk.
 
 User access summary and comparison reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
 `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`, `UserLicense`,

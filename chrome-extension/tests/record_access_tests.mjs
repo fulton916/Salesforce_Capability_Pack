@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { SfApi, SalesforceError } from "../shared/sfconn.js";
-import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
-import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry } from "../tools/record-access/record-access-read.js";
+import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, sfLabelFor, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
+import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry, withLimit, createReadCache, clearRecordFacts, MAX_IN_FLIGHT } from "../tools/record-access/record-access-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);
@@ -1755,6 +1755,326 @@ export async function run(test) {
     const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
     assert.match(page, /givesText\(it\)/);
     assert.ok(!/`Gives \$\{it\.gives\}`/.test(page));
+  });
+
+  // ---------- Salesforce's reason label next to our wording ----------
+
+  await test("record access: routes Salesforce words as 'Manager of ...' carry its label on the page model and in the copied text", () => {
+    // 1. a user assigned to a territory above one the record is shared with (shareTerrAbove)
+    const fAbove = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", ID.t2)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, territoryIds: [ID.t1] }), user(ID.bob, "Bob Jones", { sf: SF_NONE })],
+    });
+    const above = explain(fAbove, [ID.alice, ID.bob]);
+    const rAbove = above.users[0].routes.find((r) => r.key.startsWith("shareTerrAbove:"));
+    assert.equal(rAbove.sfLabel, "Manager of Territory Member");
+    assert.match(toPlainText(above), /Route 1 \(gives view access; Salesforce: Manager of Territory Member\):/);
+    assert.equal(above.difference.items.find((i) => /territory/i.test(i.route)).sfLabel, "Manager of Territory Member");
+    assert.match(toPlainText(above), /\(Salesforce: Manager of Territory Member\)/);
+    // 2. a role above someone who gets a territory's access (shareBossTerr)
+    const fBoss = facts({
+      territories: terrTree(), groups: [grp(ID.gTerr, "Territory", "", T4, true)],
+      shares: { available: true, rows: [{ who: ID.gTerr, level: "Read", cause: "Territory" }] },
+      memberRoles: { [ID.gTerr]: { roles: [{ roleId: ID.low, example: "Mia Member", terrId: ID.t2, count: 1 }], users: 1, capped: false } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const boss = explain(fBoss, [ID.alice]);
+    assert.equal(boss.users[0].routes.find((r) => r.key.startsWith("shareBossTerr:")).sfLabel, "Manager of Territory Member");
+    // 3. a public group that also reaches managers (shareBossGroup)
+    const fGroup = facts({
+      shares: { available: true, rows: [{ who: ID.gBosses, level: "Edit", cause: "Rule" }] },
+      groups: [grp(ID.gBosses, "Regular", "Field Teams", null, true)],
+      memberRoles: { [ID.gBosses]: { roles: [{ roleId: ID.mid, example: "Max Mid", count: 1 }], users: 1, capped: false } },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const grpRes = explain(fGroup, [ID.alice]);
+    const rGroup = grpRes.users[0].routes.find((r) => r.key.startsWith("shareBossGroup:"));
+    assert.equal(rGroup.sfLabel, "Manager of Group Member");
+    assert.match(toPlainText(grpRes), /Route \d \(gives edit access; Salesforce: Manager of Group Member\):/);
+    // 4. the role above the account owner's role, for a case (acct:ownerRole)
+    const fAcct = acctFacts("Case", {
+      owner: { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Read" },
+      users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const acctRes = explain(fAcct, [ID.alice]);
+    assert.equal(acctRes.users[0].routes.find((r) => r.key === "acct:ownerRole").sfLabel, "Manager of User");
+    assert.match(toPlainText(acctRes), /Salesforce: Manager of User/);
+    // the same kinds of route through the account's rows carry the label too
+    assert.equal(sfLabelFor("acct:shareBossTerr:0MI000000000004:Territory"), "Manager of Territory Member");
+    assert.equal(sfLabelFor("acct:shareBossGroup:00G1:Rule"), "Manager of Group Member");
+    assert.equal(sfLabelFor("acct:shareTerrAbove:00G1:Territory"), "Manager of Territory Member");
+  });
+
+  await test("record access: 'Manager of User' on the account shared with a user above whom our user's role is; 'Manager of Queue Member' on the owner queue route", async () => {
+    // the account is shared with a specific user whose role is below Alice's
+    const aliceTop = user(ID.alice, "Alice Smith", { sf: SF_VIEW, roleId: ID.top, roleName: "Sales Director" });
+    const fAcct = acctFacts("Case", {
+      rows: [{ who: ID.bob, level: "Read", cause: "Manual" }],
+      shareUsers: [{ id: ID.bob, name: "Bob Jones", roleId: ID.low }],
+      users: [aliceTop],
+    });
+    const res = explain(fAcct, [ID.alice]);
+    const r = res.users[0].routes.find((x) => x.key.startsWith("acct:shareBoss:"));
+    assert.ok(r && r.detail.whoId && r.detail.acct, JSON.stringify(res.users[0].routes.map((x) => x.key)));
+    assert.equal(r.sfLabel, "Manager of User");
+    assert.match(toPlainText(res), /Route \d \(gives view access; Salesforce: Manager of User\):/);
+    // the record-level share to a user, with the same role order, is not confirmed: no tag
+    const fRec = facts({
+      shares: { available: true, rows: [{ who: ID.carl, level: "Read", cause: "Manual" }] },
+      shareUsers: [{ id: ID.carl, name: "Carl Brown", roleId: ID.low }],
+      users: [aliceTop],
+    });
+    const recRes = explain(fRec, [ID.alice]);
+    const rr = recRes.users[0].routes.find((x) => x.key.startsWith("shareBoss:"));
+    assert.ok(rr && rr.detail.whoId && !rr.detail.acct);
+    assert.equal(rr.sfLabel, null);
+    // a share to a role group, with our user's role above it: not confirmed either
+    const fRole = facts({
+      groups: [grp(ID.gUk, "Role", "UK Rep", ID.low)],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Read", cause: "Rule" }] },
+      users: [aliceTop],
+    });
+    const roleRes = explain(fRole, [ID.alice]);
+    const rg = roleRes.users[0].routes.find((x) => x.key.startsWith("shareBoss:"));
+    assert.ok(rg && rg.detail.group && !rg.detail.whoId, JSON.stringify(roleRes.users[0].routes.map((x) => x.key)));
+    assert.equal(rg.sfLabel, null);
+    for (const t of [toPlainText(roleRes), toPlainText(recRes)]) assert.ok(!/[;(]\s*Salesforce: /.test(t), "no label tag");
+    // the same role group through the account's rows: no tag
+    const fAcctRole = acctFacts("Case", { rows: [{ who: ID.gUk, level: "Read", cause: "Rule" }], groups: [grp(ID.gUk, "Role", "UK Rep", ID.low)], users: [aliceTop] });
+    const ar = explain(fAcctRole, [ID.alice]).users[0].routes.find((x) => x.key.startsWith("acct:shareBoss:"));
+    assert.ok(ar && ar.detail.group);
+    assert.equal(ar.sfLabel, null);
+    // the label lookup in one place: by key and detail
+    assert.equal(sfLabelFor("acct:shareBoss:005:Manual", { type: "shareBoss", whoId: "005", acct: true }), "Manager of User");
+    assert.equal(sfLabelFor("acct:shareBoss:005:Manual"), null);
+    assert.equal(sfLabelFor("shareBoss:005:Manual", { type: "shareBoss", whoId: "005" }), null);
+    // the owner queue: role above a member of the queue
+    const rec = { ...facts().record, ownerId: ID.gQueue, ownerKind: "queue", ownerName: "Support Queue", ownerRoleId: null };
+    const tables = { members: [{ GroupId: ID.gQueue, UserOrGroupId: U5(30) }], groups: [], users: [{ Id: U5(30), Name: "Quinn Queue", UserRoleId: ID.low }], terr: [] };
+    const roleParent = new Map([[ID.top, null], [ID.mid, ID.top], [ID.low, ID.mid]]);
+    const found = await readMemberRoles(memberOrg(tables), [ID.gQueue], roleParent, new Map());
+    const fq = facts({
+      record: rec, groups: [grp(ID.gQueue, "Queue", "Support Queue")], memberRoles: found,
+      users: [user(ID.alice, "Alice Smith", { sf: SF_ALL, roleId: ID.top, roleName: "Sales Director" })],
+    });
+    const qRes = explain(fq, [ID.alice]);
+    assert.equal(qRes.users[0].routes.find((x) => x.key === "ownerQueueBoss").sfLabel, "Manager of Queue Member");
+    assert.match(toPlainText(qRes), /Salesforce: Manager of Queue Member/);
+  });
+
+  await test("record access: a route kind Salesforce's label is not known for shows no label", () => {
+    const f = facts({
+      groups: [grp(ID.gUk, "Regular", "UK Sales")],
+      shares: { available: true, rows: [{ who: ID.gUk, level: "Edit", cause: "Rule" }] },
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.mid, roleName: "UK Manager", memberOf: [{ groupId: ID.gUk, memberId: ID.alice }] }),
+        user(ID.maria, "Maria Keller", { sf: SF_ALL, roleId: ID.low, roleName: "UK Rep" }),
+      ],
+    });
+    const res = explain(f, [ID.alice, ID.maria]);
+    const keys = res.users.flatMap((u) => u.routes.map((r) => r.key));
+    assert.ok(keys.includes("owner") && keys.some((x) => x.startsWith("share:")) && keys.includes("ownerRole"), keys.join(", "));
+    for (const u of res.users) for (const r of u.routes) assert.equal(r.sfLabel, null, r.key);
+    assert.ok(!/Salesforce: /.test(toPlainText(res)));
+    for (const key of ["owner", "ownerRole", "share:00G1:Rule", "shareBoss:00G1:Rule", "acct:owner", "acct:share:00G1:Rule", "territory:0MI1", "owd", "parent", "objectAll"]) assert.equal(sfLabelFor(key), null, key);
+  });
+
+  await test("record access: the page shows the label with textContent, small and quiet", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /const sfLabelNode = .*el\("span", \{ class: "sf-label".*text: `Salesforce: \$\{label\}`/);
+    assert.equal((page.match(/const sfLabelNode = /g) || []).length, 1);
+    assert.equal((page.match(/sfLabelNode\(/g) || []).length, 2, "used on a route card and on a difference item");
+    assert.match(readFileSync(ext("tools/record-access/record-access.css"), "utf-8"), /\.sf-label \{[^}]*color: var\(--muted\)/);
+  });
+
+  // ---------- reads run together, and what is kept for the page session ----------
+
+  /** The fake org, with every request taking a few milliseconds, counting how many are on their way at once. */
+  function slowOrg(opts) {
+    const org = fakeOrg(opts);
+    const orig = org.api.fetch;
+    const flight = { now: 0, max: 0 };
+    org.api.fetch = async (url, o) => {
+      flight.now++;
+      flight.max = Math.max(flight.max, flight.now);
+      await new Promise((r) => setTimeout(r, 4));
+      try { return await orig(url, o); } finally { flight.now--; }
+    };
+    return { ...org, flight };
+  }
+  const BOTH = [{ id: ID.alice, name: "Alice Smith" }, { id: ID.alice, name: "Alice Smith" }];
+
+  await test("record access: reads run together, never more than the cap at once", async () => {
+    const { api, flight } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    flight.max = 0;
+    await readRecordAccess(api, ctx, BOTH);
+    assert.ok(flight.max > 1, `reads overlapped (most at once: ${flight.max})`);
+    assert.ok(flight.max <= MAX_IN_FLIGHT, `no more than ${MAX_IN_FLIGHT} at once (most at once: ${flight.max})`);
+    // the limiter on its own
+    let now = 0, max = 0;
+    const base = { get: async () => { now++; max = Math.max(max, now); await new Promise((r) => setTimeout(r, 2)); now--; return 1; } };
+    const lim = withLimit(base, 3);
+    const results = await Promise.all(Array.from({ length: 20 }, () => lim.get("/x")));
+    assert.equal(results.length, 20);
+    assert.equal(max, 3);
+    assert.equal(withLimit(lim, 1), lim, "an api that is already limited is not limited again");
+    // a failing read gives its place back
+    const bad = withLimit({ get: async () => { throw new Error("no"); } }, 1);
+    await assert.rejects(bad.get("/x"), /no/);
+    await assert.rejects(bad.get("/x"), /no/);
+  });
+
+  await test("record access: the answer is the same as one read after another, notes and warnings in the same order", async () => {
+    for (const failOn of [[], [/FROM AccountShare/, /FROM UserRecordAccess/], [/FROM UserRole/]]) {
+      const a = fakeOrg({ failOn: [...failOn] });
+      const b = fakeOrg({ failOn: [...failOn] });
+      const ctxA = await readRecordContext(a.api, ID.rec);
+      const ctxB = await readRecordContext(b.api, ID.rec);
+      const together = await readRecordAccess(a.api, ctxA, [{ id: ID.alice, name: "Alice Smith" }]);
+      const oneByOne = await readRecordAccess(withLimit(b.api, 1), ctxB, [{ id: ID.alice, name: "Alice Smith" }]);
+      const byJson = (x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y));
+      const norm = (f) => ({ ...f, groups: [...f.groups].sort(byJson), users: f.users.map((u) => ({ ...u, memberOf: [...u.memberOf].sort(byJson) })) });
+      assert.deepEqual(norm(together), norm(oneByOne));
+      assert.deepEqual(together.notes, oneByOne.notes);
+      assert.deepEqual(together.warnings, oneByOne.warnings);
+      assert.deepEqual(explain(together), explain(oneByOne));
+      // the same set of reads, whatever the order
+      const qs = (l) => l.filter((x) => x.q).map((x) => x.q).sort();
+      assert.deepEqual(qs(a.log), qs(b.log));
+    }
+  });
+
+  await test("record access: two users are read together and each gets their own facts", async () => {
+    const { api, flight } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    flight.max = 0;
+    const f = await readRecordAccess(api, ctx, BOTH);
+    assert.equal(f.users.length, 2);
+    assert.ok(f.users.every((u) => u.sf?.edit === true));
+    assert.ok(flight.max >= 4, `both users' reads were under way together (${flight.max})`);
+  });
+
+  await test("record access: a second Explain on the same record reads only the user-specific parts; another record reads its facts again", async () => {
+    const { api, log } = fakeOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const count = (re) => log.filter((l) => re.test(l.q || "")).length;
+    const first = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    assert.equal(count(/FROM Territory2 /), 1);
+    assert.equal(count(/FROM AccountShare/), 1);
+    const permCounts = count(/COUNT\(\) FROM ObjectPermissions WHERE SobjectType = 'Account'/);
+    assert.equal(permCounts, 1);
+    const userReads = count(/FROM UserRecordAccess/);
+    const second = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1, "roles are kept");
+    assert.equal(count(/FROM Territory2 /), 2, "this fake org has no territories, so that read failed and is asked again (a failure is never kept)");
+    assert.equal(count(/FROM AccountShare/), 1, "the account's sharing is kept");
+    assert.equal(count(/COUNT\(\) FROM ObjectPermissions WHERE SobjectType = 'Account'/), 1, "the permission count is kept");
+    assert.equal(count(/FROM UserRecordAccess/), userReads + 1, "the user's own answer is read again");
+    assert.deepEqual(explain(second), explain(first));
+    // what is kept cannot be changed from outside
+    first.roles.push({ id: "x", parentId: null, name: "Added" });
+    first.shares.rows.length = 0;
+    const third = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.ok(!third.roles.some((r) => r.id === "x"));
+    // another record: its facts are read again, the org-wide lists are not
+    const other = { ...ctx, record: { ...ctx.record, id: "001000000000009AAA" } };
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM AccountShare/), 2);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    // the page empties the record's facts when the record changes
+    clearRecordFacts(cache);
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM AccountShare/), 3);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 1);
+    // nothing is kept when no cache is given
+    await readRecordAccess(api, other, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2);
+  });
+
+  await test("record access: facts kept from an earlier Explain are marked with when they were first read; reading again removes the mark", async () => {
+    const { api } = fakeOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const pickA = [{ id: ID.alice, name: "Alice Smith" }];
+    const before = Date.now();
+    const first = await readRecordAccess(api, ctx, pickA, { cache });
+    const after = Date.now();
+    assert.ok(!first.kept, "the first Explain read everything just now");
+    const second = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.ok(second.kept && typeof second.kept.at === "number");
+    assert.ok(second.kept.at >= before && second.kept.at <= after, "the time of the first read");
+    const third = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.equal(third.kept.at, second.kept.at, "still the first read's time");
+    // reading again (the page clears the record's facts)
+    clearRecordFacts(cache);
+    const fourth = await readRecordAccess(api, ctx, pickA, { cache });
+    assert.ok(!fourth.kept);
+    assert.ok((await readRecordAccess(api, ctx, pickA, { cache })).kept, "and the facts read just now are kept again");
+    // a new record starts afresh too
+    const other = { ...ctx, record: { ...ctx.record, id: "001000000000009AAA" } };
+    assert.ok(!(await readRecordAccess(api, other, pickA, { cache })).kept);
+    // nothing in the facts but the marker differs
+    const { kept, ...rest } = second;
+    assert.deepEqual(rest, first);
+    // no cache: never a marker
+    assert.ok(!(await readRecordAccess(api, ctx, pickA)).kept);
+  });
+
+  await test("record access: the page shows one quiet line for kept facts, with a link-style button to read again", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /facts\.kept\?\.at/);
+    assert.match(page, /el\("button", \{ class: "link", text: "Read it again", onclick: readAgain \}\)/);
+    assert.match(page, /function readAgain\(\) \{\s*clearRecordFacts\(state\.cache\);\s*run\(\);/);
+    assert.match(page, /was read at \$\{time\}, the first time you explained it on this page/);
+    assert.match(page, /toLocaleTimeString\(\[\], \{ hour: "2-digit", minute: "2-digit" \}\)/);
+    assert.match(readFileSync(ext("tools/record-access/record-access.html"), "utf-8"), /<p class="hint kept" id="kept" hidden><\/p>/);
+  });
+
+  await test("record access: a read that failed is not kept; the next Explain tries it again and the note goes away", async () => {
+    const failOn = [/FROM AccountShare/, /FROM UserRole WHERE PortalType = 'None'/];
+    const { api, log } = fakeOrg({ failOn });
+    const ctx = await readRecordContext(api, ID.rec);
+    const cache = createReadCache();
+    const count = (re) => log.filter((l) => re.test(l.q || "")).length;
+    const bad = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.ok(bad.notes.some((n) => /^Roles could not be read/.test(n)));
+    assert.ok(bad.notes.some((n) => /^The account's sharing rows could not be read/.test(n)) || bad.notes.some((n) => /^The record's sharing rows could not be read/.test(n)), bad.notes.join("\n"));
+    assert.equal(bad.roles.length, 0);
+    failOn.length = 0; // the org answers now
+    const good = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2, "the failed read was tried again");
+    assert.equal(good.roles.length, 3);
+    assert.equal(good.notes.filter((n) => /could not be read/.test(n)).length, 0, good.notes.join("\n"));
+    assert.equal(good.shares.rows.length, 2);
+    // and now that it worked it is kept
+    await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }], { cache });
+    assert.equal(count(/FROM UserRole WHERE PortalType = 'None'/), 2);
+  });
+
+  await test("record access: progress counts up to the end and never goes back", async () => {
+    const { api } = slowOrg();
+    const ctx = await readRecordContext(api, ID.rec);
+    const seen = [];
+    await readRecordAccess(api, ctx, BOTH, { progress: (t) => seen.push(t) });
+    const nums = seen.map((t) => t.match(/^Reading… \((\d+) of (\d+)\)$/)).map((m) => (assert.ok(m, "plain wording"), [Number(m[1]), Number(m[2])]));
+    assert.deepEqual(nums[0], [0, 9]);
+    assert.deepEqual(nums.at(-1), [9, 9]);
+    for (let i = 1; i < nums.length; i++) assert.ok(nums[i][0] === nums[i - 1][0] + 1 && nums[i][1] === 9);
+  });
+
+  await test("record access: the page keeps what it read in memory only and empties the record's facts for a new record", () => {
+    const page = readFileSync(ext("tools/record-access/record-access.js"), "utf-8");
+    assert.match(page, /cache: createReadCache\(\)/);
+    assert.match(page, /clearRecordFacts\(state\.cache\)/);
+    assert.match(page, /cache: state\.cache/);
+    const read = readFileSync(ext("tools/record-access/record-access-read.js"), "utf-8");
+    const storage = /chrome\.storage|localStorage|sessionStorage|indexedDB/;
+    assert.ok(!storage.test(read), "nothing is written to browser storage");
+    assert.ok(!storage.test(page));
   });
 }
 
