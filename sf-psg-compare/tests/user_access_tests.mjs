@@ -36,6 +36,8 @@ function fakeFetch(routes, log = []) {
     log.push({ method: opts.method || "GET", path: u.pathname, q: u.searchParams.get("q") });
     if (!u.pathname.includes("/query")) throw new Error(`unexpected url ${url}`);
     const q = u.searchParams.get("q");
+    // A real org has no relationship name for User.CallCenterId, so any path through it fails.
+    if (/CallCenter\./.test(q)) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: "Didn't understand relationship 'CallCenter' in field path. If you are attempting to use a custom relationship, be sure to append the '__r' after the custom relationship name.", errorCode: "INVALID_FIELD" }]) };
     const route = routes.find(([re]) => re.test(q));
     if (!route) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: `no route for ${q}`, errorCode: "TEST" }]) };
     const records = route[1](q);
@@ -49,7 +51,8 @@ const apiFor = (routes, log) => new SfApi({ apiHost: "test.example.com", session
 // A synthetic org for readUserAccess.
 function userRoutes(over = {}) {
   const routes = [
-    [/SELECT CallCenter\.Name/, () => [{ CallCenter: { Name: "Demo Line", InternalName: "Demo_Line" } }]],
+    [/SELECT CallCenterId FROM User/, () => [{ CallCenterId: "04vCC0000000001AAA" }]],
+    [/FROM CallCenter WHERE Id = '04vCC0000000001AAA'/, () => [{ Id: "04vCC0000000001AAA", Name: "Demo Line", InternalName: "Demo_Line" }]],
     [/FROM EntityDefinition/, () => []],
     [/FROM Organization/, () => [{ Id: "00DORG000000001AAA" }]],
     [/FROM User WHERE Id/, () => [{ Id: "005A", Name: "Alex Example", Username: "alex@example.com", IsActive: true, ProfileId: "00ePROF00000001AAA",
@@ -479,6 +482,35 @@ export async function run(test) {
     assert.deepEqual(say(userCardLines(r, "customSettings")).slice(0, 3), ["1 custom setting value both have", "1 only Ann has", "1 only Bob has"]);
   });
 
+  await test("a compare of one user with and one without a call center, matched by internal name", async () => {
+    const a = await readUserAccess(apiFor(userRoutes()), "005A");
+    const b = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: null }]]] })), "005B");
+    b.user.name = "Blake Example";
+    b.user.username = "blake@example.com";
+    const r = compareUsers(a, b);
+    assert.deepEqual(say(userCardLines(r, "callCenter")), [`${a.user.name}: Demo Line`, `${b.user.name}: no call center`]);
+    // the same center under a different Id in another org is the same item
+    const other = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: "04vCC0000000999AAA" }]], [/FROM CallCenter WHERE Id = '04vCC0000000999AAA'/, () => [{ Id: "04vCC0000000999AAA", Name: "Demo Line", InternalName: "Demo_Line" }]]] })), "005C");
+    assert.deepEqual(say(userCardLines(compareUsers(a, other), "callCenter")), ["✓ Same in both: Demo Line"]);
+  });
+
+  await test("count lines use has / have and singular / plural correctly", () => {
+    const withCs = (n, hierarchy) => {
+      const acc = mk("A", {});
+      acc.customSettingsInfo = { found: hierarchy, examined: hierarchy, hierarchy, failed: 0, capped: false };
+      acc.sections.customSettings = Array.from({ length: n }, (_, i) => ({ key: `S${i}__c.F__c`, label: `S${i}`, setting: { api: `S${i}__c` } }));
+      return acc;
+    };
+    assert.match(customSettingsLine(withCs(1, 20)), /^1 of 20 custom settings has a value/);
+    assert.match(customSettingsLine(withCs(2, 20)), /^2 of 20 custom settings have a value/);
+    assert.match(customSettingsLine(withCs(0, 20)), /^0 of 20 custom settings have a value/);
+    assert.match(customSettingsLine(withCs(1, 1)), /^1 of 1 custom setting has a value/);
+    assert.equal(customSettingsFailedNote({ customSettingsInfo: { failed: 1 } }), "1 setting could not be read.");
+    assert.equal(customSettingsFailedNote({ customSettingsInfo: { failed: 2 } }), "2 settings could not be read.");
+    assert.equal(customSettingsSkippedNote({ customSettingsInfo: { skippedFields: 1 } }), "1 field of a special type is not shown.");
+    assert.equal(customSettingsSkippedNote({ customSettingsInfo: { skippedFields: 3 } }), "3 fields of special types are not shown.");
+  });
+
   await test("the count line says how many custom settings have a value for this user", () => {
     const items = [csItem("Auto__c", "Bypass__c", true, "user", false), csItem("Auto__c", "Flows__c", true, "profile", false), csItem("Integ__c", "Size__c", 200, "user", 50, "double")];
     const acc = withCs("Ann", items, { found: 40, examined: 40, hierarchy: 37, failed: 0, capped: false });
@@ -507,26 +539,38 @@ export async function run(test) {
     assert.ok(rows.flat().every((c) => !String(c).includes("\n")));
   });
 
-  await test("call center: present, missing and unavailable", async () => {
-    const have = await readUserAccess(apiFor(userRoutes()), "005A");
+  await test("call center: present, missing, field absent, object unreadable", async () => {
+    const log = [];
+    const have = await readUserAccess(apiFor(userRoutes(), log), "005A");
     assert.deepEqual(have.sections.callCenter, [{ key: "Demo_Line", label: "Demo Line" }]);
     assert.equal(have.unavailable.callCenter, undefined);
-    const none = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenter\.Name/, () => [{ CallCenter: null }]]] })), "005A");
+    assert.deepEqual(have.warnings, []);
+    assert.ok(log.some((c) => c.q === "SELECT CallCenterId FROM User WHERE Id = '005A'"), "own query, no relationship path");
+    assert.ok(log.some((c) => c.q === "SELECT Id, Name, InternalName FROM CallCenter WHERE Id = '04vCC0000000001AAA'"));
+    assert.ok(!log.some((c) => /CallCenter\./.test(c.q || "")));
+    // no call center: a normal value, no CallCenter read, no message
+    const log2 = [];
+    const none = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => [{ CallCenterId: null }]]] }), log2), "005A");
     assert.deepEqual(none.sections.callCenter, []);
     assert.equal(none.unavailable.callCenter, undefined);
-    const log = [];
-    const gone = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenter\.Name/, () => ({ fail: "No such column 'CallCenter' on entity 'User'", code: "INVALID_FIELD" })]] }), log), "005A");
+    assert.deepEqual(none.warnings, []);
+    assert.ok(!log2.some((c) => /FROM CallCenter/.test(c.q || "")));
+    // the field is not on User in this org
+    const gone = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => ({ fail: "No such column 'CallCenterId' on entity 'User'", code: "INVALID_FIELD" })]] })), "005A");
     assert.deepEqual(gone.sections.callCenter, []);
     assert.equal(gone.unavailable.callCenter, "Call centers are not available in this org.");
     assert.ok(gone.warnings.some((w) => w.includes("Call center")));
     assert.equal(gone.sections.permissionSets.length, 3, "other areas still read");
     assert.equal(gone.user.name, "Alex Example");
-    const denied = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenter\.Name/, () => ({ fail: "denied", code: "INSUFFICIENT_ACCESS" })]] })), "005A");
-    assert.match(denied.unavailable.callCenter, /Call center could not be read\. Your user may not have permission/);
-    assert.ok(!/denied/.test(denied.unavailable.callCenter));
+    // the CallCenter object cannot be read: plain text, raw error only under warnings (even for INVALID_TYPE)
+    for (const [msg, code] of [["denied", "INSUFFICIENT_ACCESS"], ["sObject type 'CallCenter' is not supported", "INVALID_TYPE"]]) {
+      const denied = await readUserAccess(apiFor(userRoutes({ routes: [[/FROM CallCenter WHERE/, () => ({ fail: msg, code })]] })), "005A");
+      assert.deepEqual(denied.sections.callCenter, []);
+      assert.match(denied.unavailable.callCenter, /^Call center could not be read\. Your user may not have permission/);
+      assert.ok(!denied.unavailable.callCenter.includes(msg));
+      assert.ok(denied.warnings.some((w) => w.includes(msg)));
+    }
     validateAccess(gone);
-    // its own query, not part of the main user read
-    assert.ok(log.some((c) => /SELECT CallCenter\.Name/.test(c.q || "")) && !log.some((c) => /FROM User WHERE Id/.test(c.q || "") && /CallCenter/.test(c.q || "") && /Profile\.Name/.test(c.q || "")));
     // compare card
     const r = compareUsers(mk("Ann", { callCenter: ["East"] }), mk("Bob", {}));
     assert.deepEqual(say(userCardLines(r, "callCenter")), ["Ann: East", "Bob: no call center"]);
@@ -714,7 +758,7 @@ export async function run(test) {
   await test("territory errors keep their old wording; the new match is for the call center only", async () => {
     const t = await readUserAccess(apiFor(userRoutes({ routes: [[/FROM UserTerritory2Association/, () => ({ fail: "No such column 'Foo' on entity", code: "INVALID_FIELD" })]] })), "005A");
     assert.match(t.unavailable.territories, /^Territories could not be read\. Your user may not have permission/);
-    const cc = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenter\.Name/, () => ({ fail: "No such column 'CallCenter'", code: "INVALID_FIELD" })]] })), "005A");
+    const cc = await readUserAccess(apiFor(userRoutes({ routes: [[/SELECT CallCenterId FROM User/, () => ({ fail: "No such column 'CallCenterId'", code: "INVALID_FIELD" })]] })), "005A");
     assert.equal(cc.unavailable.callCenter, "Call centers are not available in this org.");
   });
 

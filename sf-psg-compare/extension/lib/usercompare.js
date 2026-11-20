@@ -111,7 +111,7 @@ export function customSettingsLine(access) {
     return `This org has no custom settings that can differ by user or profile.${info.capped ? ` (Only the first ${info.examined} of ${info.found} custom settings were checked.)` : ""}`;
   }
   const n = new Set(itemsOf(access, "customSettings").map((i) => i.setting?.api)).size;
-  const verb = info.hierarchy === 1 ? "has" : "have";
+  const verb = n === 1 || info.hierarchy === 1 ? "has" : "have";
   let line = `${n} of ${plural(info.hierarchy, "custom setting", "custom settings")} ${verb} a value for this user or their profile that differs from the org default.`;
   if (info.capped) line += ` Only the first ${info.examined} of ${info.found} custom settings were checked; the rest are not shown.`;
   return line;

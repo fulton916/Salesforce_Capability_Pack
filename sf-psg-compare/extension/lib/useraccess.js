@@ -30,13 +30,13 @@ export async function searchUsers(api, text, limit = 50) {
 }
 
 const OFF_PATTERN = /INVALID_TYPE|not supported|sObject type/i;
-// A call center that is missing shows up as an unknown field or column on User, so it also matches these.
+// A missing User.CallCenterId shows up as an unknown field or column, so it also matches these.
 const CALL_CENTER_OFF_PATTERN = /INVALID_TYPE|INVALID_FIELD|not supported|sObject type|No such column/i;
 
 /** Plain-words message for an area that could not be read. The raw error goes to the warnings. */
 function plainMessage(e, what, offText, offPattern = OFF_PATTERN) {
   const raw = `${e?.errorCode || ""} ${e?.message || ""}`;
-  if (offText && (e?.territoriesOff || offPattern.test(raw))) return offText;
+  if (offText && (e?.territoriesOff || (!e?.noOff && offPattern.test(raw)))) return offText;
   return `${what} could not be read. Your user may not have permission to see this. Ask an admin to check.`;
 }
 
@@ -185,10 +185,22 @@ async function readTerritories(api, userId) {
   return records.filter((r) => r.Territory2).map((r) => ({ key: r.Territory2.DeveloperName, label: r.Territory2.Name || r.Territory2.DeveloperName })).sort(byLabel);
 }
 
-/** The user's call center, from its own query: the field or object may not exist in an org without call centers. */
+/** The user's call center. User.CallCenterId has no relationship name, so it is read on its own (a path such as
+ * CallCenter.Name fails in a real org), and then the CallCenter row by Id. No call center is a normal result (empty
+ * list). A missing CallCenterId field is the "not available" case; a failure on the CallCenter read is not (noOff). */
 async function readCallCenter(api, userId) {
-  const { records } = await api.query(`SELECT CallCenter.Name, CallCenter.InternalName FROM User WHERE Id = ${soqlString(userId)}`);
-  const cc = records[0]?.CallCenter;
+  const { records } = await api.query(`SELECT CallCenterId FROM User WHERE Id = ${soqlString(userId)}`);
+  const id = records[0]?.CallCenterId;
+  if (!id) return [];
+  let cc;
+  try {
+    // cached per call center: two users of a compare in the same center cost one read
+    const r = await api.cached(`call-center:${id}`, () => api.query(`SELECT Id, Name, InternalName FROM CallCenter WHERE Id = ${soqlString(id)}`));
+    cc = r.records[0];
+  } catch (e) {
+    e.noOff = true;
+    throw e;
+  }
   return cc ? [{ key: cc.InternalName || cc.Name, label: cc.Name || cc.InternalName }] : [];
 }
 

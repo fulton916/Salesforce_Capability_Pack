@@ -205,7 +205,7 @@ users are marked "Inactive". Add a second user under "Second user (optional, to 
 |---|---|
 | Profile | the profile and its user license |
 | Role | the role |
-| Call center | the call center the user is assigned to (read in its own query; if the org has no call centers the area says so) |
+| Call center | the call center the user is assigned to (read from the user's call center field, then the call center itself; "No call center" is a normal result, and the area says "not available" only if the org has no such field) |
 | Permission set groups | groups assigned to the user; a muting permission set is shown as "Muting permission set: ..." |
 | Permission sets | every permission set the user gets, and how: "Assigned directly", "Through group: ...", or both. Profile-owned sets and the summary sets Salesforce keeps for groups are left out |
 | Permission set licenses | the permission set licenses assigned |
@@ -388,7 +388,7 @@ and a depth cap of 10, so loops cannot hang it.
 User access summary and comparison reads `User`, `PermissionSetAssignment`, `PermissionSetGroup`,
 `PermissionSetGroupComponent`, `PermissionSet`, `MutingPermissionSet`, `UserLicense`,
 `PermissionSetLicense`, `PermissionSetLicenseAssign`, `GroupMember` (with `Group`),
-`UserTerritory2Association`, `CallCenter` (through `User`), `EntityDefinition` (custom settings), `Organization` (its Id), a describe of each custom setting and one read of each hierarchy setting. Hierarchy settings are told from list settings by a describe call each (only hierarchy settings have a `SetupOwnerId` field; describes are cached, so a second user costs none), done 6 at a time with progress shown. At most 300 custom settings are checked; if the org has more, the page says so. The user search runs in the org (LIKE, limit 50), so it works with
+`UserTerritory2Association`, `CallCenter` (by the Id in `User.CallCenterId`), `EntityDefinition` (custom settings), `Organization` (its Id), a describe of each custom setting and one read of each hierarchy setting. Hierarchy settings are told from list settings by a describe call each (only hierarchy settings have a `SetupOwnerId` field; describes are cached, so a second user costs none), done 6 at a time with progress shown. At most 300 custom settings are checked; if the org has more, the page says so. The user search runs in the org (LIKE, limit 50), so it works with
 thousands of users. When the org's territory feature is off, the page does not ask for it.
 
 The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector finds
