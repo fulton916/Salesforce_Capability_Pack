@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User access summary and comparison</title>
+<link rel="stylesheet" href="../../shared/pack.css">
+<link rel="stylesheet" href="user-access.css">
+</head>
+<body>
+<header class="top">
+  <h1>User access summary and comparison</h1>
+  <div class="org" id="org">Not connected</div>
+  <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
+</header>
+
+<main>
+  <section class="panel">
+    <h2 class="step">Choose a user to look at</h2>
+    <p class="hint">Type part of a name or username. You can add a second user to compare the two side by side. It covers profile, role, call center, permission sets and groups, licenses, public groups, queues, territories, and custom settings that have a different value for the user or their profile.</p>
+    <div class="pickers">
+      <div class="picker" data-side="a">
+        <label class="pick-label" for="input-a"><span class="side a">A</span> First user</label>
+        <div class="combo org-only">
+          <input type="text" id="input-a" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-a" autocomplete="off" placeholder="Start typing a name or username">
+          <ul class="psg-list" id="list-a" role="listbox" hidden></ul>
+        </div>
+        <div class="chosen"></div>
+      </div>
+      <div class="picker" data-side="b">
+        <label class="pick-label" for="input-b"><span class="side b">B</span> Second user (optional, to compare)</label>
+        <div class="combo org-only">
+          <input type="text" id="input-b" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-b" autocomplete="off" placeholder="Start typing a name or username">
+          <ul class="psg-list" id="list-b" role="listbox" hidden></ul>
+        </div>
+        <div class="chosen"></div>
+      </div>
+    </div>
+    <div class="actions"><span id="progress" role="status"></span></div>
+    <div id="error" class="error" hidden></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="panel hero">
+      <div class="vs" id="vs">
+        <div class="who a" id="whoA"></div>
+        <div class="vs-mid" id="vsMid">vs</div>
+        <div class="who b" id="whoB"></div>
+      </div>
+      <p class="verdict" id="verdict"></p>
+    </div>
+
+    <div class="cards" id="cards"></div>
+
+    <div class="panel" id="detail">
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+      <p class="help" id="help"></p>
+      <div class="toolbar">
+        <input type="search" id="search" placeholder="Search…" aria-label="Search this list">
+        <div class="seg" role="group" aria-label="Rows to show">
+          <button id="showDiff" aria-pressed="true">Only differences</button>
+          <button id="showAll" aria-pressed="false">Everything</button>
+        </div>
+        <label class="check"><input type="checkbox" id="showApi"> Show API names</label>
+        <details class="menu">
+          <summary class="button">Download ▾</summary>
+          <div class="menu-items">
+            <button id="csvTab">This list, as shown (CSV for Excel)</button>
+            <button id="csvAll">Everything (CSV for Excel)</button>
+          </div>
+        </details>
+      </div>
+      <div class="tablewrap" id="table"></div>
+    </div>
+
+    <details class="panel notes" id="notesPanel" hidden>
+      <summary id="notesTitle">Notes</summary>
+      <ul id="notes"></ul>
+    </details>
+  </section>
+
+  <p class="footer">Read-only: this page only reads from your org and never changes anything. Nothing about the users is saved.</p>
+</main>
+<script type="module" src="user-access.js"></script>
+</body>
+</html>
