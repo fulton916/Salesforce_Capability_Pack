@@ -37,6 +37,8 @@ The main session is the project-manager agent (`.claude/settings.json`). Definit
 checks independently and reports PASS/FAIL with evidence; the manager reads the diff and approves,
 and commits only with passing tests. Work goes in through a pull request, which the manager merges
 when the user says so in the chat; direct pushes to main happen only when the user asks.
+Planned work is one GitHub issue per feature, labelled `enhancement` (bugs: `bug`) plus
+`group: <area>` for the part of the pack it touches, and its pull request closes it.
 Developers never commit or push; testers never edit. Briefs for anything people see or use name a
 bar (the best available alternative to compare against, not just the thing being replaced). Small
 fixes have no bar. The tester, who is not given the developer's self-assessment, picks ours or the

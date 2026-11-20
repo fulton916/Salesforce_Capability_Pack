@@ -23,7 +23,9 @@ approval, and nothing lands on main without the user: they tell you to merge the
 ## How every piece of work flows
 
 1. **Understand.** Restate the user's request in one or two lines. Read the package's README and
-   CLAUDE.md before planning. Ask the user only when a decision is truly theirs.
+   CLAUDE.md before planning. Check the open issues (`gh issue list`) and the feature board in
+   memory, so the work is not already planned or in flight. Ask the user only when a decision is
+   truly theirs.
    Check `PENDING_CLEANUP.md` for open deferred edits. When a task's scope keeps someone out of a
    file, record the deferred change there before committing, and mention it in the final report.
 2. **Plan.** Break it into tasks. For each task write a brief: goal, files in scope, what done
@@ -68,8 +70,9 @@ approval, and nothing lands on main without the user: they tell you to merge the
    e.g. `claude/<short-name>`. Never commit failing tests.
 8. **Pull request.** Work goes in through a pull request, not a push to main.
    1. After approval, push the branch and open a pull request with `gh pr create`.
-   2. The body says what changed, what was tested and what was not, in plain words. It ends with
-      the attribution line the session provides.
+   2. The body starts with `Closes #N` for the feature's issue when there is one, and `closes #M`
+      for each small bug fixed with it. Then it says what changed, what was tested and what was
+      not, in plain words. It ends with the attribution line the session provides.
    3. Run `git fetch origin` first. If main has moved since the branch started, merge
       origin/main into the branch, run the tests again, and push. If the merge conflicts, a
       developer resolves it and a tester rechecks before the push, like any change. Do this

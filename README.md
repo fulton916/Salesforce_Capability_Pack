@@ -4,6 +4,8 @@ Standalone Salesforce admin and translation tools. Each folder is a self-contain
 
 **Want the Chrome extension?** Follow [Install the Chrome extension (developer mode, about 2 minutes)](#install-the-chrome-extension-developer-mode-about-2-minutes).
 
+**Roadmap:** [open features](https://github.com/fulton916/Salesforce_Capability_Pack/issues?q=is%3Aissue+is%3Aopen+label%3Aenhancement)
+
 ## What's in the pack
 
 There are two kinds of tool:
