@@ -210,7 +210,7 @@ Try it: `python tools/dev_server.py --no-org`, then open
 
 ## Install (unpacked, for your own browser)
 
-New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-step-by-step) in the main README.
+New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
 
 1. Copy this folder anywhere.
 2. Chrome or Edge: open `chrome://extensions` (Edge: `edge://extensions`).
