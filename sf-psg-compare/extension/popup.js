@@ -1,4 +1,5 @@
 import { isSalesforceHost } from "./lib/sfconn.js";
+import { parseUrlContext, contextQuery } from "./lib/urlcontext.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.
@@ -17,6 +18,12 @@ const TOOLS = [
     page: "hierarchy.html",
     title: "Territory & role hierarchy",
     description: "See the whole territory or role tree; export it for Excel",
+  },
+  {
+    page: "flow-usage.html",
+    title: "Where is it used in flows?",
+    description: "Find the flows that use an object, a field or a record Id",
+    context: true, // the page can start from the object or field of the Salesforce page that is open
   },
 ];
 
@@ -54,7 +61,9 @@ for (const tool of TOOLS) {
   btn.append(title, desc);
   if (inOrg) {
     btn.addEventListener("click", async () => {
-      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}`) });
+      let extra = "";
+      if (tool.context) extra = contextQuery(parseUrlContext(tab?.url)); // object and field only; never the address itself
+      await chrome.tabs.create({ url: chrome.runtime.getURL(`${tool.page}?host=${encodeURIComponent(host)}${extra ? "&" + extra : ""}`) });
       window.close();
     });
   }

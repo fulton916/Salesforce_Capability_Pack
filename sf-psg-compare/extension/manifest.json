@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Salesforce Capability Pack",
-  "version": "0.3.0",
-  "description": "Admin tools for Salesforce: compare permission set groups, see a user's access, and see the territory and role hierarchy. Read-only; uses your existing Salesforce login.",
+  "version": "0.4.0",
+  "description": "Admin tools for Salesforce: compare permission set groups, see a user's access, see the territory and role hierarchy, and find which flows use an object, a field or a record Id. Read-only; uses your existing Salesforce login.",
   "permissions": ["cookies", "activeTab", "tabs"],
   "host_permissions": [
     "https://*.salesforce.com/*",

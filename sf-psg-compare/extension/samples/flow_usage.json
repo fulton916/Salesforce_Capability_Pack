@@ -1,0 +1,1648 @@
+{
+ "org": {
+  "name": "Made-up Org",
+  "id": "00D000000000001AAA",
+  "isSandbox": true
+ },
+ "objects": {
+  "Account": {
+   "label": "Account",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "Account ID",
+     "type": "id"
+    },
+    {
+     "name": "Name",
+     "label": "Account Name",
+     "type": "string"
+    },
+    {
+     "name": "Status__c",
+     "label": "Account Status",
+     "type": "picklist"
+    },
+    {
+     "name": "Industry",
+     "label": "Industry",
+     "type": "picklist"
+    },
+    {
+     "name": "OwnerId",
+     "label": "Owner ID",
+     "type": "reference",
+     "relationshipName": "Owner",
+     "referenceTo": [
+      "User"
+     ]
+    },
+    {
+     "name": "ParentId",
+     "label": "Parent Account ID",
+     "type": "reference",
+     "relationshipName": "Parent",
+     "referenceTo": [
+      "Account"
+     ]
+    },
+    {
+     "name": "Type",
+     "label": "Account Type",
+     "type": "picklist"
+    },
+    {
+     "name": "Rating",
+     "label": "Rating",
+     "type": "picklist"
+    }
+   ],
+   "childRelationships": [
+    {
+     "relationshipName": "Contacts",
+     "childSObject": "Contact",
+     "field": "AccountId"
+    },
+    {
+     "relationshipName": "Opportunities",
+     "childSObject": "Opportunity",
+     "field": "AccountId"
+    }
+   ]
+  },
+  "Contact": {
+   "label": "Contact",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "Contact ID",
+     "type": "id"
+    },
+    {
+     "name": "LastName",
+     "label": "Last Name",
+     "type": "string"
+    },
+    {
+     "name": "Email",
+     "label": "Email",
+     "type": "email"
+    },
+    {
+     "name": "Status__c",
+     "label": "Contact Status",
+     "type": "picklist"
+    },
+    {
+     "name": "AccountId",
+     "label": "Account ID",
+     "type": "reference",
+     "relationshipName": "Account",
+     "referenceTo": [
+      "Account"
+     ]
+    },
+    {
+     "name": "OwnerId",
+     "label": "Owner ID",
+     "type": "reference",
+     "relationshipName": "Owner",
+     "referenceTo": [
+      "User"
+     ]
+    }
+   ],
+   "childRelationships": []
+  },
+  "Opportunity": {
+   "label": "Opportunity",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "Opportunity ID",
+     "type": "id"
+    },
+    {
+     "name": "Name",
+     "label": "Name",
+     "type": "string"
+    },
+    {
+     "name": "StageName",
+     "label": "Stage",
+     "type": "picklist"
+    },
+    {
+     "name": "AccountId",
+     "label": "Account ID",
+     "type": "reference",
+     "relationshipName": "Account",
+     "referenceTo": [
+      "Account"
+     ]
+    },
+    {
+     "name": "OwnerId",
+     "label": "Owner ID",
+     "type": "reference",
+     "relationshipName": "Owner",
+     "referenceTo": [
+      "User"
+     ]
+    }
+   ]
+  },
+  "Case": {
+   "label": "Case",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "Case ID",
+     "type": "id"
+    },
+    {
+     "name": "Subject",
+     "label": "Subject",
+     "type": "string"
+    },
+    {
+     "name": "Status",
+     "label": "Status",
+     "type": "picklist"
+    },
+    {
+     "name": "AccountId",
+     "label": "Account ID",
+     "type": "reference",
+     "relationshipName": "Account",
+     "referenceTo": [
+      "Account"
+     ]
+    },
+    {
+     "name": "OwnerId",
+     "label": "Owner ID",
+     "type": "reference",
+     "relationshipName": "Owner",
+     "referenceTo": [
+      "User",
+      "Group"
+     ]
+    }
+   ]
+  },
+  "User": {
+   "label": "User",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "User ID",
+     "type": "id"
+    },
+    {
+     "name": "Name",
+     "label": "Full Name",
+     "type": "string"
+    },
+    {
+     "name": "Email",
+     "label": "Email",
+     "type": "email"
+    }
+   ]
+  },
+  "Partner_Account__c": {
+   "label": "Account",
+   "fields": [
+    {
+     "name": "Id",
+     "label": "Record ID",
+     "type": "id"
+    },
+    {
+     "name": "Name",
+     "label": "Account Name",
+     "type": "string"
+    }
+   ],
+   "childRelationships": []
+  }
+ },
+ "flows": [
+  {
+   "def": {
+    "id": "300000000000001AAA",
+    "apiName": "Account_Status_Router",
+    "label": "Account Status Router",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Account",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000001AAA",
+    "latestVersionId": "301000000000001AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "Account",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000001AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Update",
+       "filters": [
+        {
+         "field": "Status__c",
+         "operator": "NotEqualTo",
+         "value": {
+          "stringValue": "Active"
+         }
+        }
+       ]
+      },
+      "decisions": [
+       {
+        "name": "Is_Churned",
+        "label": "Is churned?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Churned"
+            }
+           },
+           {
+            "leftValueReference": "$Record__Prior.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Active"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "recordLookups": [
+       {
+        "name": "Get_Contacts",
+        "label": "Get Contacts",
+        "object": "Contact",
+        "filters": [
+         {
+          "field": "AccountId",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "$Record.Id"
+          }
+         },
+         {
+          "field": "Status__c",
+          "operator": "EqualTo",
+          "value": {
+           "stringValue": "Open"
+          }
+         }
+        ],
+        "queriedFields": [
+         "Status__c",
+         "Email"
+        ],
+        "storeOutputAutomatically": true
+       }
+      ],
+      "recordUpdates": [
+       {
+        "name": "Update_Account",
+        "label": "Update Account",
+        "object": "Account",
+        "filters": [
+         {
+          "field": "Id",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "$Record.Id"
+          }
+         }
+        ],
+        "inputAssignments": [
+         {
+          "field": "Status__c",
+          "operator": "EqualTo",
+          "value": {
+           "stringValue": "Closed"
+          }
+         },
+         {
+          "field": "Industry",
+          "operator": "EqualTo",
+          "value": {
+           "stringValue": "Other"
+          }
+         }
+        ]
+       }
+      ],
+      "textTemplates": [
+       {
+        "name": "Note",
+        "text": "Status is now {!$Record.Status__c} for {!$Record.Name}"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000002AAA",
+    "apiName": "Contact_Welcome",
+    "label": "Contact Welcome Screen",
+    "processType": "Flow",
+    "triggerType": "",
+    "triggerObject": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000002AAA",
+    "latestVersionId": "301000000000002AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000002AAA": {
+     "metadata": {
+      "variables": [
+       {
+        "name": "acct",
+        "dataType": "SObject",
+        "objectType": "Account"
+       },
+       {
+        "name": "recordId",
+        "dataType": "String"
+       }
+      ],
+      "recordLookups": [
+       {
+        "name": "Get_Account",
+        "label": "Get Account",
+        "object": "Account",
+        "filters": [
+         {
+          "field": "Id",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "recordId"
+          }
+         }
+        ],
+        "storeOutputAutomatically": true
+       },
+       {
+        "name": "Get_Contacts",
+        "label": "Get Contacts",
+        "object": "Contact",
+        "filters": [
+         {
+          "field": "AccountId",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "recordId"
+          }
+         }
+        ],
+        "storeOutputAutomatically": true
+       }
+      ],
+      "loops": [
+       {
+        "name": "Loop_Contacts",
+        "label": "Loop over contacts",
+        "collectionReference": "Get_Contacts"
+       }
+      ],
+      "decisions": [
+       {
+        "name": "Check_Status",
+        "label": "Check status",
+        "rules": [
+         {
+          "name": "Is_Active",
+          "label": "Is active",
+          "conditions": [
+           {
+            "leftValueReference": "Get_Account.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Active"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "assignments": [
+       {
+        "name": "Set_Status",
+        "label": "Set status",
+        "assignmentItems": [
+         {
+          "assignToReference": "acct.Status__c",
+          "operator": "Assign",
+          "value": {
+           "stringValue": "Reviewed"
+          }
+         },
+         {
+          "assignToReference": "acct.Name",
+          "operator": "Assign",
+          "value": {
+           "elementReference": "Get_Account.Name"
+          }
+         }
+        ]
+       },
+       {
+        "name": "Show_Parent",
+        "label": "Remember parent status",
+        "assignmentItems": [
+         {
+          "assignToReference": "parentStatus",
+          "operator": "Assign",
+          "value": {
+           "elementReference": "Loop_Contacts.Account.Parent.Status__c"
+          }
+         }
+        ]
+       }
+      ],
+      "screens": [
+       {
+        "name": "Welcome",
+        "label": "Welcome",
+        "fields": [
+         {
+          "name": "Intro",
+          "fieldType": "DisplayText",
+          "fieldText": "<p>Account status: {!Get_Account.Status__c}</p>"
+         },
+         {
+          "name": "Dyn",
+          "fieldType": "ObjectProvided",
+          "objectFieldReference": "acct.Status__c"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000003AAA",
+    "apiName": "Opportunity_Stage_Notify",
+    "label": "Opportunity Stage Notify",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Opportunity",
+    "recordTriggerType": "CreateAndUpdate",
+    "isActive": true,
+    "activeVersionId": "301000000000003AAA",
+    "latestVersionId": "301000000000003AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "Opportunity",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000003AAA": {
+     "metadata": {
+      "start": {
+       "object": "Opportunity",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "CreateAndUpdate",
+       "filters": [],
+       "filterFormula": "{!$Record.Account.Status__c} = 'Active'"
+      },
+      "decisions": [
+       {
+        "name": "Parent_Active",
+        "label": "Parent account active?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.Account.Parent.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Active"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "recordCreates": [
+       {
+        "name": "Create_Case",
+        "label": "Create review case",
+        "object": "Case",
+        "inputAssignments": [
+         {
+          "field": "Subject",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "$Record.Name"
+          }
+         },
+         {
+          "field": "Status",
+          "operator": "EqualTo",
+          "value": {
+           "stringValue": "New"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000004AAA",
+    "apiName": "Account_Status_Process",
+    "label": "Account Status Process",
+    "processType": "Workflow",
+    "triggerType": "",
+    "triggerObject": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000004AAA",
+    "latestVersionId": "301000000000004AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000004AAA": {
+     "metadata": {
+      "variables": [
+       {
+        "name": "myVariable_current",
+        "dataType": "SObject",
+        "objectType": "Account"
+       },
+       {
+        "name": "myVariable_old",
+        "dataType": "SObject",
+        "objectType": "Account"
+       }
+      ],
+      "formulas": [
+       {
+        "name": "formula_changed",
+        "dataType": "Boolean",
+        "expression": "{!myVariable_current.Status__c} <> {!myVariable_old.Status__c}"
+       }
+      ],
+      "decisions": [
+       {
+        "name": "myDecision",
+        "label": "Status changed",
+        "rules": [
+         {
+          "name": "myRule_1",
+          "label": "Status changed",
+          "conditions": [
+           {
+            "leftValueReference": "formula_changed",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "true"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "recordUpdates": [
+       {
+        "name": "myRule_1_A1",
+        "label": "Set review flag",
+        "object": "Account",
+        "filters": [
+         {
+          "field": "Id",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "myVariable_current.Id"
+          }
+         }
+        ],
+        "inputAssignments": [
+         {
+          "field": "Industry",
+          "operator": "EqualTo",
+          "value": {
+           "stringValue": "Review"
+          }
+         }
+        ]
+       }
+      ],
+      "processType": "Workflow",
+      "processMetadataValues": [
+       {
+        "name": "ObjectType",
+        "value": {
+         "stringValue": "Account"
+        }
+       },
+       {
+        "name": "TriggerType",
+        "value": {
+         "stringValue": "onAllChanges"
+        }
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000005AAA",
+    "apiName": "Old_Status_Cleanup",
+    "label": "Old Status Cleanup",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeSave",
+    "triggerObject": "Account",
+    "recordTriggerType": "CreateAndUpdate",
+    "isActive": false,
+    "activeVersionId": null,
+    "latestVersionId": "301000000000005AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "Account",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000005AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "CreateAndUpdate",
+       "filters": []
+      },
+      "assignments": [
+       {
+        "name": "Clear",
+        "label": "Clear status",
+        "assignmentItems": [
+         {
+          "assignToReference": "$Record.Status__c",
+          "operator": "Assign",
+          "value": {
+           "stringValue": ""
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000006AAA",
+    "apiName": "Account_Owner_Check",
+    "label": "Account Owner Check",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeSave",
+    "triggerObject": "Account",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000006AAA",
+    "latestVersionId": "301000000000006BAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "Account",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000006AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "Update",
+       "filters": []
+      },
+      "decisions": [
+       {
+        "name": "Owner_Set",
+        "label": "Owner set?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.OwnerId",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "x"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "301000000000006BAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "Update",
+       "filters": []
+      },
+      "decisions": [
+       {
+        "name": "Owner_Set",
+        "label": "Owner set?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Active"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000021AAA",
+    "apiName": "Account_Late_Before_Save",
+    "label": "Account Late Checks (before save)",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeSave",
+    "triggerObject": "Account",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000021AAA",
+    "latestVersionId": "301000000000021BAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": 1200,
+    "lastModified": "2026-01-21T09:00:00.000+0000",
+    "triggerObjectName": "Account",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000021AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "Update",
+       "filters": []
+      },
+      "decisions": [
+       {
+        "name": "Owner_Set",
+        "label": "Owner set?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.OwnerId",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "x"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    },
+    "301000000000021BAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "Update",
+       "filters": []
+      },
+      "decisions": [
+       {
+        "name": "Owner_Set",
+        "label": "Owner set?",
+        "rules": [
+         {
+          "name": "Yes",
+          "label": "Yes",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.Status__c",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "Active"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000007AAA",
+    "apiName": "Generic_Record_Helper",
+    "label": "Generic Record Helper",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "",
+    "triggerObject": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000007AAA",
+    "latestVersionId": "301000000000007AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000007AAA": {
+     "metadata": {
+      "variables": [
+       {
+        "name": "anyRecord",
+        "dataType": "SObject"
+       },
+       {
+        "name": "result",
+        "dataType": "String"
+       }
+      ],
+      "assignments": [
+       {
+        "name": "Read_Status",
+        "label": "Read the status",
+        "assignmentItems": [
+         {
+          "assignToReference": "result",
+          "operator": "Assign",
+          "value": {
+           "elementReference": "anyRecord.Status__c"
+          }
+         }
+        ]
+       }
+      ],
+      "textTemplates": [
+       {
+        "name": "Msg",
+        "text": "Owner status: {!$Record.Owner.Status__c}"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000008AAA",
+    "apiName": "Case_Routing",
+    "label": "Case Routing",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Case",
+    "recordTriggerType": "Create",
+    "isActive": true,
+    "activeVersionId": "301000000000008AAA",
+    "latestVersionId": "301000000000008AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "Case",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000008AAA": {
+     "metadata": {
+      "start": {
+       "object": "Case",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Create",
+       "filters": []
+      },
+      "decisions": [
+       {
+        "name": "Is_Vip",
+        "label": "Is VIP account?",
+        "rules": [
+         {
+          "name": "Vip",
+          "label": "VIP",
+          "conditions": [
+           {
+            "leftValueReference": "$Record.AccountId",
+            "operator": "EqualTo",
+            "rightValue": {
+             "stringValue": "001000000000001"
+            }
+           }
+          ]
+         }
+        ]
+       }
+      ],
+      "assignments": [
+       {
+        "name": "Owner_Name",
+        "label": "Owner name",
+        "assignmentItems": [
+         {
+          "assignToReference": "ownerName",
+          "operator": "Assign",
+          "value": {
+           "elementReference": "$Record.Owner.Name"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000009AAA",
+    "apiName": "pkg__Packaged_Sync",
+    "label": "Packaged Sync",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "",
+    "triggerObject": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000009AAA",
+    "latestVersionId": "301000000000009AAA",
+    "namespace": "pkg",
+    "managed": true,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000009AAA": {
+     "metadata": null
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000010AAA",
+    "apiName": "Locked_Down_Flow",
+    "label": "Locked Down Flow",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "",
+    "triggerObject": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000010AAA",
+    "latestVersionId": "301000000000010AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "lastModified": "2026-01-15T10:00:00.000+0000",
+    "triggerObjectName": "",
+    "hasAsyncPath": false
+   },
+   "versions": {
+    "301000000000010AAA": {
+     "error": "INSUFFICIENT_ACCESS: You do not have access to read this flow."
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000011AAA",
+    "apiName": "Account_Defaults_Before_Save",
+    "label": "Account Defaults (before save)",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeSave",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "Create",
+    "isActive": true,
+    "activeVersionId": "301000000000011AAA",
+    "latestVersionId": "301000000000011AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": 10,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-10T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000011AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "Create",
+       "filterLogic": "and",
+       "filters": [
+        {
+         "field": "Industry",
+         "operator": "IsNull",
+         "value": {
+          "booleanValue": true
+         }
+        }
+       ]
+      },
+      "assignments": [
+       {
+        "name": "Set_Industry",
+        "label": "Set industry",
+        "assignmentItems": [
+         {
+          "assignToReference": "$Record.Industry",
+          "operator": "Assign",
+          "value": {
+           "stringValue": "Other"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000012AAA",
+    "apiName": "Account_Validate_Before_Save",
+    "label": "Account Checks (before save)",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeSave",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "CreateAndUpdate",
+    "isActive": true,
+    "activeVersionId": "301000000000012AAA",
+    "latestVersionId": "301000000000012AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": 10,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-20T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000012AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeSave",
+       "recordTriggerType": "CreateAndUpdate",
+       "filterLogic": "1 AND (2 OR 3)",
+       "filters": [
+        {
+         "field": "Type",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Customer"
+         }
+        },
+        {
+         "field": "Rating",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Hot"
+         }
+        },
+        {
+         "field": "Industry",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Banking"
+         }
+        }
+       ]
+      },
+      "assignments": [
+       {
+        "name": "Tidy",
+        "label": "Tidy rating",
+        "assignmentItems": [
+         {
+          "assignToReference": "$Record.Rating",
+          "operator": "Assign",
+          "value": {
+           "stringValue": "Warm"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000013AAA",
+    "apiName": "Account_Notify_After_Save",
+    "label": "Account Notify (after save)",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000013AAA",
+    "latestVersionId": "301000000000013AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": 20,
+    "hasAsyncPath": true,
+    "lastModified": "2026-01-18T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000013AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Update",
+       "filterLogic": "formula_evaluates_to_true",
+       "filterFormula": "AND({!$Record.Rating} = 'Hot', ISCHANGED({!$Record.Rating}))",
+       "scheduledPaths": [
+        {
+         "name": "Follow_Up",
+         "label": "Follow up",
+         "offsetNumber": 3,
+         "offsetUnit": "Days",
+         "timeSource": "RecordTriggerEvent"
+        },
+        {
+         "name": "Async",
+         "label": "Run asynchronously",
+         "pathType": "AsyncAfterCommit"
+        }
+       ]
+      },
+      "actionCalls": [
+       {
+        "name": "Email_Owner",
+        "label": "Email the owner",
+        "actionType": "emailSimple",
+        "inputParameters": [
+         {
+          "name": "emailBody",
+          "value": {
+           "stringValue": "Rating changed"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000014AAA",
+    "apiName": "Account_Delete_Guard",
+    "label": "Account Delete Guard",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordBeforeDelete",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "Delete",
+    "isActive": true,
+    "activeVersionId": "301000000000014AAA",
+    "latestVersionId": "301000000000014AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-05T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000014AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordBeforeDelete",
+       "recordTriggerType": "Delete",
+       "filterLogic": "and",
+       "filters": [
+        {
+         "field": "Type",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Customer"
+         }
+        }
+       ]
+      },
+      "customErrors": [
+       {
+        "name": "Stop",
+        "label": "Stop the delete",
+        "customErrorMessages": [
+         {
+          "errorMessage": "Customers cannot be deleted"
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000015AAA",
+    "apiName": "Account_Nightly_Review",
+    "label": "Account Nightly Review",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "Scheduled",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000015AAA",
+    "latestVersionId": "301000000000015AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-08T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000015AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "Scheduled",
+       "filterLogic": "and",
+       "filters": [
+        {
+         "field": "Rating",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Hot"
+         }
+        }
+       ],
+       "schedule": {
+        "frequency": "Daily",
+        "startDate": "2026-02-01",
+        "startTime": "06:00:00.000Z"
+       }
+      },
+      "recordUpdates": [
+       {
+        "name": "Mark_Reviewed",
+        "label": "Mark reviewed",
+        "object": "Account",
+        "inputReference": "$Record"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000016AAA",
+    "apiName": "Account_Contact_Sync",
+    "label": "Account Contact Sync",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Account",
+    "triggerObjectName": "Account",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000016AAA",
+    "latestVersionId": "301000000000016AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-12T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000016AAA": {
+     "metadata": {
+      "start": {
+       "object": "Account",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Update",
+       "filters": []
+      },
+      "loops": [
+       {
+        "name": "Loop_Contacts",
+        "label": "Loop over the contacts",
+        "collectionReference": "$Record.Contacts",
+        "nextValueConnector": {
+         "targetReference": "Set_Contact"
+        }
+       }
+      ],
+      "assignments": [
+       {
+        "name": "Set_Contact",
+        "label": "Set contact status",
+        "assignmentItems": [
+         {
+          "assignToReference": "Loop_Contacts.Status__c",
+          "operator": "Assign",
+          "value": {
+           "stringValue": "Review"
+          }
+         }
+        ]
+       }
+      ],
+      "recordUpdates": [
+       {
+        "name": "Save_Contacts",
+        "label": "Save the contacts",
+        "inputReference": "Loop_Contacts"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000017AAA",
+    "apiName": "Opportunity_Closed_Update_Account",
+    "label": "Opportunity Closed Updates Account",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Opportunity",
+    "triggerObjectName": "Opportunity",
+    "recordTriggerType": "Update",
+    "isActive": true,
+    "activeVersionId": "301000000000017AAA",
+    "latestVersionId": "301000000000017AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-14T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000017AAA": {
+     "metadata": {
+      "start": {
+       "object": "Opportunity",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Update",
+       "filters": [
+        {
+         "field": "StageName",
+         "operator": "EqualTo",
+         "value": {
+          "stringValue": "Closed Won"
+         }
+        }
+       ]
+      },
+      "recordLookups": [
+       {
+        "name": "Get_Account",
+        "label": "Find the account",
+        "object": "Account",
+        "filters": [
+         {
+          "field": "Id",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "$Record.AccountId"
+          }
+         }
+        ],
+        "storeOutputAutomatically": true
+       }
+      ],
+      "recordUpdates": [
+       {
+        "name": "Mark_Customer",
+        "label": "Mark as customer",
+        "object": "Account",
+        "filters": [
+         {
+          "field": "Id",
+          "operator": "EqualTo",
+          "value": {
+           "elementReference": "$Record.AccountId"
+          }
+         }
+        ],
+        "inputAssignments": [
+         {
+          "field": "Type",
+          "value": {
+           "stringValue": "Customer"
+          }
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000018AAA",
+    "apiName": "Account_Bulk_Save",
+    "label": "Account Bulk Save",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "",
+    "triggerObject": "",
+    "triggerObjectName": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000018AAA",
+    "latestVersionId": "301000000000018AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-16T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000018AAA": {
+     "metadata": {
+      "variables": [
+       {
+        "name": "acct",
+        "dataType": "SObject",
+        "objectType": "Account",
+        "isInput": true
+       }
+      ],
+      "recordUpdates": [
+       {
+        "name": "Save_Account",
+        "label": "Save the account",
+        "inputReference": "acct"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000019AAA",
+    "apiName": "Account_Cleanup_Remove",
+    "label": "Account Cleanup",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "",
+    "triggerObject": "",
+    "triggerObjectName": "",
+    "recordTriggerType": "",
+    "isActive": true,
+    "activeVersionId": "301000000000019AAA",
+    "latestVersionId": "301000000000019AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-17T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000019AAA": {
+     "metadata": {
+      "variables": [
+       {
+        "name": "oldAccounts",
+        "dataType": "SObject",
+        "objectType": "Account",
+        "isCollection": true
+       }
+      ],
+      "recordDeletes": [
+       {
+        "name": "Remove_Old",
+        "label": "Remove old accounts",
+        "inputReference": "oldAccounts"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "def": {
+    "id": "300000000000020AAA",
+    "apiName": "Partner_Account_Welcome",
+    "label": "Partner Account Welcome",
+    "processType": "AutoLaunchedFlow",
+    "triggerType": "RecordAfterSave",
+    "triggerObject": "Account",
+    "triggerObjectName": "Partner_Account__c",
+    "recordTriggerType": "Create",
+    "isActive": true,
+    "activeVersionId": "301000000000020AAA",
+    "latestVersionId": "301000000000020AAA",
+    "namespace": "",
+    "managed": false,
+    "triggerOrder": null,
+    "hasAsyncPath": false,
+    "lastModified": "2026-01-09T09:00:00.000+0000"
+   },
+   "versions": {
+    "301000000000020AAA": {
+     "metadata": {
+      "start": {
+       "object": "Partner_Account__c",
+       "triggerType": "RecordAfterSave",
+       "recordTriggerType": "Create",
+       "filters": []
+      },
+      "textTemplates": [
+       {
+        "name": "Hello",
+        "text": "Welcome"
+       }
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

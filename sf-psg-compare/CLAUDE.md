@@ -2,8 +2,8 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with three read-only tools,
-named in the toolbar menu "Compare permission set groups", "Look up user access" and "Territory & role hierarchy". It reads the
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with four read-only tools,
+named in the toolbar menu "Compare permission set groups", "Look up user access", "Territory & role hierarchy" and "Where is it used in flows?". It reads the
 org through the REST API with the user's existing browser session and never writes to the org.
 Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
 Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
@@ -15,7 +15,7 @@ Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and deve
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all three pages.
+- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all four pages.
 - `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
 - `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
@@ -80,6 +80,83 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
   usernames or emails, so say so); names that repeat are told apart by path, never by name alone; the tree's
   load does not read users.
 
+## Where is it used in flows? (fourth tool)
+
+A read-only page, `extension/flow-usage.html`, that finds the flows using a field (object + field), or containing a
+text or record Id, and shows the step in each flow with what it does (sets / checks / uses); and, when only an object
+is picked, the object view ("which flows run when an Account is saved, in order, and which others change or read
+Account records"). Links `psg-compare.css` and adds `flow-usage.css`.
+
+- `extension/lib/flowscan.js` — pure, tested: `scanFlow(metadata, target, {describe})` (async only because relationship
+  paths ask `describe(objectApiName)`), with target `{kind: "field", object, field}` or `{kind: "text", text}`. Returns
+  `{hits, possible, wholeRecord, records, trigger}`. `records` (`[{element, label, kind, op: get|create|update|delete,
+  object, objectKnown}]`) and `trigger` (`{object, triggerType, recordTriggerType}`) do not depend on the target:
+  the object view uses them with no re-scan (`recordElements(meta)` gives the same list without describe; scanFlow also
+  types loops over related lists). `startInfo(meta)` says how a flow starts (object, trigger, entry filters / formula,
+  scheduled and async paths, schedule; for Process Builder, `processType: "Workflow"` and its `processMetadataValues`
+  `ObjectType` / `TriggerType`, or the `myVariable_current` variable, give the object). Names: `$Record` and
+  `$Record__Prior` are the start object; SObject variables (`objectType`, so Process Builder's `myVariable_current` / `_old`);
+  Get Records with `storeOutputAutomatically`; loops and collection steps take their collection's type; transforms their
+  `objectType`; `$Setup.<Object>.<Field>`, `$User`. `[0]` and `[$EachItem]` are dropped. Relationship paths use describe
+  (`relationshipName` -> `referenceTo`; `Parent:Account` pins a polymorphic type). A step that cannot be followed, a
+  polymorphic one that includes the target, or a head that is not known (an untyped SObject variable, `$Record` in a flow
+  with no start object) is **possible**, never silently dropped; heads that are plainly not records (`$Flow`, `$Label`,
+  strings, formulas, screen fields) are skipped. Actions: `sets` = `inputAssignments[].field` of create/update,
+  `assignToReference`, transform `outputFieldApiName`; `checks` = filters, a condition's `leftValueReference`, the start
+  `filterFormula`; everything else `uses`. A Create or Update step that saves a whole record variable of the target object (no field assignments) is a **possible**
+  hit with `detail` ("saves a whole Account record, so it may set this field"); `wholeRecord` still lists them. A loop over a
+  related list (`$Record.Contacts`, `acct.Contacts`) takes the child object from the parent's describe
+  (`childRelationships`: relationshipName -> childSObject), so its hits are sure. Hits for one step and field are merged (`refs` lists how it was written). Text and
+  Id search walks every string; an Id matches in both forms (`idForms`). Also `plainFlowType`, `buildResults`,
+  `summaryLine`, `csvRows` / `csvText` (through `toCsv`, which guards cells starting with = + - @ tab CR; one row per
+  step, plus one row per flow that could not be looked inside, with the plain reason in "How sure").
+- `extension/lib/flowobject.js` — pure, tested: the object view. `buildObjectView(object, entries, {labelOf, objectLabel, partial})`
+  with `entries` `[{def, versionId, versionKind, error?, start?, records?}]` (one per flow) returns `{groups: before / after /
+  delete (a flow with any create/update/delete step on the object is in `changes` only, with all its steps; `reads` has flows that change nothing; items in run order, each with `band` low / none / high / off, `orderKnown`; the group has `noOrderCount`), process (Process Builder: `{items}`, not numbered, by label), scheduled, changes, reads, unreadable, pending}`. Matching is by API name only
+  (`def.triggerObjectName` from `FlowDefinitionView.TriggerObjectOrEvent.QualifiedApiName`, else the start element's
+  object); the label (`triggerObject`) is for showing and never compared. `compareRunOrder` is the one place that
+  settles order within one group (rule in its comment, from Salesforce Help "Define the Run Order of Record-Triggered Flows for an Object"):
+  active flows with trigger order 1-1000 (lowest first, same number by API name), then active flows with none, then 1001-2000
+  (same), then inactive flows (they do not run). Flows with no trigger order really run in order of their **activation date**, which
+  the page cannot read, so they are listed by API name (as Flow Trigger Explorer does) and shown as an unnumbered block with a note
+  (`noOrderBlockText({above, below})`, which mentions flows above only when flows with order 1-1000 are in the group and flows below only when 1001-2000 ones are; only when a group has two or more; a lone one has a certain place). No created-date read exists any more.
+  `RUN_ORDER_RULE` is the Notes wording; `runOrderWords(item)` is the CSV "Run order" cell. The CSV has "Trigger order" (blank when
+  none) and "Run order" columns instead of a position. Process Builder (`processType`
+  Workflow, `groupOf` -> "process") runs after the save but before the after-save flows, in no promised order: it is
+  `view.process`, between before and after on the page and in the CSV ("Process Builder processes", no position).
+  `entryConditions` (plain words: "Status
+  equals Closed", custom logic as `[A] and ([B] or [C])`, a formula as "has a formula condition", more than 6 as "has N
+  conditions"), `pathWords(start, labelOf)` (a scheduled path shows the field's label), `scheduleWords`, `metaWords` (the line under a flow's name: "Scheduled flow: runs daily at 06:00, ..."), `whenWords`, `objectSummary`, `objectCsvRows` / `objectCsvText` /
+  `objectCsvFileName` (one row per step, or per flow with none; unreadable flows get a row with the reason).
+- `extension/lib/flowread.js` — `readFlowList` (one `FlowDefinitionView` SELECT including `TriggerObjectOrEvent.QualifiedApiName`, `TriggerOrder`,
+  `HasAsyncAfterCommitPath`; `DurableId` is the 300 flow Id; a column the org rejects by name is dropped and the query repeated, otherwise
+  it falls back to the short list), `versionsToRead` (active version of active flows; with `includeInactive` also the
+  latest version where it differs; a version Id that is not a 301 Id, as on some installed packages
+  (`MktCloud__Name-1`), becomes `versionId: null`), `readFlowVersion` (Tooling `SELECT Id, Metadata FROM Flow WHERE Id = '301...'`,
+  one row per call, or Salesforce returns no Metadata), `readVersions` (5 in flight, progress callback, one failure never
+  stops the rest, a version already in the cache is not read again), `whyUnreadable`, `resolveContext` (Tooling
+  `CustomField` / `CustomObject` by Id).
+- `extension/lib/urlcontext.js` — pure: `parseUrlContext(url)` (Setup field and object pages, `/lightning/r/...`,
+  `/lightning/o/...`), `contextQuery`, `contextFromParams` (keeps API names and 00N / 01I Ids, drops anything else), `pickByDeveloperName`. `popup.js` passes only `object` and
+  `field`, never the address.
+- `extension/flow-usage.js` — the page. `?host=`, `?dev=1`, `?demo=1`, plus `object=` and `field=`. Flow contents live in a
+  Map for the page session (memory only), shared by the field search and the object view; describes are cached per object.
+  Picking an object runs the object view at once (list facts first, then the trigger flows' contents, then the rest, with
+  the progress line); picking a field runs the field search; `object=` alone (record page, list view) runs the object view.
+  The Flow Builder link needs the validated `?host=` and a 301 version Id, so flows with no usable Id get no link.
+- Sample: `extension/samples/flow_usage.json` (written by hand; made-up flows, objects and describes, Ids like
+  `301000000000001AAA`; includes a package flow with no contents and one that failed; Account flows for every object-view group (two before-save flows with
+  the same trigger order, one with 1200, one inactive, two after-save flows with no trigger order, an async path, Process Builder, a scheduled flow, a loop over `$Record.Contacts`, flows that change and read
+  Account) and `Partner_Account__c`, whose label is also "Account"). A test keeps it synthetic.
+- Tests: `tests/flow_usage_tests.mjs`, run from `tests/run_tests.mjs` (includes the no-innerHTML, no-storage, no-write guard).
+- Real flows seen on a sandbox: the Metadata is full of null keys; references appear as `elementReference`,
+  `leftValueReference`, `assignToReference`, `objectFieldReference`, `collectionReference`, `inputReference` and as
+  `{!...}` merge fields in formulas, templates and `filterFormula`; polymorphic references look like
+  `$Record.Parent:Account.Field`. On that sandbox `TriggerOrder` was empty on every flow and no Process Builder processes existed, so the trigger-order bands
+  and the Process Builder wording are from the documented shape, not from live data. On that sandbox the Account and Opportunity groups listed the flows with no trigger order in API-name order (plain character-code order, capitals before lowercase and "_" after capitals, as Flow Trigger Explorer sorts them; `byApiName` does not use `localeCompare`). Not handled: Apex-defined types.
+- Rules that matter: GET and SOQL only; org text only through `textContent` / `el()`; match by API name (Ids only to
+  open a flow in Flow Builder); the session id is never stored.
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
@@ -88,6 +165,8 @@ CSV export with the tree in the cells. Links `psg-compare.css` and adds `hierarc
 - Field-level scoping for translations → `sf-translation-toolkit`, not this.
 - Removing assignments → `sf-user-access-teardown`, not this.
 - "Show me the whole role or territory tree", "get one branch into Excel" → the hierarchy page.
+- "Which flows use this field?", "what does each flow do with it?", "which flows mention this record Id?",
+  "which flows run when an Account is saved, and in what order?", "which flows change or read Accounts?" → Where is it used in flows?
 
 ## Working on the code
 
