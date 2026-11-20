@@ -1,21 +1,18 @@
 // "Why can a user see this record?" Pure reasoning: no browser, no network.
 //
-// `explain(facts)` takes facts gathered from the org by recordaccessread.js (schema
+// `explain(facts)` takes facts gathered from the org by record-access-read.js (schema
 // "sf-record-access/1") and works out every route that gives each user access, written as a short
 // chain of plain steps. The verdict is NEVER worked out here: it comes only from Salesforce's own
 // UserRecordAccess answer in `user.sf`. Routes are our explanation; when they do not match
 // Salesforce's answer the result says so (`mismatch`) and lists likely causes, never a guess as fact.
 
+import { looksLikeId } from "../../shared/recordid.js";
+
+export { looksLikeId };
+
 export const ACCESS_SCHEMA = "sf-record-access/1";
 
 // ---------- record Ids and links ----------
-
-const ID_RE = /^(?:[a-zA-Z0-9]{15}|[a-zA-Z0-9]{18})$/;
-
-/** A Salesforce Id: 15 or 18 letters and digits, with at least one digit (so "ProductConsumed" is not an Id). */
-export function looksLikeId(s) {
-  return typeof s === "string" && ID_RE.test(s) && /\d/.test(s);
-}
 
 /** The 18-character form of an Id (the check letters are worked out from the capitals of the 15). */
 export function to18(id) {
@@ -33,36 +30,6 @@ export function to18(id) {
 }
 
 const k = (id) => String(id || "").slice(0, 15); // compare Ids by their first 15 characters
-
-/** The record Id in a Salesforce page address, or null. Also accepts a bare Id.
- *  Lightning (/lightning/r/<Object>/<Id>/view, /lightning/r/<Id>/view), Classic (/<Id>), console and
- *  older Lightning addresses (Id in the # part). Setup pages and list pages give null. */
-export function recordIdFromUrl(input) {
-  const s = String(input ?? "").trim();
-  if (!s) return null;
-  if (looksLikeId(s)) return s;
-  let u;
-  try { u = new URL(s); } catch { return null; }
-  if (!/^https?:$/.test(u.protocol)) return null;
-  const path = u.pathname.split("/").filter(Boolean);
-  const first = (path[0] || "").toLowerCase();
-  if (first === "lightning") {
-    if ((path[1] || "").toLowerCase() !== "r") return null; // lists (o), Setup, pages, apps
-    const rest = path.slice(2);
-    if (looksLikeId(rest[1])) return rest[1]; // /r/<Object>/<Id>/...
-    if (looksLikeId(rest[0])) return rest[0]; // /r/<Id>/...
-    return null;
-  }
-  if (first === "setup") return null;
-  if (first === "console" || first === "one") { // classic console, older Lightning: the Id is after the #
-    let hash = u.hash;
-    try { hash = decodeURIComponent(hash); } catch { /* keep as is */ }
-    const hit = hash.split("/").find((p) => looksLikeId(p));
-    return hit || null;
-  }
-  if (path.length >= 1 && path.length <= 2 && looksLikeId(path[0])) return path[0]; // Classic: /001..., /001.../e
-  return null;
-}
 
 // ---------- levels ----------
 

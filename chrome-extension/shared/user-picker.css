@@ -1,0 +1,7 @@
+/* The user picker and error box styles used by both the User access page and the record-access page.
+   pack.css is loaded first; the page's own css comes after. */
+.tag-inactive { color: var(--risk); background: var(--risk-bg); font-size: 11px; font-weight: 700; margin-left: 8px; padding: 0 7px; border-radius: 9px; }
+#error details.tech { margin-top: 6px; font-size: 12px; }
+#error details.tech summary { cursor: pointer; }
+#error details.tech div { margin-top: 4px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.psg-list .dev.plain { font: 12px system-ui, sans-serif; }

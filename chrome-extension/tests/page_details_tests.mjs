@@ -4,7 +4,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { parsePageUrl, cleanUrl, snapshotText, fileName, sandboxNameFromHost, whenText, scrub, scrubNote, objectText, NOTE_REMOVED_TEXT } from "../tools/page-details/page-details-logic.js";
+import { cleanUrl } from "../shared/pageurl.js";
+import { parsePageUrl, snapshotText, fileName, sandboxNameFromHost, whenText, scrub, scrubNote, objectText, NOTE_REMOVED_TEXT } from "../tools/page-details/page-details-logic.js";
 import { readIssueSnapshot, readCurrentUser, orgProblem } from "../tools/page-details/page-details-read.js";
 import { SfApi } from "../shared/sfconn.js";
 

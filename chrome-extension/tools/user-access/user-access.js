@@ -1,9 +1,11 @@
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
-import { searchUsers, readUserAccess } from "./user-access-read.js";
+import { searchUsers } from "../../shared/users-read.js";
+import { matchUsers } from "../../shared/users-logic.js";
+import { readUserAccess } from "./user-access-read.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
-  matchUsers, statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
+  statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
   userCardLines, orgParts, SINGLE_VALUE_KEYS, customSettingsLine, customSettingsSkippedNote, customSettingsFailedNote, customSettingsHiddenNote,
 } from "./user-access-logic.js";
 import { startLiveReload } from "../../shared/livereload.js";

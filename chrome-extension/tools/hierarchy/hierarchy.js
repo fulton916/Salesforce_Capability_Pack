@@ -1,6 +1,7 @@
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
-import { readTerritoryModels, readTerritories, readRoles, readRoleUsers, readTerritoryUsers } from "./hierarchy-read.js";
+import { readRoles } from "../../shared/roles-read.js";
+import { readTerritoryModels, readTerritories, readRoleUsers, readTerritoryUsers } from "./hierarchy-read.js";
 import {
   NOUNS, USER_FIELDS, buildTree, flatten, statsOf, summaryText, treeNotes, defaultModel, searchNodes, exportRows, exportFileName, toCsv, PATH_SEP,
   attachUsers, listUsers, countUsers, usersSummary,

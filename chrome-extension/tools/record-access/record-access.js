@@ -1,8 +1,9 @@
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
-import { searchUsers } from "../user-access/user-access-read.js";
-import { matchUsers } from "../user-access/user-access-logic.js";
-import { recordIdFromUrl, explain, toPlainText, owdText, exactFirst, givesText, LEVEL_PHRASE } from "./record-access-logic.js";
+import { searchUsers } from "../../shared/users-read.js";
+import { matchUsers } from "../../shared/users-logic.js";
+import { recordIdFromUrl } from "../../shared/recordid.js";
+import { explain, toPlainText, owdText, exactFirst, givesText, LEVEL_PHRASE } from "./record-access-logic.js";
 import { readRecordContext, readRecordAccess, searchUsersExactFirst, readUserById, withRetry, createReadCache, clearRecordFacts } from "./record-access-read.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";

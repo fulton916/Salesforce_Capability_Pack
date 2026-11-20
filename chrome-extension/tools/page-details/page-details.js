@@ -1,6 +1,7 @@
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readIssueSnapshot } from "./page-details-read.js";
-import { snapshotText, fileName, cleanUrl, whenText, scrubNote, objectText, NOTE_REMOVED_TEXT, HASH_HINT, KIND_TEXT } from "./page-details-logic.js";
+import { cleanUrl } from "../../shared/pageurl.js";
+import { snapshotText, fileName, whenText, scrubNote, objectText, NOTE_REMOVED_TEXT, HASH_HINT, KIND_TEXT } from "./page-details-logic.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
 

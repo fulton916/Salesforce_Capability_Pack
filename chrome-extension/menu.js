@@ -1,7 +1,7 @@
 import { isSalesforceHost } from "./shared/sfconn.js";
-import { recordIdFromUrl } from "./tools/record-access/record-access-logic.js";
+import { recordIdFromUrl } from "./shared/recordid.js";
 import { parseUrlContext, contextQuery } from "./shared/urlcontext.js";
-import { cleanUrl } from "./tools/page-details/page-details-logic.js";
+import { cleanUrl } from "./shared/pageurl.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./shared/feedback.js";
 
 // One entry per tool. To add a tool, add a line here and ship its page.

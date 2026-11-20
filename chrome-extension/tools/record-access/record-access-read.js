@@ -5,7 +5,7 @@
 // fails softly: it is left out, a plain sentence goes to `notes` and the raw error to `warnings`.
 
 import { chunk, soqlString } from "../../shared/sfconn.js";
-import { readRoles } from "../hierarchy/hierarchy-read.js";
+import { readRoles } from "../../shared/roles-read.js";
 import { ACCESS_SCHEMA, to18, looksLikeId, exactFirst } from "./record-access-logic.js";
 
 const ID_CHUNK = 200;

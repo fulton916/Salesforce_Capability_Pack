@@ -4,30 +4,15 @@
 // The object is shown on the page and can be exported as CSV; it is never saved to a file
 // because it holds a user name and username.
 
-import { chunk, soqlString, soqlLike } from "../../shared/sfconn.js";
+import { chunk, soqlString } from "../../shared/sfconn.js";
 import { ACCESS_SCHEMA, settingItems, plural } from "./user-access-logic.js";
 
 export { ACCESS_SCHEMA };
 
 const ID_CHUNK = 200; // Ids per IN (...) clause, keeps the URL short.
-const MAX_WORDS = 6;
 
 const qualified = (ns, name) => (ns ? `${ns}__${name}` : name);
 const byLabel = (x, y) => x.label.localeCompare(y.label);
-
-/** Find users by name or username, in the org. Every typed word must match one of the two.
- * Returns {users, more}; `more` is true when there are more matches than `limit`. */
-export async function searchUsers(api, text, limit = 50) {
-  const words = String(text || "").trim().split(/\s+/).filter(Boolean).slice(0, MAX_WORDS);
-  if (!words.length) return { users: [], more: false };
-  const where = words.map((w) => `(Name LIKE '%${soqlLike(w)}%' OR Username LIKE '%${soqlLike(w)}%')`).join(" AND ");
-  const soql = `SELECT Id, Name, Username, IsActive, Profile.Name FROM User WHERE ${where} ORDER BY IsActive DESC, Name LIMIT ${limit + 1}`;
-  const { records } = await api.query(soql);
-  const users = records.slice(0, limit).map((r) => ({
-    id: r.Id, name: r.Name, username: r.Username, isActive: r.IsActive === true, profile: r.Profile?.Name || "",
-  }));
-  return { users, more: records.length > limit };
-}
 
 const OFF_PATTERN = /INVALID_TYPE|not supported|sObject type/i;
 // A missing User.CallCenterId shows up as an unknown field or column, so it also matches these.

@@ -6,7 +6,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { SfApi, SalesforceError } from "../shared/sfconn.js";
-import { recordIdFromUrl, looksLikeId, to18, explain, toPlainText, sfLabelFor, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
+import { recordIdFromUrl } from "../shared/recordid.js";
+import { looksLikeId, to18, explain, toPlainText, sfLabelFor, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
 import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry, withLimit, createReadCache, clearRecordFacts, MAX_IN_FLIGHT } from "../tools/record-access/record-access-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -1384,7 +1385,8 @@ export async function run(test) {
       }
       assert.ok(!/https?:\/\/(?!127\.0\.0\.1)/.test(text.replace(/https:\/\/\$\{/g, "")), `${f.join("/")} mentions a remote URL`);
     }
-    const pure = readFileSync(ext("tools/record-access/record-access-logic.js"), "utf-8");
+    // the one import allowed is the shared (also pure) record Id helper
+    const pure = readFileSync(ext("tools/record-access/record-access-logic.js"), "utf-8").replace('import { looksLikeId } from "../../shared/recordid.js";', "");
     for (const bad of ["document.", "window.", "fetch(", "chrome.", "location.", "import "]) assert.ok(!pure.includes(bad), `record-access-logic.js contains ${bad}`);
     const read = readFileSync(ext("tools/record-access/record-access-read.js"), "utf-8");
     assert.ok(!/\b(INSERT|UPDATE|DELETE|UPSERT|POST|PATCH|PUT)\b/.test(read.replace(/Delete|Update/g, "")), "record-access-read.js has a write verb");
