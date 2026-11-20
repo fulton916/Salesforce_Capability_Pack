@@ -2,8 +2,8 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with five read-only tools,
-named in the toolbar menu "Compare permission set groups", "User access summary and comparison", "Territory & role hierarchy", "Why can a user see this record?" and "Where is it used in flows?". It reads the
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with six read-only tools,
+named in the toolbar menu "Compare permission set groups", "User access summary and comparison", "Territory & role hierarchy", "Why can a user see this record?", "Where is it used in flows?" and "Page details for a ticket". It reads the
 org through the REST API with the user's existing browser session and never writes to the org.
 Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
 Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
@@ -15,7 +15,7 @@ Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and deve
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
 - `extension/lib/compare.js` — `compareSnapshots(a, b)` → `{sections, counts, highlights, gives}`; also `filterRows`, `toRows`, `cardLines` (summary card text) and `sortRows`/`sortGrouped`/`sortSection` (what the page shows and exports). Pure.
 - `extension/lib/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all five pages.
+- `extension/lib/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all six pages.
 - `extension/popup.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
 - `extension/psg-compare.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
@@ -260,6 +260,35 @@ Account records"). Links `psg-compare.css` and adds `flow-usage.css`.
 - Rules that matter: GET and SOQL only; org text only through `textContent` / `el()`; match by API name (Ids only to
   open a flow in Flow Builder); the session id is never stored.
 
+## Page details for a ticket (sixth tool)
+
+A read-only page, `extension/issue-snapshot.html`, that shows who the person is, the org, and the page or
+record they were on, and copies it (clipboard or .txt) for a support ticket. Links `psg-compare.css` and
+adds `issue-snapshot.css`. "Snapshot" is the file/code name only; the visible title is "Page details for a ticket".
+
+- `extension/lib/issuesnapshot.js` — pure, tested: `cleanUrl` (path plus `filterName` only; drops every other
+  parameter, the hash and `;params`), `parsePageUrl` (record / list / setup / home / other; classic `/<Id>`
+  has no object; Experience Cloud `/s/` is other), `snapshotText` (the ticket text; note first; missing areas
+  worded plainly), `scrub` (last guard against session-like strings), `whenText`, `fileName`, `sandboxNameFromHost`.
+- `extension/lib/issuesnapshotread.js` — `readOrgDetails` (`Organization`), `readCurrentUser`, `readPageDetails`
+  (describe, one `SELECT` for a record using only fields the object has, a `ListView` name lookup),
+  `readIssueSnapshot`. Each area returns `{data, problem, raw}` and never throws. Current user: REST
+  `chatter/users/me` for the Id, then `/services/oauth2/userinfo` as a fallback, then a `SELECT` on `User`; if
+  only the User query fails the Chatter fields are used with a note. Verified read-only against a sandbox through the dev server: org, user, record pages (Account, Case, Opportunity), a list view, a Setup page and home. Not verified: the real popup → browser-session path and the real clipboard.
+- `extension/issue-snapshot.js` — the page. `?host=`, `?dev=1`, `?demo=1` as elsewhere; `?url=` is the cleaned
+  address from the popup and is cleaned again on the page. The "What happened" note is read at click time and never kept.
+- Sample: `extension/samples/issue_snapshot_demo.json` (made-up; a test checks it stays synthetic).
+- Tests: `tests/issue_snapshot_tests.mjs` (includes the no-innerHTML, no-storage guard).
+- Rules that matter: reads only; never the session id, cookies or page body; no values beyond name, record type,
+  owner and dates; the popup passes `cleanUrl(tab.url)` only; the page says to paste only into the company's own
+  ticket system. A hash-based address (old `/one/one.app#/...`) loses its record because the hash is dropped;
+  `parsePageUrl` sets `hashAddress` (kind "other" and cleaned path `/one/one.app`) and the Page area says to open the record again.
+- The note is cleaned only by `scrubNote` (`00D…!…` session ids, long `Bearer` tokens, `sid=` / `access_token=` /
+  `refresh_token=` / `id_token=` / `oauth_token=`); `code=` and bare `token=` stay. When it removes something the page
+  shows one line near the buttons. Everything else (org text, address) still goes through the stricter `scrub`.
+- An object name from the address must match `^[A-Za-z][A-Za-z0-9_]{0,79}$`, else the page is "other" (no reads). The
+  Org read's failure text is worded by cause (`orgProblem`); the My Domain host shows even when that read fails.
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
@@ -271,6 +300,7 @@ Account records"). Links `psg-compare.css` and adds `flow-usage.css`.
 - "Why can (or can't) this user see this record?", "why does A see it and B not?" → the record access page.
 - "Which flows use this field?", "what does each flow do with it?", "which flows mention this record Id?",
   "which flows run when an Account is saved, and in what order?", "which flows change or read Accounts?" → Where is it used in flows?
+- "I need to raise a ticket and give support my org, user and page" → Page details for a ticket.
 
 ## Working on the code
 
