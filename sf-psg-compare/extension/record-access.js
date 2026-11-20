@@ -2,8 +2,8 @@ import { SfApi, findSession } from "./lib/sfconn.js";
 import { readOrg } from "./lib/snapshot.js";
 import { searchUsers } from "./lib/useraccess.js";
 import { matchUsers } from "./lib/usercompare.js";
-import { recordIdFromUrl, explain, toPlainText, owdText, exactFirst, LEVEL_PHRASE } from "./lib/recordaccess.js";
-import { readRecordContext, readRecordAccess, searchUsersExactFirst, readUserById } from "./lib/recordaccessread.js";
+import { recordIdFromUrl, explain, toPlainText, owdText, exactFirst, givesText, LEVEL_PHRASE } from "./lib/recordaccess.js";
+import { readRecordContext, readRecordAccess, searchUsersExactFirst, readUserById, withRetry } from "./lib/recordaccessread.js";
 import { startLiveReload } from "./lib/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./lib/feedback.js";
 
@@ -90,7 +90,7 @@ async function connect() {
       $$(".org-only").forEach((n) => (n.hidden = true));
       return;
     }
-    state.api = new SfApi(session);
+    state.api = withRetry(new SfApi(session));
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
     showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
   } catch (e) {
@@ -378,7 +378,7 @@ function renderResult() {
     if (d.items.length) parts.push(el("p", { class: "hint", text: `The routes ${d.more} has that ${d.less} is missing:` }));
     for (const it of d.items) {
       parts.push(el("div", { class: "diffitem" },
-        el("div", { class: "route-head" }, it.gives ? el("span", { class: "gives", text: `Gives ${it.gives}` }) : null, el("span", { text: it.route })),
+        el("div", { class: "route-head" }, it.gives ? el("span", { class: it.limited ? "gives limited" : "gives", text: givesText(it) }) : null, el("span", { text: it.route })),
         ...it.missing.map((m) => el("p", { class: "miss", text: m })),
         ...it.change.map((m) => el("p", { class: "change", text: `What would change it: ${m}` }))));
     }
