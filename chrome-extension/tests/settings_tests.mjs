@@ -104,6 +104,47 @@ export async function run(test) {
     assert.deepEqual(await store.getHidden(), ["hierarchy"], "the saved list stays as it was");
   });
 
+  // A fake storage whose get fails on the listed call numbers (1-based) and otherwise works.
+  const flakyGet = (initial, failOn) => {
+    const data = { ...initial };
+    let n = 0;
+    return {
+      data,
+      async get(key) { if (failOn.includes(++n)) throw new Error("no"); return key in data ? { [key]: [...data[key]] } : {}; },
+      async set(obj) { Object.assign(data, obj); },
+    };
+  };
+
+  await test("settings store: a failed read before a switch change throws and leaves the stored list alone", async () => {
+    const st = flakyGet({ [HIDDEN_KEY]: ["hierarchy", "flow-usage"] }, [1]);
+    const store = createSettingsStore(TOOLS, st);
+    await assert.rejects(() => store.setToolOn("user-access", false));
+    assert.deepEqual(st.data[HIDDEN_KEY], ["hierarchy", "flow-usage"]);
+    await store.setToolOn("user-access", false); // the next try reads fine and saves
+    assert.deepEqual(st.data[HIDDEN_KEY], ["user-access", "hierarchy", "flow-usage"]);
+  });
+
+  await test("settings store: getHidden after a failed read gives the last good list; with none, an empty list", async () => {
+    const st = flakyGet({ [HIDDEN_KEY]: ["hierarchy", "flow-usage"] }, [2]);
+    const store = createSettingsStore(TOOLS, st);
+    assert.deepEqual(await store.getHidden(), ["hierarchy", "flow-usage"]);
+    assert.deepEqual(await store.getHidden(), ["hierarchy", "flow-usage"], "the read fails; the last good list comes back");
+    const first = createSettingsStore(TOOLS, flakyGet({ [HIDDEN_KEY]: ["hierarchy"] }, [1]));
+    assert.deepEqual(await first.getHidden(), [], "no earlier good read: every tool shows");
+  });
+
+  await test("settings page: a failed read during a switch change says the error and draws the last good list", async () => {
+    const st = flakyGet({ [HIDDEN_KEY]: ["hierarchy", "flow-usage"] }, [2, 3]);
+    const store = createSettingsStore(TOOLS, st);
+    const draws = [], says = [];
+    const page = createSettingsPage(store, { draw: (h) => draws.push([...h]), say: (text, bad) => says.push({ text, bad: !!bad }) });
+    await page.load(); // read 1 works
+    await page.toggle("user-access", false); // reads 2 and 3 fail
+    assert.deepEqual(st.data[HIDDEN_KEY], ["hierarchy", "flow-usage"]);
+    assert.deepEqual(draws.at(-1), ["hierarchy", "flow-usage"]);
+    assert.deepEqual(says, [{ text: "Could not save this change. Try again.", bad: true }]);
+  });
+
   // A fake storage whose get and set take a while (10-20 ms, varying), like the browser's.
   const slowStorage = (initial = {}, { failSetOn = [] } = {}) => {
     const data = { ...initial };
