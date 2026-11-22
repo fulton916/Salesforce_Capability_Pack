@@ -542,9 +542,23 @@ it. It is held in memory for that tab only and never stored. Visible text says "
 keep the old `licence` spelling so saved files still load. Saved group files use
 `sf-psg-snapshot/2`; `/1` files still load.
 
+## Choose which tools show in the menu
+
+Not every tool applies to everyone. Open **Settings** (the link at the bottom of the toolbar menu, or right-click the
+extension icon and choose **Options**) and untick the tools you do not use. They disappear from the toolbar menu; tick
+one again, or press **Show all tools**, to bring it back. Each change saves at once and says "Saved".
+
+- Hiding a tool only removes it from the menu. It changes nothing in Salesforce and does not stop anyone opening the tool.
+- Your choice is kept by Chrome on this computer only. It is never synced or sent anywhere, so on another computer (or
+  another loaded copy of the extension) you choose again. Only the
+  names of the tools you hid are stored; nothing from Salesforce, no login and no user names.
+- Tools added in a later version show up by default.
+- If Chrome cannot read the choice, every tool shows. When the page is opened from the dev server instead of the
+  extension (`http://127.0.0.1:8765/settings.html`), changes are not kept.
+
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · v0.7.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.8.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -603,8 +617,12 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 
 | Path | What |
 |---|---|
-| `manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs; Salesforce hosts only) |
-| `menu.html`, `menu.js` | The toolbar menu: a menu of tools. Detects the org in the current tab and opens the chosen page |
+| `manifest.json` | Chrome MV3 manifest (permissions: cookies, activeTab, tabs, storage; Salesforce hosts only; registers the Settings page as the options page) |
+| `menu.html`, `menu.js` | The toolbar menu: a menu of the tools that are turned on. Detects the org in the current tab and opens the chosen page |
+| `settings.html`, `settings.js` | The Settings page: turn each tool on or off in the menu |
+| `settings-logic.js` | What the Settings page does on a click: keeps the boxes in step with what is saved, then shows one status |
+| `shared/tool-list.js` | The one list of tools (id, page, title, description) that the menu and Settings both read. Add a tool here |
+| `shared/menu-settings.js` | The only file that uses `chrome.storage`: keeps the list of hidden tool ids (`hiddenTools`) in Chrome's local storage (this computer only); falls back to showing every tool |
 | `tools/compare-groups/compare-groups.*` | The Compare permission set groups page |
 | `tools/user-access/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
 | `tools/user-access/user-access-read.js` | Reads one user's access from the org (`readUserAccess`) |

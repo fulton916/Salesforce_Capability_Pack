@@ -16,7 +16,8 @@ People "Load unpacked" this folder: `manifest.json` sits directly inside it.
 
 ```
 manifest.json, menu.html, menu.js    the toolbar menu
-shared/        sfconn.js, sfread.js (readOrg), roles-read.js (readRoles), users-read.js (searchUsers), users-logic.js (matchUsers),
+settings.html, settings.js           the Settings page (manifest `options_ui`): turn tools on or off in the menu
+shared/        tool-list.js (TOOLS: the one list the menu and Settings read), menu-settings.js (hidden-tool store; the only chrome.storage user), sfconn.js, sfread.js (readOrg), roles-read.js (readRoles), users-read.js (searchUsers), users-logic.js (matchUsers),
                recordid.js (recordIdFromUrl, looksLikeId), pageurl.js (cleanUrl), csv.js (toCsv), feedback.js, pick.js,
                urlcontext.js, livereload.js, pack.css, user-picker.css (user list and error box styles for user-access and record-access)
 tools/<tool>/  one folder per tool: compare-groups, user-access, hierarchy, record-access, flow-usage, page-details
@@ -28,7 +29,7 @@ Naming rule: the folder is the tool's short name. `<tool>.html`, `<tool>.js` and
 `<tool>-<part>.js` (flow-usage has `-scan` and `-object`). Compare-groups has no css of its own: `shared/pack.css`
 is the common stylesheet every page loads first.
 
-A tool does not import from or link to another tool's folder, and `menu.js` imports nothing from `tools/`. Code
+A tool does not import from or link to another tool's folder, and `menu.js` and `settings.js` import nothing from `tools/`. Code
 several tools need lives in `shared/` (a layout test checks this). Shared reads are named `<what>-read.js`, pure helpers
 `<what>-logic.js` or by what they do (`recordid.js`, `pageurl.js`), and styles used by more than one page `<what>.css`.
 
@@ -49,7 +50,11 @@ Earlier names, for old notes: `extension/lib/snapshot.js` = compare-groups-read,
 - `shared/csv.js` — `toCsv(rows)`: RFC 4180 with a BOM; guards cells starting with = + - @ tab CR. Pure.
 - `shared/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
 - `shared/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all six pages.
-- `menu.js` — the toolbar menu: one entry per tool, enabled only on a Salesforce tab.
+- `shared/tool-list.js` — `TOOLS`, the one list of tools: `id` (the folder name, stable: it is what Settings remembers), `page`, `title`, `description`, and the menu flags (`needsRecord`, `context`, `withPageAddress`). To add a tool, add an entry here and ship its page.
+- `shared/menu-settings.js` — `visibleTools(tools, hidden)` (pure), `cleanHidden`, `createSettingsStore(tools, storage)` (`storage` is injectable; tests pass a fake). Stores one key, `hiddenTools` (ids of hidden tools, so a new tool is on by default), in `chrome.storage.local` (this computer only; never `chrome.storage.sync`, so the choice is not synced or sent anywhere, and another computer or another loaded copy of the extension starts with every tool on); drops unknown ids on read and write; with no storage or a failed read every tool shows and changes stay in memory. Reads and saves run through one promise queue inside the store, so quick changes each build on the one before; a failed save rejects only its own caller.
+- `menu.js` — the toolbar menu: one entry per tool that is on, enabled only on a Salesforce tab. It waits for the setting before drawing (no flash), shows "All tools are hidden" with a link when none is on, and has a Settings link in the footer (`openOptionsPage`, falling back to a new tab).
+- `settings.html`, `settings.js` — the Settings page (manifest `options_ui`, `open_in_tab`): one checkbox per tool, saves at once, "Show all tools". DOM by `createElement`/`textContent` only; wires boxes and the button to `settings-logic.js`. Tests: `tests/settings_tests.mjs`.
+- `settings-logic.js` — `createSettingsPage(store, {draw, say})` with `load()`, `toggle(id, on)`, `showAll()`; no DOM, no storage of its own. Rule: while saves are in flight the boxes show what was clicked; when the LAST one finishes (worked or failed) it redraws every box from `store.getHidden()` and only then says one status ("Saved" / not-kept wording, or the plain error if any save in the burst failed). Never say "Saved" while a save is running. Switches and Show all go through it the same way; do not call the store from `settings.js`.
 - `tools/compare-groups/compare-groups.js` — the Compare permission set groups page. Builds DOM with `textContent` only.
 
 ## User access summary and comparison (second tool)
@@ -384,7 +389,7 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
 ## Guardrails
 
 - No telemetry, no remote code (MV3 forbids it), no requests to any host but the org. The one other thing allowed is opening a github.com new-issue tab (`feedback.js`) that the user submits themselves; no org data in it (no host, org name, user names or page URL), no GitHub API calls, no tokens.
-- Do not store the session id (no `chrome.storage`, no `localStorage`).
+- `chrome.storage` is used only by `shared/menu-settings.js`, only for the list of hidden tool ids (`hiddenTools`, local area only; the sync area is never used). Never store the session id, host, org data or user names; no `localStorage` anywhere. A test checks that the store is the only file that uses browser storage; the other guards still ban it in every other file.
 - Do not commit snapshots taken from a real org. `.gitignore` ignores `snapshots/` and
   `psg_*.json` outside `samples/`.
 - Verified against a live sandbox (read-only, through the dev server): fields, objects, system

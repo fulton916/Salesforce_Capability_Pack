@@ -1108,7 +1108,7 @@ export async function run(test) {
   });
 
   await test("flow page: links, menu entry, feedback tool and version", () => {
-    const popup = text("menu.js");
+    const popup = text("menu.js") + text("shared/tool-list.js"); // the tool entry lives in the shared list
     assert.match(popup, /page: "tools\/flow-usage\/flow-usage\.html"[\s\S]*?title: "Where is it used in flows\?"[\s\S]*?description: "Find the flows that use an object, a field or a record Id"/);
     assert.match(popup, /contextQuery\(parseUrlContext\(tab\?\.url\)\)/);
     const html = text("tools/flow-usage/flow-usage.html");

@@ -2,46 +2,9 @@ import { isSalesforceHost } from "./shared/sfconn.js";
 import { recordIdFromUrl } from "./shared/recordid.js";
 import { parseUrlContext, contextQuery } from "./shared/urlcontext.js";
 import { cleanUrl } from "./shared/pageurl.js";
+import { TOOLS } from "./shared/tool-list.js";
+import { createSettingsStore, visibleTools } from "./shared/menu-settings.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "./shared/feedback.js";
-
-// One entry per tool. To add a tool, add a line here and ship its page.
-const TOOLS = [
-  {
-    page: "tools/compare-groups/compare-groups.html",
-    title: "Compare permission set groups",
-    description: "Find out how two permission set groups differ",
-  },
-  {
-    page: "tools/user-access/user-access.html",
-    title: "User access summary and comparison",
-    description: "See what a user can access, or compare two users",
-  },
-  {
-    page: "tools/hierarchy/hierarchy.html",
-    title: "Territory & role hierarchy",
-    description: "See the whole territory or role tree; export it for Excel",
-  },
-  {
-    page: "tools/record-access/record-access.html",
-    title: "Why can a user see this record?",
-    description: "Explain who can see the record open in this tab, and why",
-    // Needs the record open in this tab: its Id goes in the address of the page.
-    needsRecord: true,
-    noRecordDescription: "Open a record first, then explain who can see it and why",
-  },
-  {
-    page: "tools/flow-usage/flow-usage.html",
-    title: "Where is it used in flows?",
-    description: "Find the flows that use an object, a field or a record Id",
-    context: true, // the page can start from the object or field of the Salesforce page that is open
-  },
-  {
-    page: "tools/page-details/page-details.html",
-    title: "Page details for a ticket",
-    description: "Copy who you are, which org and which page, to paste into a ticket",
-    withPageAddress: true,
-  },
-];
 
 const state = document.getElementById("state");
 const hostEl = document.getElementById("host");
@@ -65,7 +28,32 @@ if (inOrg) {
   state.textContent = "These tools work on a Salesforce page. Go to a Salesforce tab (any page in your org), then click the Salesforce Capability Pack icon again.";
 }
 
-for (const tool of TOOLS) {
+// Wait for the setting before drawing, so the menu never shows a tool and then hides it.
+const shown = visibleTools(TOOLS, await createSettingsStore(TOOLS).getHidden());
+
+// Opens the Settings page (works with or without a Salesforce tab), then closes the menu.
+async function openSettings() {
+  try {
+    await chrome.runtime.openOptionsPage();
+  } catch {
+    try { await chrome.tabs.create({ url: chrome.runtime.getURL("settings.html") }); } catch { window.open("settings.html", "_blank"); }
+  }
+  window.close();
+}
+
+if (!shown.length) {
+  const none = document.createElement("p");
+  none.className = "hint";
+  none.append("All tools are hidden. ");
+  const open = document.createElement("a");
+  open.href = "settings.html";
+  open.textContent = "Open Settings to show them again";
+  open.addEventListener("click", (event) => { event.preventDefault(); openSettings(); });
+  none.append(open, ".");
+  menu.append(none);
+}
+
+for (const tool of shown) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.disabled = !inOrg;
@@ -89,6 +77,8 @@ for (const tool of TOOLS) {
   }
   menu.append(btn);
 }
+
+document.getElementById("settings").addEventListener("click", (event) => { event.preventDefault(); openSettings(); });
 
 // Report a bug / suggest an improvement. Works without a Salesforce tab. Only the tool name,
 // extension version and browser go into the link; the person submits on GitHub themselves.

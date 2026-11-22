@@ -27,7 +27,7 @@ CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need
 
 Every package has `README.md` (for people) and `CLAUDE.md` (for you). Beyond that:
 - CLI packages: `scripts/` and offline `tests/`, plus synthetic `examples/` where useful (absent in `sf-country-state-codes`).
-- `chrome-extension`: `manifest.json`, `menu.*`, `shared/`, `tools/<tool>/` (page, `-read`, `-logic`), `dev/`, `samples/` and `tests/` (Node runner); no `scripts/` and no `examples/`.
+- `chrome-extension`: `manifest.json`, `menu.*`, `settings.*`, `shared/`, `tools/<tool>/` (page, `-read`, `-logic`), `dev/`, `samples/` and `tests/` (Node runner); no `scripts/` and no `examples/`.
 - `sf-translation-field-notes`: `docs/` only; no scripts, tests or examples.
 
 ## Workflow

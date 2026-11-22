@@ -10,6 +10,7 @@ import { toCsv } from "../shared/csv.js";
 import { SECTION_TITLES, SECTION_HELP, compareSnapshots, toRows, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection } from "../tools/compare-groups/compare-groups-logic.js";
 import { matchPsgs, searchWords } from "../shared/pick.js";
 
+const STORE_FILE = "shared/menu-settings.js"; // the only file allowed to use chrome.storage
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sample = (n) => JSON.parse(readFileSync(path.join(here, "../samples", n), "utf-8"));
 
@@ -32,6 +33,7 @@ await (await import("./hierarchy_tests.mjs")).run(test);
 await (await import("./record_access_tests.mjs")).run(test);
 await (await import("./flow_usage_tests.mjs")).run(test);
 await (await import("./page_details_tests.mjs")).run(test);
+await (await import("./settings_tests.mjs")).run(test);
 
 // ---------- fakes ----------
 
@@ -1040,18 +1042,24 @@ await test("layout: every tool folder has its page, and the manifest and menu po
   assert.deepEqual(readdirSync(path.join(extRoot, "tools")).sort(), [...tools].sort());
   const manifest = JSON.parse(readFileSync(path.join(extRoot, "manifest.json"), "utf-8"));
   assert.ok(files.includes(manifest.action.default_popup));
-  const menu = readFileSync(path.join(extRoot, "menu.js"), "utf-8");
-  const pages = [...menu.matchAll(/page: "([^"]+)"/g)].map((m) => m[1]);
+  const list = readFileSync(path.join(extRoot, "shared/tool-list.js"), "utf-8");
+  const pages = [...list.matchAll(/page: "([^"]+)"/g)].map((m) => m[1]);
+  const ids = [...list.matchAll(/id: "([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(ids, tools, "tool ids are the folder names, in menu order");
   assert.equal(pages.length, tools.length);
+  assert.ok(!/page: "/.test(readFileSync(path.join(extRoot, "menu.js"), "utf-8")), "menu.js keeps no tool list of its own");
   for (const p of pages) assert.ok(files.includes(p), p);
 });
 
 await test("layout: no page or script loads remote code, or writes org data as HTML", () => {
-  const files = walk(extRoot).filter((e) => !e.dir && /^(menu\.|shared\/|tools\/)/.test(e.path) && /\.(js|html)$/.test(e.path));
+  const files = walk(extRoot).filter((e) => !e.dir && /^(menu\.|settings[.-]|shared\/|tools\/)/.test(e.path) && /\.(js|html)$/.test(e.path));
   assert.ok(files.length >= 34, `only ${files.length} files scanned`);
   for (const f of files) {
     const text = readFileSync(path.join(extRoot, f.path), "utf-8");
-    for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "eval(", "new Function", "localStorage", "chrome.storage"]) assert.ok(!text.includes(bad), `${f.path} uses ${bad}`);
+    for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "eval(", "new Function", "localStorage", "chrome.storage"]) {
+      if (bad === "chrome.storage" && f.path === STORE_FILE) continue; // the one file allowed to use it
+      assert.ok(!text.includes(bad), `${f.path} uses ${bad}`);
+    }
     assert.ok(!/<script[^>]+src=["']https?:/i.test(text), `${f.path} loads a remote script`);
     assert.ok(!/import\s*(\(|[^"']*from\s*)["']https?:/.test(text), `${f.path} imports remote code`);
   }
@@ -1071,8 +1079,10 @@ await test("layout: no tool imports or links a file from another tool's folder, 
       assert.ok(!m || m[1] === own, `${f.path} reaches into tools/${m && m[1]}: ${r}`);
     }
   }
-  const menu = readFileSync(path.join(extRoot, "menu.js"), "utf-8");
-  assert.deepEqual(refs(menu).filter((r) => /(^|\/)tools\//.test(r)), [], "menu.js imports from tools/");
+  for (const top of ["menu.js", "settings.js", "settings-logic.js", "settings.html"]) {
+    const text = readFileSync(path.join(extRoot, top), "utf-8");
+    assert.deepEqual(refs(text).filter((r) => /(^|\/)tools\//.test(r)), [], `${top} imports from tools/`);
+  }
 });
 
 console.log(failures.length ? `\n${failures.length} FAILED, ${passed} passed` : `\nAll ${passed} checks passed.`);
