@@ -177,6 +177,7 @@ def main():
     print(f"Hierarchy: http://127.0.0.1:{a.port}/tools/hierarchy/hierarchy.html?demo=1")
     print(f"Flows:     http://127.0.0.1:{a.port}/tools/flow-usage/flow-usage.html?demo=1   (live org: ...?dev=1)")
     print(f"Others:    http://127.0.0.1:{a.port}/tools/<user-access|record-access|page-details>/<same name>.html?demo=1")
+    print(f"Settings:  http://127.0.0.1:{a.port}/settings.html   (changes are not kept outside the extension)")
     print("Read-only: only GET requests are forwarded. Ctrl+C to stop.")
     try:
         srv.serve_forever()

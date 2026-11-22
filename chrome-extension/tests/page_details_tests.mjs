@@ -307,7 +307,7 @@ export async function run(test) {
 
   await test("snapshot: the popup passes only the cleaned address", () => {
     const js = read(ext("menu.js"));
-    assert.ok(js.includes('title: "Page details for a ticket"'));
+    assert.ok(read(ext("shared/tool-list.js")).includes('title: "Page details for a ticket"'));
     assert.ok(js.includes("cleanUrl(tab?.url"));
     assert.ok(!/tab\??\.url\)\}/.test(js));
   });

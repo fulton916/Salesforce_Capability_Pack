@@ -1543,7 +1543,7 @@ export async function run(test) {
   });
 
   await test("record access: popup entry, record Id in the address, and the manifest version", () => {
-    const popup = readFileSync(ext("menu.js"), "utf-8");
+    const popup = readFileSync(ext("menu.js"), "utf-8") + readFileSync(ext("shared/tool-list.js"), "utf-8");
     assert.match(popup, /page: "tools\/record-access\/record-access\.html"[\s\S]*?title: "Why can a user see this record\?"[\s\S]*?description: "Explain who can see the record open in this tab, and why"/);
     assert.match(popup, /&record=\$\{encodeURIComponent\(recordId\)\}/);
     assert.match(popup, /Open a record first/);

@@ -386,7 +386,7 @@ export async function run(test) {
   });
 
   await test("hierarchy: the tool is in the toolbar menu and the manifest version moved on", () => {
-    assert.match(readFileSync(ext("menu.js"), "utf-8"), /page: "tools\/hierarchy\/hierarchy\.html"[\s\S]*?title: "Territory & role hierarchy"/);
+    assert.match(readFileSync(ext("shared/tool-list.js"), "utf-8"), /page: "tools\/hierarchy\/hierarchy\.html"[\s\S]*?title: "Territory & role hierarchy"/);
     const manifest = JSON.parse(readFileSync(ext("manifest.json"), "utf-8"));
     assert.match(manifest.version, /^0\.[3-9]\.\d+$/); // moved on from 0.2
   });
