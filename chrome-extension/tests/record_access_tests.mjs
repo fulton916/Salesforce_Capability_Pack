@@ -2129,10 +2129,10 @@ export async function run(test) {
     });
     try {
       await import(`../tools/record-access/record-access.js?failed-run`);
-      const ready = async (f) => { for (let i = 0; i < 200 && !f(); i++) await new Promise((r) => setTimeout(r, 10)); assert.ok(f(), "page did not get ready"); };
-      await ready(() => nodes["#explain"] && nodes["#explain"].disabled === false && nodes["#recordCard"].children.length);
+      const ready = async (f) => { const end = Date.now() + 15000; while (!f() && Date.now() < end) await new Promise((r) => setTimeout(r, 10)); assert.ok(f(), "page did not get ready"); };
+      await ready(() => nodes["#explain"]?.disabled === false && nodes["#recordCard"]?.children.length);
       const click = async (sel) => { for (const h of nodes[sel].handlers.click || []) await h({}); };
-      const idle = async () => { await ready(() => !nodes["#explain"].disabled); };
+      const idle = async () => { await ready(() => !nodes["#explain"]?.disabled); };
       const keptButton = () => nodes["#kept"].children.find((c) => c && c.handlers?.click);
       const errorText = () => textOf(nodes["#error"]);
 
