@@ -18,6 +18,7 @@ const IDENT = /^[A-Za-z0-9_]+$/;
 const ACCOUNT_CHILD_LEVEL = {
   Case: { share: "CaseAccessLevel", role: "CaseAccessForAccountOwner" },
   Opportunity: { share: "OpportunityAccessLevel", role: "OpportunityAccessForAccountOwner" },
+  Contact: { share: "ContactAccessLevel", role: "ContactAccessForAccountOwner" },
 };
 const list = (ids) => ids.map(soqlString).join(", ");
 const uniq = (a) => [...new Set(a.filter(Boolean))];
@@ -189,7 +190,7 @@ export async function readRecordContext(api, recordId) {
     const refs = fields.filter((f) => f.type === "reference" && (f.referenceTo || []).length === 1);
     parentField = (refs.find((f) => f.cascadeDelete) || refs.find((f) => f.name === "AccountId") || refs.find((f) => f.name === "ParentId"))?.name || null;
   }
-  // Cases and Opportunities also get access through their account (the account's own sharing).
+  // Cases, Opportunities and Contacts also get access through their account (the account's own sharing).
   const acctField = ACCOUNT_CHILD_LEVEL[obj.api] && fields.some((f) => f.name === "AccountId") ? "AccountId" : null;
   const cols = ["Id", nameField, hasOwner ? "OwnerId" : null, parentField, acctField, isActivity ? "WhoId" : null].filter(Boolean);
   const { records } = await api.query(`SELECT ${uniq(cols).join(", ")} FROM ${obj.api} WHERE Id = ${soqlString(id)}`);

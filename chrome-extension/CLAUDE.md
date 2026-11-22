@@ -154,26 +154,26 @@ takes a pasted link or Id, which is also how the dev server is used).
   role-and-subordinates and territory groups (visited set, MAX_DEPTH, MAX_MEMBER_GROUPS,
   MAX_MEMBER_USERS, `capped` flag). Facts: `memberRoles[groupId] = {roles: [{roleId, example, count}],
   users, capped}`. `explain` finds a member whose role is strictly below the user's (`membersBelow`).
-- Access through the account (Cases and Opportunities with an `AccountId`; `record-access-logic.js` `acctScope`,
+- Access through the account (Cases, Opportunities and Contacts with an `AccountId`; `record-access-logic.js` `acctScope`,
   `shareRows(rows, scope)`; reader `readAccountAccess`): the record's own share rows and the parent
   account's share rows go through the same loop, so groups (nested), roles, role-and-subordinates,
   territories, bosses-groups and role-above are reused. Facts: `facts.account = {id, name, rows:[{who,
   level, cause}], truncated, owner:{id, name, roleId, level}}`, and `user.accountTeamRole`. The reader
-  selects `UserOrGroupId, RowCause, CaseAccessLevel` (or `OpportunityAccessLevel`) from `AccountShare`
+  selects `UserOrGroupId, RowCause, CaseAccessLevel` (or `OpportunityAccessLevel`, `ContactAccessLevel`) from `AccountShare`
   for the account (one query, LIMIT 2000) and drops None and Owner rows. The owner's level is the Owner
-  row's level, with `UserRole.CaseAccessForAccountOwner` / `OpportunityAccessForAccountOwner` as
+  row's level, with `UserRole.CaseAccessForAccountOwner` / `OpportunityAccessForAccountOwner` / `ContactAccessForAccountOwner` as
   fallback. Routes have keys and topics prefixed `acct:` and `detail.acct`, so they take part in topic
   matching and `hasInFacts`. An account route starts "The case belongs to account 'X'" and says
   "...which gives <level> access to the account's cases". A None row gives no route. The object-permission
   cap applies as for other routes. Extra queries: 1 account name, 1 AccountShare, 1 owner, 1 role, plus 1
   AccountTeamMember per user. Territory routes on the account come only from AccountShare Territory rows.
-  Contacts are not covered.
+  A contact whose org-wide default is Controlled by Parent gets no account routes (access follows the account, through the parent flow). An ImplicitChild or ImplicitParent account row is a route only when its level is Read or Edit.
 - Confirmed live (sandbox, read-only queries): `AccountShare.CaseAccessLevel`, `OpportunityAccessLevel`,
   `ContactAccessLevel`; `UserRole.*AccessForAccountOwner`; the Owner row equals the role setting; Team,
   Manual, Rule, Territory and Territory2AssociationManual rows carry their own levels; ImplicitParent
   rows are None. Consistent with the data but not proven: people above an account holder or the account
   owner in the role hierarchy get the same level. Not tested: that role-above route for Cases.
-- Still not covered: contacts through the account, restriction and scoping rules, Experience Cloud sharing sets, which specific
+- Still not covered: restriction and scoping rules, Experience Cloud sharing sets, which specific
   sharing rule. Access through the account is only as complete as the account's first 2000 share rows.
 - Routes may carry a `topic` (same way in reached differently: a territory through a share row or the
   territory list, one group share as member or as manager, the owner queue as member or as boss, a
