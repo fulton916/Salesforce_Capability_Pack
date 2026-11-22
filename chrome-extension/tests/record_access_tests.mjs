@@ -1116,11 +1116,11 @@ export async function run(test) {
 
   // ---------- guards ----------
 
-  // ---------- access through the account (Cases and Opportunities) ----------
+  // ---------- access through the account (Cases, Opportunities and Contacts) ----------
 
   /** A Case or Opportunity whose account is "Contoso (sample)": the account's own sharing is in `account`. */
   function acctFacts(object, { rows = [], owner = null, users = [], territories, groups = [], shareUsers = [], memberRoles } = {}) {
-    const plural = object === "Case" ? "Cases" : "Opportunities";
+    const plural = { Case: "Cases", Opportunity: "Opportunities", Contact: "Contacts" }[object];
     return facts({
       record: { id: "500000000000001AAA", object, name: "Sample record", ownerId: ID.carl, ownerKind: "user", ownerName: "Carl Brown", ownerRoleId: ID.other, accountId: ID.rec, accountName: "Contoso (sample)", parentId: null, parentObjectLabel: "", parentName: "" },
       object: { api: object, label: object, plural, custom: false, grantByHierarchy: null },
@@ -1372,6 +1372,151 @@ export async function run(test) {
     const res = explain(f);
     assert.equal(res.users[0].mismatch, null);
     assert.equal(res.users[0].routes[0].steps[1], "The account is shared by a sharing rule with public group 'EMEA Sales', which gives view access to the account's cases");
+    assert.ok(log.every((l) => l.method === "GET"));
+    for (const l of log.filter((x) => x.q)) assert.match(l.q, /^SELECT /);
+  });
+
+  await test("record access: a contact is reached through an account shared with a public group, worded for the account's contacts", () => {
+    const f = acctFacts("Contact", {
+      rows: [{ who: ID.gEmea, level: "Read", cause: "Rule" }],
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_VIEW, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE }),
+      ],
+    });
+    const res = explain(f);
+    const r = res.users[0].routes[0];
+    assert.equal(res.users[0].routes.length, 1);
+    assert.equal(r.access, "view");
+    assert.equal(r.steps[0], "The contact belongs to account 'Contoso (sample)'");
+    assert.equal(r.steps[1], "The account is shared by a sharing rule with public group 'EMEA Sales', which gives view access to the account's contacts");
+    assert.equal(res.users[0].mismatch, null);
+    assert.deepEqual(res.users[1].routes, []);
+    // two users: the difference names what Bob lacks through the account
+    assert.equal(res.difference.items.length, 1);
+    assert.match(res.difference.items[0].route, /^The account is shared by a sharing rule with public group 'EMEA Sales'/);
+    assert.equal(res.difference.items[0].missing[0], "Bob Jones is not in public group 'EMEA Sales', directly or through another group.");
+    assert.match(res.difference.items[0].change[0], /Adding Bob Jones to public group 'EMEA Sales'/);
+    assert.ok(res.notes.some((n) => /Access through the account is checked for contacts/.test(n) && !/Not checked: contacts/.test(n)));
+  });
+
+  await test("record access: a contact is reached through the role above the account owner (contact access for account owners)", () => {
+    const owner = { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Edit" };
+    const f = acctFacts("Contact", { owner, users: [
+      user(ID.alice, "Alice Smith", { sf: SF_EDIT, roleId: ID.mid, roleName: "UK Manager" }),
+      user(ID.bob, "Bob Jones", { sf: SF_NONE, roleId: ID.other, roleName: "France Rep" }),
+    ] });
+    const res = explain(f, [ID.alice, ID.bob]);
+    const r = res.users[0].routes.find((x) => x.key === "acct:ownerRole");
+    assert.equal(r.access, "edit");
+    assert.equal(r.sfLabel, "Manager of User");
+    assert.match(chainText(r), /^The contact belongs to account 'Contoso \(sample\)' -> .*gives account owners edit access to the account's contacts -> Alice Smith's role 'UK Manager' is above 'UK Rep'/);
+    assert.match(res.difference.items[0].missing[0], /Bob Jones's role 'France Rep' is not above the account owner's role 'UK Rep'/);
+  });
+
+  await test("record access: a contact gets no route from an account row whose contact access is None (manual or implicit)", () => {
+    const f = acctFacts("Contact", {
+      rows: [{ who: ID.alice, level: "None", cause: "Manual" }, { who: ID.alice, level: "None", cause: "ImplicitChild" }, { who: ID.alice, level: null, cause: "ImplicitChild" }],
+      users: [user(ID.alice, "Alice Smith", { sf: SF_NONE })],
+    });
+    assert.deepEqual(explain(f).users[0].routes, []);
+    // an implicit row counts only when it gives Read or Edit
+    const g = acctFacts("Contact", { rows: [{ who: ID.alice, level: "Read", cause: "ImplicitChild" }], users: [user(ID.alice, "Alice Smith", { sf: SF_VIEW })] });
+    assert.equal(explain(g).users[0].routes.length, 1);
+    assert.equal(explain(g).users[0].routes[0].access, "view");
+  });
+
+  await test("record access: a contact controlled by parent gets no account routes, and the parent flow is unchanged", () => {
+    const f = acctFacts("Contact", {
+      rows: [{ who: ID.gEmea, level: "Read", cause: "Rule" }],
+      owner: { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Edit" },
+      groups: [grp(ID.gEmea, "Regular", "EMEA Sales")],
+      users: [
+        user(ID.alice, "Alice Smith", { sf: SF_EDIT, parentSf: SF_EDIT, roleId: ID.mid, memberOf: [{ groupId: ID.gEmea, memberId: ID.alice }] }),
+        user(ID.bob, "Bob Jones", { sf: SF_NONE, parentSf: SF_NONE }),
+      ],
+    });
+    f.owd = { internal: "ControlledByParent", external: "ControlledByParent" };
+    f.record = { ...f.record, ownerId: null, ownerKind: null, ownerName: "", parentId: ID.rec, parentObjectLabel: "Account", parentName: "Contoso (sample)" };
+    const res = explain(f);
+    assert.deepEqual(kinds(res.users[0]), ["parent"]);
+    assert.ok(!res.users[0].routes.some((r) => r.key.startsWith("acct:")));
+    assert.match(res.users[0].routes[0].steps.join(" "), /Contacts depend on the record they belong to: Account 'Contoso \(sample\)'/);
+    assert.match(res.users[1].parentLine, /Bob Jones can't see it/);
+    assert.ok(!res.notes.some((n) => /through the account/.test(n)));
+    // the same contact with a Private default does get the account route
+    f.owd = { internal: "Private", external: "Private" };
+    assert.ok(explain(f).users[0].routes.some((r) => r.key.startsWith("acct:")));
+  });
+
+  await test("record access: a contact with no account has no account scope", () => {
+    const f = acctFacts("Contact", { users: [user(ID.alice, "Alice Smith", { sf: SF_NONE })] });
+    delete f.account;
+    const res = explain(f);
+    assert.deepEqual(res.users[0].routes, []);
+    assert.ok(!res.notes.some((n) => /through the account/.test(n)));
+  });
+
+  await test("record access: reading a contact reads ContactAccessLevel from AccountShare and ContactAccessForAccountOwner from the owner's role", async () => {
+    const log = [];
+    const queries = [];
+    const route = (q) => {
+      queries.push(q);
+      if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
+      if (/FROM Contact WHERE Id/.test(q)) return [{ Id: "003000000000001AAA", Name: "Pat Sample", OwnerId: ID.carl, AccountId: ID.rec }];
+      if (/SELECT Name FROM Account/.test(q)) return [{ Name: "Contoso (sample)" }];
+      if (/SELECT OwnerId, Owner.Name, Owner.UserRoleId FROM Account/.test(q)) return [{ OwnerId: ID.maria, Owner: { Name: "Maria Keller", UserRoleId: ID.low } }];
+      if (/SELECT ContactAccessForAccountOwner FROM UserRole/.test(q)) return [{ ContactAccessForAccountOwner: "Edit" }];
+      if (/FROM User WHERE Id = '005000000000004AAA'/.test(q)) return [{ Name: "Carl Brown", UserRoleId: ID.other }];
+      if (/FROM User WHERE Id = '005000000000001AAA'/.test(q)) return [{ Id: ID.alice, Name: "Alice Smith", Username: "alice@example.invalid", IsActive: true, UserType: "Standard", Profile: { Name: "Standard User" }, UserRoleId: ID.mid, UserRole: { Name: "UK Manager" } }];
+      if (/FROM User WHERE Id IN/.test(q)) return [];
+      if (/FROM UserRole/.test(q)) return [{ Id: ID.top, Name: "Sales Director", DeveloperName: "SD", ParentRoleId: null }, { Id: ID.mid, Name: "UK Manager", DeveloperName: "UKM", ParentRoleId: ID.top }, { Id: ID.low, Name: "UK Rep", DeveloperName: "UKR", ParentRoleId: ID.mid }, { Id: ID.other, Name: "France Rep", DeveloperName: "FR", ParentRoleId: ID.top }];
+      if (/FROM Territory2 /.test(q)) return { fail: "sObject type 'Territory2' is not supported.", code: "INVALID_TYPE" };
+      if (/FROM ContactShare/.test(q)) return [{ UserOrGroupId: ID.carl, ContactAccessLevel: "All", RowCause: "Owner" }];
+      if (/FROM AccountShare/.test(q)) return [
+        { UserOrGroupId: ID.maria, RowCause: "Owner", ContactAccessLevel: "Edit" },
+        { UserOrGroupId: ID.gEmea, RowCause: "Rule", ContactAccessLevel: "Read" },
+        { UserOrGroupId: ID.gUk, RowCause: "ImplicitChild", ContactAccessLevel: "None" },
+      ];
+      if (/FROM Group WHERE RelatedId IN/.test(q)) return [];
+      if (/FROM Group WHERE Id IN/.test(q)) return [];
+      if (/FROM GroupMember/.test(q)) return [];
+      if (/FROM UserRecordAccess/.test(q)) return [{ RecordId: "003000000000001AAA", HasReadAccess: true, HasEditAccess: true, HasDeleteAccess: false, HasTransferAccess: false, HasAllAccess: false, MaxAccessLevel: "Edit" }];
+      if (/FROM PermissionSetAssignment/.test(q)) return [{ PermissionSetId: "0PS000000000001AAA", PermissionSetGroupId: null, PermissionSet: { Label: "X", Type: "Profile", IsOwnedByProfile: true, Profile: { Name: "Standard User" }, PermissionsViewAllData: false, PermissionsModifyAllData: false } }];
+      if (/FROM ObjectPermissions/.test(q)) return [{ ParentId: "0PS000000000001AAA", PermissionsRead: true, PermissionsCreate: true, PermissionsEdit: true, PermissionsDelete: false, PermissionsViewAllRecords: false, PermissionsModifyAllRecords: false }];
+      if (/FROM AccountTeamMember/.test(q)) return [];
+      if (/COUNT\(\)/.test(q)) return { total: 0 };
+      return { fail: `no route for ${q}`, code: "TEST" };
+    };
+    const describes = {
+      Contact: { label: "Contact", labelPlural: "Contacts", custom: false, fields: [{ name: "Id", type: "id" }, { name: "Name", type: "string", nameField: true }, { name: "OwnerId", type: "reference", referenceTo: ["User"] }, { name: "AccountId", type: "reference", referenceTo: ["Account"] }] },
+      Account: { label: "Account", labelPlural: "Accounts", custom: false, fields: [{ name: "Id", type: "id" }, { name: "Name", type: "string", nameField: true }] },
+      ContactShare: { fields: [{ name: "ContactId" }, { name: "ContactAccessLevel" }, { name: "RowCause" }, { name: "UserOrGroupId" }] },
+    };
+    const fetchImpl = async (url, opts = {}) => {
+      const u = new URL(url);
+      log.push({ method: opts.method || "GET", q: u.searchParams.get("q") });
+      const ok = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) });
+      if (/\/sobjects\/$/.test(u.pathname)) return ok({ sobjects: [{ name: "Contact", keyPrefix: "003", label: "Contact", labelPlural: "Contacts" }, { name: "Account", keyPrefix: "001", label: "Account", labelPlural: "Accounts" }] });
+      const m = u.pathname.match(/\/sobjects\/(\w+)\/describe\/$/);
+      if (m) return describes[m[1]] ? ok(describes[m[1]]) : { ok: false, status: 404, text: async () => JSON.stringify([{ message: "not found", errorCode: "NOT_FOUND" }]) };
+      const r = route(u.searchParams.get("q"));
+      if (r.fail) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: r.fail, errorCode: r.code || "TEST" }]) };
+      if (r.total !== undefined) return ok({ done: true, totalSize: r.total, records: [] });
+      return ok({ done: true, totalSize: r.length, records: r });
+    };
+    const api = new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl });
+    const ctx = await readRecordContext(api, "003000000000001AAA");
+    assert.equal(ctx.record.accountId, ID.rec);
+    assert.equal(ctx.record.accountName, "Contoso (sample)");
+    const f = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.deepEqual(f.account.rows, [{ who: ID.gEmea, level: "Read", cause: "Rule" }], "Owner and None rows are left out");
+    assert.deepEqual(f.account.owner, { id: ID.maria, name: "Maria Keller", roleId: ID.low, level: "Edit" });
+    assert.match(log.find((l) => /FROM AccountShare/.test(l.q || "")).q, /SELECT UserOrGroupId, RowCause, ContactAccessLevel FROM AccountShare WHERE AccountId = '001000000000001AAA'/);
+    assert.ok(queries.some((q) => /SELECT ContactAccessForAccountOwner FROM UserRole WHERE Id = /.test(q)));
+    const res = explain(f);
+    assert.ok(res.users[0].routes.some((r) => r.key === "acct:ownerRole" && r.access === "edit"));
     assert.ok(log.every((l) => l.method === "GET"));
     for (const l of log.filter((x) => x.q)) assert.match(l.q, /^SELECT /);
   });

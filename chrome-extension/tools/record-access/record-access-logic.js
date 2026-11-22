@@ -389,13 +389,15 @@ function shareTopic(target, gk, cause) {
   return `shareGroup:${gk}:${cause}`;
 }
 
-const ACCT_CHILD = { Case: "cases", Opportunity: "opportunities" };
+const ACCT_CHILD = { Case: "cases", Opportunity: "opportunities", Contact: "contacts" };
 
-/** Cases and Opportunities with an account: what the account's own sharing gives to them. null otherwise. */
+/** Cases, Opportunities and Contacts with an account: what the account's own sharing gives to them. null otherwise.
+ *  A contact whose org-wide default is Controlled by Parent gets no account scope: its access follows the account itself (the parent flow). */
 function acctScope(ctx) {
   const a = ctx.facts.account;
   const many = ACCT_CHILD[ctx.api];
   if (!many || !a || !a.id) return null;
+  if (ctx.api === "Contact" && ctx.facts.owd?.internal === "ControlledByParent") return null;
   const name = a.name || "the account";
   return { key: "acct:", many, name, rows: a.rows || [], lead: `The ${ctx.label.toLowerCase()} belongs to account '${name}'` };
 }
@@ -490,7 +492,7 @@ function routesFor(u, name, ctx, sf) {
     });
   }
 
-  // Share rows: the record's own, then (Cases and Opportunities) the rows of its account.
+  // Share rows: the record's own, then (Cases, Opportunities and Contacts) the rows of its account.
   let cappedTerritories = 0;
   const acct = acctScope(ctx);
   const shareRows = (rows, sc) => {
@@ -504,6 +506,7 @@ function routesFor(u, name, ctx, sf) {
       if (info.kind === "owner") continue; // the owner has their own route
       if (sc && /^none$/i.test(String(row.level || ""))) continue; // the account gives nothing to its cases or opportunities here
       const level = shareLevel(row.level);
+      if (sc && info.kind === "implicit" && !level) continue; // implicit rows on the account count only when they give Read or Edit to this kind of record
       const who = k(row.who);
       const phrase = sc ? `The account is ${info.phrase[0].toLowerCase()}${info.phrase.slice(1)}` : info.phrase;
       const withWho = (target) => `${phrase} with ${target}${info.why ? `, ${info.why}` : ""}${levelNote(level)}`;
@@ -1024,7 +1027,7 @@ export function explain(facts, userIds) {
     ...(users.some((u) => u.mismatch) ? ["Salesforce's answer is the one shown at the top. Routes are our explanation, and they did not match it for everyone (see the lists above)."] : []),
     "Not checked: restriction rules and scoping rules, Experience Cloud sharing sets, field-level access, and which specific sharing rule gave access (Salesforce only says 'a sharing rule').",
     ...(acctScope(ctx) ? [
-      `Access through the account is checked for ${ctx.plural.toLowerCase()}: the account's own sharing (sharing rules, manual shares, the account team, territories) and the account owner, including people above them in the role hierarchy. Not checked: contacts. Salesforce's "View Sharing Hierarchy" page is the place to confirm a route we could not explain.`,
+      `Access through the account is checked for ${ctx.plural.toLowerCase()}: the account's own sharing (sharing rules, manual shares, the account team, territories) and the account owner, including people above them in the role hierarchy. Salesforce's "View Sharing Hierarchy" page is the place to confirm a route we could not explain.`,
       ...(ctx.facts.account?.truncated ? ["The account has a very long list of sharing rows. Only the first part was read, so a route through the account may be missing."] : []),
     ] : []),
     "Not checked: manager groups (groups made of a user's manager). People above a group's members in the role hierarchy are checked for groups that give access to managers, but only up to a limit on members.",
