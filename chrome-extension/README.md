@@ -386,16 +386,16 @@ different record, paste its link or Id into the box and click "Use this record".
   them, or because they own it), the page says the first user is above them instead of listing it as
   missing. A team route that only repeats the owner is shown once, as the owner route.
 
-- **Cases and Opportunities: access through the account.** When the record has an account, the page also
+- **Cases, Opportunities and Contacts: access through the account.** When the record has an account, the page also
   reads who the account is shared with (sharing rules, manual shares, the account team, territories) and
-  who owns it, and shows the routes that give access to the account's cases or opportunities, in plain
+  who owns it, and shows the routes that give access to the account's cases, opportunities or contacts, in plain
   steps such as "The case belongs to account 'X' → the account is shared by a sharing rule with public
   group 'G', which gives view access to the account's cases → Jason is in 'G' through group 'H'". It also
   shows people above the account owner or an account team member in the role hierarchy. If the account
-  gives no access to its cases or opportunities, there is no route. Salesforce's own View Sharing
+  gives no access to those records, there is no route. A contact whose org-wide default is Controlled by Parent gets no account routes: its access follows the account itself, as shown by the parent. Salesforce's own View Sharing
   Hierarchy page may list more reasons for a user than this page does.
 
-Not covered, and the page does not say it cannot exist: contacts, restriction and scoping rules, and
+Not covered, and the page does not say it cannot exist: restriction and scoping rules, and
 Experience Cloud sharing sets.
 
 Routes it looks for: no Read on the object at all (then nothing else matters, but never when
