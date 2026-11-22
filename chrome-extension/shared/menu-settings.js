@@ -2,8 +2,9 @@
 // storage. It keeps one thing: `hiddenTools`, the ids of the tools the person turned off, in
 // Chrome's local storage on this computer only (never synced, never sent anywhere). Nothing else is ever stored (no session id, host, org data or user names).
 // Hidden tools are stored (not shown ones) so a tool added later is on by default.
-// Outside the extension (the dev server) or when storage fails, every tool shows and changes
-// are kept in memory for the page session only.
+// Outside the extension (the dev server) every tool shows and changes are kept in memory for the
+// page session only. If a read fails, getHidden gives the last list read in this page session (or
+// every tool on if none), and a switch change fails instead of saving over what could not be read.
 
 export const HIDDEN_KEY = "hiddenTools";
 
@@ -35,15 +36,18 @@ export function createSettingsStore(tools, storage = browserStorage()) {
     tail = run.catch(() => {});
     return run;
   };
-  async function read() {
+  // Strict read: throws if the browser cannot be read. Saves use this, so a list is never built
+  // from a failed read.
+  async function readStrict() {
     if (!storage) return cleanHidden(memory, tools);
-    try {
-      const got = await storage.get(HIDDEN_KEY);
-      memory = cleanHidden(got?.[HIDDEN_KEY], tools);
-    } catch {
-      memory = []; // cannot read: show every tool
-    }
+    const got = await storage.get(HIDDEN_KEY);
+    memory = cleanHidden(got?.[HIDDEN_KEY], tools);
     return [...memory];
+  }
+  // Never throws. On a failed read it gives the last list read or saved in this page session,
+  // or [] (every tool shows) if there is none.
+  async function read() {
+    try { return await readStrict(); } catch { return [...memory]; }
   }
   async function write(ids) {
     const clean = cleanHidden(ids, tools);
@@ -56,9 +60,10 @@ export function createSettingsStore(tools, storage = browserStorage()) {
     getHidden() { return queued(read); },
     // Saves the list. Throws if the browser refuses; the stored value then stays as it was.
     setHidden(ids) { return queued(() => write(ids)); },
+    // Throws (and stores nothing) if the current list cannot be read.
     setToolOn(id, on) {
       return queued(async () => {
-        const hidden = new Set(await read());
+        const hidden = new Set(await readStrict());
         if (on) hidden.delete(id); else hidden.add(id);
         return write([...hidden]);
       });
