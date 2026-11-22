@@ -2078,6 +2078,133 @@ export async function run(test) {
     assert.ok(!storage.test(read), "nothing is written to browser storage");
     assert.ok(!storage.test(page));
   });
+
+  await test("record access: a failed run (such as Read it again) takes the earlier result away and says so next to the error; a good run clears it", async () => {
+    // Run the real page against a tiny fake page and the fake org (dev-server mode), then break the network.
+    const nodes = {};
+    const mk = () => {
+      const n = { hidden: false, disabled: false, textContent: "", value: "", children: [], handlers: {}, attrs: {} };
+      n.addEventListener = (t, f) => { (n.handlers[t] ||= []).push(f); };
+      n.append = (...c) => { n.children.push(...c); };
+      n.replaceChildren = (...c) => { n.children = c; n.textContent = ""; };
+      n.setAttribute = (k, v) => { n.attrs[k] = v; };
+      n.removeAttribute = () => {};
+      n.focus = n.select = n.scrollIntoView = () => {};
+      n.querySelector = () => mk();
+      n.querySelectorAll = () => [];
+      return n;
+    };
+    const textOf = (n) => (typeof n === "string" ? n : n instanceof Object && n.children ? (n.textContent || "") + n.children.map(textOf).join("") : String(n?.data ?? ""));
+    const saved = {};
+    const set = (k, v) => { saved[k] = Object.getOwnPropertyDescriptor(globalThis, k); Object.defineProperty(globalThis, k, { value: v, configurable: true, writable: true }); };
+    const { api } = fakeOrg();
+    let down = false;
+    let offline = false;
+    const clipboard = [];
+    class FakeNode {}
+    set("Node", FakeNode);
+    set("location", { search: `?dev=1&record=${ID.rec}&a=${ID.alice}`, host: "127.0.0.1:8766", origin: "http://127.0.0.1:8766", protocol: "http:", port: "8766" });
+    set("navigator", { userAgent: "test", clipboard: { writeText: async (t) => { clipboard.push(t); } } });
+    set("document", {
+      title: "", activeElement: null,
+      querySelector: (s) => (nodes[s] ||= mk()),
+      querySelectorAll: () => [],
+      getElementById: () => null,
+      createTextNode: (data) => ({ data }),
+      createElement: () => {
+        const n = mk();
+        Object.setPrototypeOf(n, FakeNode.prototype);
+        return n;
+      },
+    });
+    set("fetch", async (url, opts) => {
+      if (/^http:\/\/127\.0\.0\.1:8766\/sf/.test(url)) {
+        if (offline === "bug") throw new TypeError("Cannot read properties of undefined (reading 'x')");
+        if (offline) throw new TypeError("Failed to fetch");
+        if (down) return { ok: false, status: 400, text: async () => JSON.stringify([{ message: "RAW_TEST_FAILURE connection lost", errorCode: "TEST" }]) };
+        if (/FROM%20Organization/.test(url)) return { ok: true, status: 200, text: async () => JSON.stringify({ done: true, totalSize: 1, records: [{ Id: "00D000000000001AAA", Name: "Test Org", IsSandbox: true }] }) };
+        return api.fetch(url.replace("http://127.0.0.1:8766/sf", "https://test.example.com"), opts);
+      }
+      throw new Error("no network in tests");
+    });
+    try {
+      await import(`../tools/record-access/record-access.js?failed-run`);
+      const ready = async (f) => { const end = Date.now() + 15000; while (!f() && Date.now() < end) await new Promise((r) => setTimeout(r, 10)); assert.ok(f(), "page did not get ready"); };
+      await ready(() => nodes["#explain"]?.disabled === false && nodes["#recordCard"]?.children.length);
+      const click = async (sel) => { for (const h of nodes[sel].handlers.click || []) await h({}); };
+      const idle = async () => { await ready(() => !nodes["#explain"]?.disabled); };
+      const keptButton = () => nodes["#kept"].children.find((c) => c && c.handlers?.click);
+      const errorText = () => textOf(nodes["#error"]);
+
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, false, "first Explain shows a result");
+      assert.equal(nodes["#error"].hidden, true);
+      const firstVerdict = nodes["#verdict"].textContent;
+      assert.ok(firstVerdict);
+      await click("#explain"); await idle();
+      assert.equal(nodes["#kept"].hidden, false, "the second Explain says the sharing facts were kept");
+      assert.ok(keptButton(), "with a Read it again button");
+
+      down = true;
+      for (const h of keptButton().handlers.click) h({}); // Read it again, and the read fails
+      await idle();
+      assert.equal(nodes["#results"].hidden, true, "the earlier result is gone");
+      assert.equal(nodes["#error"].hidden, false);
+      assert.match(errorText(), /earlier result was taken away/);
+      assert.match(errorText(), /Technical details/);
+      assert.match(errorText(), /RAW_TEST_FAILURE/, "raw text is under Technical details");
+      clipboard.length = 0;
+      await click("#copy");
+      assert.equal(clipboard.length, 0, "nothing stale is copied");
+
+      down = false;
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, false, "a good run shows a result again");
+      assert.equal(nodes["#error"].hidden, true, "and the error is gone");
+      assert.equal(nodes["#verdict"].textContent, firstVerdict);
+
+      // a failed Explain with a result on screen does the same
+      down = true;
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, true);
+      assert.match(errorText(), /earlier result was taken away/);
+      // and one that fails with no result on screen has no earlier result to mention
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, true);
+      assert.equal(nodes["#error"].hidden, false);
+      assert.doesNotMatch(errorText(), /earlier result/);
+
+      // the network drops (fetch itself rejects): plain words, a Technical details fold, and sentences that do not run together
+      down = false;
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, false);
+      offline = true;
+      await click("#explain"); await idle();
+      assert.equal(nodes["#results"].hidden, true);
+      const net = errorText();
+      assert.match(net, /Could not reach the org\. Check your connection/);
+      assert.match(net, /cannot be mistaken for a new one\. Click Explain to try again\./);
+      assert.match(net, /Technical details/);
+      assert.match(net, /Failed to fetch/, "raw text is under Technical details");
+      assert.doesNotMatch(net, /Failed to fetch(?:The|Could)/);
+      assert.doesNotMatch(net, /try again\.The/);
+      assert.equal(nodes["#error"].children[0], "Could not reach the org. Check your connection, or reload the Salesforce tab and try again. The earlier result was taken away, so it cannot be mistaken for a new one. Click Explain to try again.");
+      // the same failure with nothing on screen has no earlier-result sentence
+      await click("#explain"); await idle();
+      const net2 = errorText();
+      assert.match(net2, /Could not reach the org\./);
+      assert.match(net2, /Technical details/);
+      assert.doesNotMatch(net2, /earlier result/);
+      // a TypeError that is not a network failure (a bug in our own code) is not reported as "could not reach the org"
+      offline = "bug";
+      await click("#explain"); await idle();
+      assert.equal(nodes["#error"].hidden, false);
+      assert.doesNotMatch(errorText(), /Could not reach the org/);
+      assert.match(errorText(), /Cannot read properties of undefined/);
+    } finally {
+      for (const [k, d] of Object.entries(saved)) { if (d) Object.defineProperty(globalThis, k, d); else delete globalThis[k]; }
+    }
+  });
 }
 
 function k15(id) { return id.slice(0, 15); }

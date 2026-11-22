@@ -327,7 +327,20 @@ async function run() {
     state.keptAt = facts.kept?.at ?? null;
     renderResult();
   } catch (e) {
-    showError(e?.status ? plainError(e, "Could not read from the org. If you have been away a while, reload the Salesforce tab and try again.") : e?.message || "Something went wrong.", e?.status ? rawOf(e) : "");
+    // A run that failed must not leave an older answer on screen: it could be read as the new one. Take it away
+    // (this also hides "Copy explanation" and the "read at" line) and say so next to the error.
+    const hadResult = state.result !== null;
+    clearResult();
+    // No status and a browser fetch network-failure message (Chrome/Edge "Failed to fetch", Firefox "NetworkError when attempting
+    // to fetch resource.", Safari "Load failed") means the request never reached the org. Any other TypeError is a bug in our own
+    // code and is not called a connection problem. A plain Error thrown by the reader on purpose already has plain words and is shown as it is.
+    const unreached = !e?.status && /failed to fetch|networkerror|load failed/i.test(e?.message || "");
+    const plain = unreached
+      ? "Could not reach the org. Check your connection, or reload the Salesforce tab and try again."
+      : e?.status ? plainError(e, "Could not read from the org. If you have been away a while, reload the Salesforce tab and try again.") : e?.message || "Something went wrong.";
+    const joined = hadResult ? `${plain.replace(/\s*$/, "").replace(/([^.!?])$/, "$1.")} The earlier result was taken away, so it cannot be mistaken for a new one. Click Explain to try again.` : plain;
+    showError(joined, unreached ? e?.message || String(e) : e?.status ? rawOf(e) : "");
+    $("#error").scrollIntoView({ behavior: "smooth", block: "nearest" });
   } finally {
     state.busy = false;
     setProgress("");

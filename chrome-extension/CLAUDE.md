@@ -227,7 +227,7 @@ takes a pasted link or Id, which is also how the dev server is used).
 - Kept-facts line: `readRecordAccess` adds `facts.kept = {at}` (ms time of the first read) only when some of the record's own facts came
   from the cache (`cache.recAt` is set at the first read and reset by `clearRecordFacts` or a new record); otherwise no `kept`. The page
   (`#kept`, `renderKept`) shows "Who this record is shared with was read at HH:MM ... Read it again"; the button is `readAgain`
-  (clears the record facts, runs Explain again with the same users). Org-wide lists may stay kept; the line is about the record's sharing.
+  (clears the record facts, runs Explain again with the same users). Org-wide lists may stay kept; the line is about the record's sharing. A failed run takes away the shown result and says so next to the error.
 - A difference item carries `limited` and `effective` like the person's card; `givesText(item)` words it ("Would give
   edit access, limited to view by object permissions"), for the page and the copied text.
 - Tasks and events (WhatId and WhoId): the parent is WhatId and the person is WhoId (`whoId`, user
