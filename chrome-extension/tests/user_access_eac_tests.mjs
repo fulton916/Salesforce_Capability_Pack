@@ -7,12 +7,17 @@ import path from "node:path";
 
 import { SfApi } from "../shared/sfconn.js";
 import { readUserAccess } from "../tools/user-access/user-access-read.js";
-import { readEacRaw, readEacAccessUserIds, EAC_PERMISSION_FIELDS } from "../tools/user-access/user-access-eac-read.js";
+import { readEacRaw, readEacAccessUserIds, readPastedUsers, EAC_PERMISSION_FIELDS } from "../tools/user-access/user-access-eac-read.js";
 import {
   STATUS_WORDS, NO_STATUS_TEXT, ASSIGNED_ONLY_TEXT, EAC_OFF_TEXT, NO_CONFIG_TITLE, NOTHING_SYNCED_TEXT, INACTIVE_TEXT, SHOW_CHOICES,
   statusWords, isConnected, buildEacRows, eacCounts, filterEacRows, filterNoConfig, groupByConfig,
   eacCsvRows, noConfigCsvRows, eacDetailText, eacItem, profileNote, assignedText, toCsv, eacSummaryLine, EMPTY_CONFIG_NOTE, NO_EAC_USER_TEXT,
 } from "../tools/user-access/user-access-eac.js";
+import {
+  ACTIONS, validConfigId, inspectorSteps, parsePasted, userLookupQueries, matchPasted, knownConfigs, entryFromRow, entryFromUser, entryFromRecord,
+  planChange, skipGroups, previewSummary, usableId, profileKey, allNoRealId, duplicatesText, skipHelp, changeTable, undoTable, tabText, csvText, outputFor, changeFileName, copyWithFallback,
+  CHANGE_WARNING, NO_UNDO_ADD, AFTER_STEP, CONFIG_ID_HELP,
+} from "../tools/user-access/user-access-eac-changes.js";
 import { compareUsers, validateAccess, toRows, toRowsSingle, SECTION_KEYS } from "../tools/user-access/user-access-logic.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -578,7 +583,7 @@ export async function run(test) {
   });
 
   await test("eac: new files never use innerHTML, localStorage or chrome.storage, and send no write verbs", () => {
-    for (const f of ["user-access-eac.js", "user-access-eac-read.js"]) {
+    for (const f of ["user-access-eac.js", "user-access-eac-read.js", "user-access-eac-changes.js"]) {
       const text = readFileSync(path.join(here, "..", "tools", "user-access", f), "utf-8");
       for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "localStorage", "chrome.storage", "POST", "PATCH", "DELETE", "method:"]) assert.ok(!text.includes(bad), `${f} contains ${bad}`);
       assert.ok(!/\bCOUNT\s*\(/i.test(text.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, "")), `${f} has no COUNT() call`);
@@ -587,4 +592,372 @@ export async function run(test) {
     const page = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.js"), "utf-8");
     assert.ok(!page.includes("innerHTML"));
   });
+
+  // ----- changes as text (issue #42) -----
+  const pad = (n) => String(n).padStart(12, "0");
+  const U = (n) => `005${pad(n)}AAA`;
+  const CF = (n) => `063${pad(n)}AAA`;
+  const AS = (n) => `0M0${pad(n)}AAA`;
+  const PROF = `00e${pad(1)}AAA`;
+  const [A, B, C] = [CF(1), CF(2), CF(3)];
+  const person = (n, name, active = true) => ({ Id: U(n), Name: name, Username: `u${n}@example.com`, Email: `person${n}@example.org`, IsActive: active });
+  const world = () => buildEacRows({
+    statuses: [],
+    assignments: [
+      { Id: AS(1), AssignedId: U(1), ConfigurationId: A }, { Id: AS(2), AssignedId: U(2), ConfigurationId: A },
+      { Id: AS(3), AssignedId: U(3), ConfigurationId: B }, { Id: AS(4), AssignedId: PROF, ConfigurationId: A },
+      { Id: AS(6), AssignedId: U(6), ConfigurationId: A }, { Id: AS(7), AssignedId: U(6), ConfigurationId: C },
+    ],
+    configs: { [A]: "Config A", [B]: "Config B", [C]: "Config C" },
+    users: [person(1, "Uma One"), person(2, "Ivan Inactive", false), person(3, "Bea Three"), person(4, "Pia Profile"), person(6, "Dee Double"), person(7, "Nora None"), person(8, "Ned Off", false)],
+    profiles: { [PROF]: "Service Standard" }, profileMembers: { [PROF]: [U(4)] },
+  });
+  const rowOf = (rows, n, cfg) => rows.find((r) => r.userId === U(n) && (!cfg || r.configId === cfg));
+  const asEntries = (rows, ...ns) => ns.map((n) => (n === 7 ? entryFromRecord(person(7, "Nora None")) : n === 8 ? entryFromRecord(person(8, "Ned Off", false)) : n === 6 ? entryFromUser({ userId: U(6), name: "Dee Double", isActive: true }) : entryFromRow(rowOf(rows, n))));
+  const skippedBy = (plan) => Object.fromEntries(plan.skipped.map((s) => [s.name, s.code]));
+  const shown = (plan) => ({ ...plan, previewed: true });
+
+  await test("changes: rows carry the assignment row Id; every profile assignment is a row of its own", () => {
+    const { rows, profileRows } = world();
+    assert.deepEqual(rowOf(rows, 1).assignmentIds, [AS(1)]);
+    assert.deepEqual(rowOf(rows, 4).assignmentIds, [], "through a profile only: no row of their own");
+    assert.deepEqual(profileRows.map((p) => [p.id, p.profileId, p.profileName, p.configId, p.configuration, p.members]), [[AS(4), PROF, "Service Standard", A, "Config A", 1]]);
+    assert.deepEqual(knownConfigs(rows, profileRows).map((c) => [c.name, c.count]), [["Config A", 4], ["Config B", 1], ["Config C", 1]]);
+  });
+
+  await test("changes: Add gives the exact header and rows, and applies every skip rule", () => {
+    const { rows } = world();
+    const plan = planChange({ action: "add", targetId: B, entries: asEntries(rows, 1, 2, 3, 4, 6, 7, 8), rows });
+    assert.equal(plan.error, "");
+    assert.deepEqual(plan.items.map((i) => i.userId), [U(7)]);
+    assert.deepEqual(skippedBy(plan), {
+      "Uma One": "useMove", "Ivan Inactive": "inactive", "Bea Three": "alreadyThere", "Pia Profile": "profileOnly", "Dee Double": "useMove", "Ned Off": "inactive",
+    });
+    const t = changeTable(plan);
+    assert.deepEqual(t.header, ["AssignedId", "ConfigurationId"]);
+    assert.equal(t.op, "Insert");
+    assert.equal(tabText(t), `AssignedId\tConfigurationId\n${U(7)}\t${B}`);
+    assert.equal(csvText(t), `AssignedId,ConfigurationId\r\n${U(7)},${B}\r\n`);
+    assert.equal(undoTable(plan), null, "an add cannot be undone from here");
+    assert.match(NO_UNDO_ADD, /read again and use Remove/);
+    assert.ok(skipGroups(plan).some((g) => g.code === "useMove" && g.entries.length === 2));
+  });
+
+  await test("changes: Add skips a user already in the target through a profile, and counts a user picked twice once", () => {
+    const { rows } = world();
+    const plan = planChange({ action: "add", targetId: A, entries: [...asEntries(rows, 4), ...asEntries(rows, 7, 7)], rows });
+    assert.deepEqual(skippedBy(plan), { "Pia Profile": "alreadyThere" });
+    assert.deepEqual(plan.items.map((i) => i.userId), [U(7)]);
+  });
+
+  await test("changes: Move gives Id and ConfigurationId, the undo goes back to the old configuration, and every skip rule applies", () => {
+    const { rows } = world();
+    const plan = planChange({ action: "move", targetId: B, entries: asEntries(rows, 1, 2, 3, 4, 6, 7), rows });
+    assert.deepEqual(plan.items.map((i) => [i.assignmentId, i.fromConfigId]), [[AS(1), A], [AS(2), A]], "an inactive user can be moved");
+    assert.deepEqual(skippedBy(plan), { "Bea Three": "alreadyThere", "Pia Profile": "profileOnly", "Dee Double": "severalRows", "Nora None": "notIn" });
+    const t = changeTable(plan);
+    assert.equal(tabText(t), `Id\tConfigurationId\n${AS(1)}\t${B}\n${AS(2)}\t${B}`);
+    assert.equal(t.op, "Update");
+    const u = undoTable(plan);
+    assert.equal(u.op, "Update");
+    assert.equal(tabText(u), `Id\tConfigurationId\n${AS(1)}\t${A}\n${AS(2)}\t${A}`);
+    assert.equal(csvText(t), `Id,ConfigurationId\r\n${AS(1)},${B}\r\n${AS(2)},${B}\r\n`);
+    // Ticking the row of one configuration says which assignment to move.
+    const one = planChange({ action: "move", targetId: B, entries: [entryFromRow(rowOf(rows, 6, A))], rows });
+    assert.deepEqual(one.items.map((i) => i.assignmentId), [AS(6)]);
+    assert.equal(one.skipped.length, 0);
+  });
+
+  await test("changes: Remove gives Id only, skips profile-only users, offers whole profile assignments, and the undo inserts them back", () => {
+    const { rows, profileRows } = world();
+    const plan = planChange({ action: "remove", entries: asEntries(rows, 1, 2, 4, 6, 7), profileItems: profileRows, rows });
+    assert.deepEqual(plan.items.map((i) => i.assignmentId), [AS(1), AS(2)]);
+    assert.deepEqual(skippedBy(plan), { "Pia Profile": "profileOnly", "Dee Double": "severalRows", "Nora None": "notIn" });
+    assert.deepEqual(plan.profileItems.map((p) => p.id), [AS(4)]);
+    const t = changeTable(plan);
+    assert.equal(t.op, "Delete");
+    assert.equal(tabText(t), `Id\n${AS(1)}\n${AS(2)}\n${AS(4)}`);
+    assert.equal(csvText(t), `Id\r\n${AS(1)}\r\n${AS(2)}\r\n${AS(4)}\r\n`);
+    const u = undoTable(plan);
+    assert.equal(u.op, "Insert");
+    assert.equal(tabText(u), `AssignedId\tConfigurationId\n${U(1)}\t${A}\n${U(2)}\t${A}\n${PROF}\t${A}`);
+    assert.match(previewSummary(plan), /Remove 2 users from their configuration and remove 1 whole profile assignment\./);
+    const row = planChange({ action: "remove", entries: [entryFromRow(rowOf(rows, 6, C))], rows });
+    assert.deepEqual(row.items.map((i) => [i.assignmentId, i.fromConfigId]), [[AS(7), C]]);
+  });
+
+  await test("changes: a user in a configuration directly and through a profile keeps the profile note on Remove", () => {
+    const rows = buildEacRows({
+      assignments: [{ Id: AS(1), AssignedId: U(1), ConfigurationId: A }, { Id: AS(4), AssignedId: PROF, ConfigurationId: A }],
+      configs: { [A]: "Config A" }, users: [person(1, "Uma One")], profiles: { [PROF]: "Service Standard" }, profileMembers: { [PROF]: [U(1)] },
+    }).rows;
+    const plan = planChange({ action: "remove", entries: [entryFromRow(rows[0])], rows });
+    assert.deepEqual(plan.items.map((i) => i.assignmentId), [AS(1)]);
+    assert.match(plan.items[0].note, /Still in Config A through the profile Service Standard/);
+  });
+
+  await test("changes: a typed configuration Id is 063 plus 12 or 15 letters or digits", () => {
+        assert.equal(validConfigId(` ${CF(9)} `), CF(9), "18 characters, spaces trimmed");
+    assert.equal(validConfigId("063A1b2C3d4E5f6"), "063A1b2C3d4E5f6", "15 characters");
+    for (const bad of ["", "063", "063A1b2C3d4E5f", "063A1b2C3d4E5f67", "063A1b2C3d4E5f6789A0", "003A1b2C3d4E5f6", "063A1b2C3d4E5f-", "063A1b2C3d4E 5f6", null, undefined]) {
+      assert.equal(validConfigId(bad), null, String(bad));
+    }
+    const { rows } = world();
+    const typed = planChange({ action: "add", targetId: "063ZZZZZZZZZZZZ", entries: asEntries(rows, 7), rows });
+    assert.equal(typed.error, "");
+    assert.equal(typed.targetId, "063ZZZZZZZZZZZZ");
+    assert.match(typed.targetName, /Unnamed configuration \(Id 063ZZZZZZZZZZZZ\)/);
+    assert.equal(tabText(changeTable(typed)), "AssignedId\tConfigurationId\n" + U(7) + "\t063ZZZZZZZZZZZZ");
+    for (const bad of ["", "063short", "0x3" + pad(1) + "AAA", "063'; DROP"]) {
+      const p = planChange({ action: "move", targetId: bad, entries: asEntries(rows, 1), rows });
+      assert.ok(p.error, `error for ${bad}`);
+      assert.equal(p.items.length, 0);
+    }
+    assert.equal(planChange({ action: "remove", entries: asEntries(rows, 1), rows }).error, "", "Remove needs no target");
+    assert.match(CONFIG_ID_HELP, /Setup > Einstein Activity Capture > Configurations/);
+    assert.match(CONFIG_ID_HELP, /063/);
+  });
+
+  await test("changes: pasted names (one per line or commas, any case, usernames or emails): found, not found, repeated, ambiguous", () => {
+    const { tokens, tooMany } = parsePasted("U1@Example.com, person2@example.org\n\n  ghost@example.com ;u1@example.com\r\nU3@example.com");
+    assert.deepEqual(tokens, ["U1@Example.com", "person2@example.org", "ghost@example.com", "U3@example.com"], "repeats in another case are dropped");
+    assert.equal(tooMany, false);
+    assert.equal(parsePasted(Array.from({ length: 600 }, (_, i) => `x${i}@example.com`).join("\n")).tooMany, true);
+    const users = [person(1, "Uma One"), person(2, "Ivan Inactive", false), { Id: U(3), Name: "Cy Three", Username: "cy@example.com", Email: "shared@example.org", IsActive: true }, { Id: U(4), Name: "Di Four", Username: "di@example.com", Email: "shared@example.org", IsActive: true }];
+    const m = matchPasted(["U1@Example.COM", "PERSON2@example.org", "ghost@example.com", "shared@example.org", "cy@example.com"], users);
+    assert.deepEqual(m.found.map((f) => [f.token, f.user.Id]), [["U1@Example.COM", U(1)], ["PERSON2@example.org", U(2)], ["cy@example.com", U(3)]]);
+    assert.deepEqual(m.notFound, ["ghost@example.com"]);
+    assert.deepEqual(m.ambiguous, [{ token: "shared@example.org", count: 2 }], "an email on two users picks nobody");
+    const p = planChange({ action: "add", targetId: B, entries: m.found.map((f) => entryFromRecord(f.user)), rows: [], notFound: m.notFound });
+    assert.deepEqual(p.notFound, ["ghost@example.com"]);
+    assert.deepEqual(p.items.map((i) => i.userId), [U(1), U(3)]);
+    assert.deepEqual(skippedBy(p), { "Ivan Inactive": "inactive" });
+  });
+
+  await test("changes: the lookup is a read-only SELECT on User, in batches, with every pasted value escaped", async () => {
+    const tokens = ["o'brien@example.com", "back\\slash@example.com", ...Array.from({ length: 120 }, (_, i) => `n${i}@example.com`)];
+    const qs = userLookupQueries(tokens);
+    assert.equal(qs.length, 3, "50 per batch");
+    assert.ok(qs.every((q) => q.startsWith("SELECT Id, Name, Username, Email, IsActive FROM User WHERE Username IN (") && q.includes(") OR Email IN (")));
+    assert.ok(qs[0].includes("'o\\'brien@example.com'"));
+    assert.ok(qs[0].includes("'back\\\\slash@example.com'"));
+    assert.ok(!/UserEmailCalendarSync|ActivityUsrConnectionStatus/.test(qs.join()), "no WHERE on the EAC objects");
+    const log = [];
+    const fetchImpl = async (url, opts = {}) => {
+      const u = new URL(url);
+      log.push({ method: opts.method || "GET", q: u.searchParams.get("q") });
+      const found = /n1@example\.com/.test(u.searchParams.get("q")) ? [{ Id: U(5), Name: "Eve Five", Username: "n1@example.com", Email: "n1@example.com", IsActive: true }] : [];
+      return resp(200, { done: true, totalSize: found.length, records: found });
+    };
+    const api = new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl });
+    const users = await readPastedUsers(api, tokens);
+    assert.deepEqual(users.map((x) => x.Id), [U(5)]);
+    assert.equal(log.length, 3);
+    assert.ok(log.every((l) => l.method === "GET"), "only GET requests");
+  });
+
+  await test("changes: the output holds only API columns and Ids: no names, usernames or emails", () => {
+    const { rows, profileRows } = world();
+    const cases = [
+      planChange({ action: "add", targetId: B, entries: asEntries(rows, 7), rows }),
+      planChange({ action: "move", targetId: B, entries: asEntries(rows, 1, 2), rows }),
+      planChange({ action: "remove", entries: asEntries(rows, 1, 2), profileItems: profileRows, rows }),
+    ];
+    for (const plan of cases) {
+      const out = outputFor(shown(plan));
+      const all = [out.text, out.csv, out.undoText].join("\n");
+      for (const bad of ["Uma", "Ivan", "Nora", "Pia", "Config A", "Service", "@", "example"]) assert.ok(!all.includes(bad), `${plan.action} output has ${bad}`);
+      for (const line of all.replace(/﻿/g, "").split(/\r?\n/).filter(Boolean)) for (const cell of line.split(/[\t,]/)) assert.match(cell, /^[A-Za-z0-9]+$/);
+      assert.deepEqual(changeTable(plan).header, ACTIONS[plan.action].header);
+    }
+    assert.equal(changeFileName("move", "202611221030"), "eac_move_202611221030.csv");
+  });
+
+  await test("changes: nothing is built until the preview has been shown, and a bad Id never reaches the text", () => {
+    const { rows } = world();
+    const plan = planChange({ action: "add", targetId: B, entries: asEntries(rows, 7), rows });
+    assert.throws(() => outputFor(plan), /preview first/i);
+    assert.ok(outputFor(shown(plan)).text.includes(U(7)));
+    const bad = planChange({ action: "add", targetId: B, entries: [{ userId: "005\tx", name: "Bad Id", isActive: true, configId: null }], rows });
+    assert.deepEqual(skippedBy(bad), { "Bad Id": "badId" });
+    assert.equal(outputFor(shown(bad)), null, "nothing to load");
+    assert.throws(() => changeTable({ action: "remove", items: [{ assignmentId: "x y" }], profileItems: [] }), /Id does not look right/);
+    assert.throws(() => outputFor(shown(planChange({ action: "move", targetId: "nope", entries: [], rows }))), /configuration|Pick/i);
+  });
+
+  await test("changes: building and previewing make no request at all; the lookup makes only GET", async () => {
+    const log = [];
+    const api = fakeOrg({ status: [], sync: [{ Id: AS(1), AssignedId: U(1), ConfigurationId: A }], users: [person(1, "Uma One")] }, log);
+    const raw = await readEacRaw(api);
+    const before = log.length;
+    assert.ok(before > 0);
+    const { rows, profileRows } = buildEacRows(raw);
+    for (const action of ["add", "move", "remove"]) {
+      const plan = planChange({ action, targetId: B, entries: rows.map(entryFromRow), profileItems: profileRows, rows });
+      outputFor(shown(plan));
+    }
+    assert.equal(log.length, before, "no request while building changes");
+    assert.ok(log.every((l) => l.method === "GET"), "only GET requests");
+  });
+
+  await test("changes: copy falls back when the clipboard is missing, blocked or rejects", async () => {
+    let got = null;
+    assert.deepEqual(await copyWithFallback("a\tb", { writeText: async (t) => { got = t; } }), { copied: true });
+    assert.equal(got, "a\tb");
+    assert.deepEqual(await copyWithFallback("x", { writeText: async () => { throw new Error("NotAllowedError"); } }), { copied: false });
+    assert.deepEqual(await copyWithFallback("x", { writeText: () => { throw new Error("sync throw"); } }), { copied: false });
+    assert.deepEqual(await copyWithFallback("x", undefined), { copied: false });
+    assert.deepEqual(await copyWithFallback("x", {}), { copied: false });
+    const page = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.js"), "utf-8");
+    assert.ok(page.includes("fallbackBox(text)") && page.includes("ta.value = text") && page.includes("Select all and copy"));
+    assert.ok(page.includes("navigator.clipboard"), "uses the clipboard API");
+  });
+
+  await test("changes: steps, warnings and button labels use the action names; the selection survives a change of the Show filter", () => {
+    assert.deepEqual(inspectorSteps("move"), ["Open Salesforce Inspector, then Data Import.", "Action: Update.", "Object: UserEmailCalendarSync.", "Format: Excel.", "Paste the copied text.", "Import."]);
+    assert.ok(inspectorSteps("add")[1].includes("Insert") && inspectorSteps("remove")[1].includes("Delete"));
+    assert.equal(AFTER_STEP, "Then click Show everyone again here to check the result.");
+    assert.equal(CHANGE_WARNING, "This changes who captures email and calendar activity. Check the preview first.");
+    const page = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.js"), "utf-8");
+    for (const t of ["Copy for Salesforce Inspector: ${a.word}", "Download CSV (Data Loader): ${a.word}", "Copy undo text for the ${a.word}", "Select all ${num("]) assert.ok(page.includes(t), t);
+    const showLine = page.split("\n").find((l) => l.includes('$("#eacShow").addEventListener("change"'));
+    assert.ok(showLine && !/\bsel\b|plan/.test(showLine), "the Show filter does not touch the picks");
+    const html = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.html"), "utf-8");
+    for (const id of ["eacPaste", "eacAction", "eacTarget", "eacTargetId", "eacPreview", "eacPreviewBox", "eacSelShown"]) assert.ok(html.includes(`id="${id}"`), id);
+    assert.ok(!/localStorage|chrome\.storage|innerHTML/.test(page));
+  });
+
+  const PLACEHOLDER = "000000000000000AAA";
+  const orgLike = () => buildEacRows({
+    statuses: [],
+    assignments: [
+      { Id: PLACEHOLDER, AssignedId: U(1), ConfigurationId: A }, { Id: PLACEHOLDER, AssignedId: U(2), ConfigurationId: A },
+      { Id: PLACEHOLDER, AssignedId: U(3), ConfigurationId: B }, { Id: PLACEHOLDER, AssignedId: PROF, ConfigurationId: A },
+      { Id: PLACEHOLDER, AssignedId: `00e${pad(2)}AAA`, ConfigurationId: B },
+    ],
+    configs: { [A]: "Config A", [B]: "Config B" },
+    users: [person(1, "Uma One"), person(2, "Ivan Inactive", false), person(3, "Bea Three"), person(7, "Nora None")],
+    profiles: { [PROF]: "Service Standard" }, profileMembers: { [PROF]: [U(4)], [`00e${pad(2)}AAA`]: [U(5)] },
+  });
+
+  await test("changes: org-like data where every row has the placeholder Id: Move and Remove build nothing and say why, Add still works", () => {
+    assert.equal(usableId(PLACEHOLDER), false);
+    assert.equal(usableId("000000000000000"), false);
+    assert.equal(usableId(AS(1)), true);
+    const { rows, profileRows } = orgLike();
+    assert.ok(profileRows.length === 2 && profileRows.every((p) => p.id === PLACEHOLDER));
+    assert.equal(new Set(profileRows.map(profileKey)).size, 2, "profile rows are told apart without their Id");
+    const users = rows.filter((r) => r.direct);
+    for (const action of ["move", "remove"]) {
+      const plan = planChange({ action, targetId: C, entries: users.map(entryFromRow), profileItems: profileRows, rows });
+      assert.equal(plan.items.length, 0, action);
+      assert.equal(plan.profileItems.length, 0, action);
+      assert.ok(plan.skipped.length >= 3 && plan.skipped.every((s) => s.code === "noRealId"), `${action}: ${JSON.stringify(plan.skipped)}`);
+      assert.match(skipHelp(action, "noRealId"), /no real Id \(every row shows 000000000000000AAA\), so it can't be moved or removed with Inspector\. Use Setup for now\./);
+      assert.ok(allNoRealId(plan));
+      assert.match(previewSummary(plan), /no real Id/);
+      assert.equal(outputFor(shown(plan)), null, "no text, so no copy buttons and no undo");
+    }
+    const add = planChange({ action: "add", targetId: C, entries: [entryFromRecord(person(7, "Nora None")), entryFromRecord(person(8, "Eli Eight"))], rows });
+    assert.deepEqual(changeTable(add).rows, [[U(7), C], [U(8), C]], "one row per user");
+    const page = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.js"), "utf-8");
+    assert.ok(page.includes("allNoRealId(plan)"), "the page shows no copy buttons for it");
+  });
+
+  await test("changes: a placeholder Id never reaches any output, not even built by hand", () => {
+    for (const t of [
+      () => changeTable({ action: "remove", items: [{ assignmentId: PLACEHOLDER }], profileItems: [] }),
+      () => changeTable({ action: "move", targetId: B, items: [{ assignmentId: PLACEHOLDER }], profileItems: [] }),
+      () => changeTable({ action: "remove", items: [], profileItems: [{ id: PLACEHOLDER }] }),
+      () => undoTable({ action: "remove", items: [{ userId: U(1), fromConfigId: A }], profileItems: [{ profileId: PROF, configId: "000000000000000AAA" }] }),
+    ]) assert.throws(t, /Id does not look right/);
+    const { rows, profileRows } = orgLike();
+    const plan = planChange({ action: "remove", entries: [], profileItems: profileRows, rows });
+    assert.equal(plan.profileItems.length, 0);
+    assert.ok(plan.skipped.every((s) => s.code === "noRealId"));
+  });
+
+  await test("changes: the same assignment picked twice is listed once, and the preview says so", () => {
+    const { rows } = world();
+    const r1 = rowOf(rows, 1);
+    const plan = planChange({ action: "remove", entries: [entryFromRow(r1), entryFromUser({ userId: U(1), name: "Uma One" }), entryFromRecord(person(1, "Uma One"))], rows });
+    assert.deepEqual(plan.items.map((i) => i.assignmentId), [AS(1)]);
+    assert.equal(plan.skipped.length, 0, "no contradicting skip");
+    assert.equal(plan.duplicates, 2);
+    assert.equal(duplicatesText(plan), "2 picks were the same assignment and are listed once.");
+    assert.equal(changeTable(plan).rows.length, 1);
+    const dup = { action: "remove", items: [{ assignmentId: AS(1), userId: U(1), fromConfigId: A }, { assignmentId: AS(1), userId: U(1), fromConfigId: A }], profileItems: [] };
+    assert.equal(changeTable(dup).rows.length, 1);
+    assert.equal(undoTable(dup).rows.length, 1);
+    const pr = world().profileRows[0];
+    const twice = planChange({ action: "remove", entries: [], profileItems: [pr, pr], rows });
+    assert.equal(twice.profileItems.length, 1);
+    assert.equal(twice.duplicates, 1);
+    assert.equal(duplicatesText({ duplicates: 1 }), "1 pick was the same assignment and is listed once.");
+    assert.equal(duplicatesText({ duplicates: 0 }), "");
+  });
+
+  await test("changes: a tick plus a paste of one user gives one result, with no more-than-one-assignment skip; Move sends one row per user", () => {
+    const { rows } = world();
+    const tick = entryFromRow(rowOf(rows, 6, C));
+    const pasted = entryFromRecord(person(6, "Dee Double"));
+    const rm = planChange({ action: "remove", entries: [tick, pasted], rows });
+    assert.deepEqual(rm.items.map((i) => i.assignmentId), [AS(7)]);
+    assert.equal(rm.skipped.length, 0);
+    assert.equal(rm.duplicates, 1);
+    const rm2 = planChange({ action: "remove", entries: [pasted, tick], rows });
+    assert.deepEqual([rm2.items.length, rm2.skipped.length], [1, 0], "the order does not matter");
+    assert.deepEqual(skippedBy(planChange({ action: "remove", entries: [pasted], rows })), { "Dee Double": "severalRows" });
+    const both = planChange({ action: "move", targetId: B, entries: [entryFromRow(rowOf(rows, 6, A)), entryFromRow(rowOf(rows, 6, C))], rows });
+    assert.deepEqual(both.items.map((i) => i.assignmentId), [AS(6)]);
+    assert.deepEqual(both.skipped.map((s) => s.code), ["sameTarget"]);
+    assert.equal(changeTable(both).rows.length, 1);
+    assert.match(skipHelp("move", "sameTarget"), /Only one assignment per user/);
+    const rmBoth = planChange({ action: "remove", entries: [entryFromRow(rowOf(rows, 6, A)), entryFromRow(rowOf(rows, 6, C))], rows });
+    assert.deepEqual(rmBoth.items.map((i) => i.assignmentId), [AS(6), AS(7)]);
+  });
+
+  await test("changes: numbers in the preview use thousands separators, and the change files have no BOM", () => {
+    const entries = Array.from({ length: 2558 }, (_, i) => entryFromRecord({ Id: `005${String(i + 1000).padStart(12, "0")}AAA`, Name: `User ${i}`, IsActive: true }));
+    const plan = planChange({ action: "add", targetId: B, entries, rows: [] });
+    assert.match(previewSummary(plan), /^Add 2,558 users to /);
+    for (const action of ["add", "move", "remove"]) {
+      const { rows, profileRows } = world();
+      const p = planChange({ action, targetId: B, entries: asEntries(rows, 1, 2, 7), profileItems: action === "remove" ? profileRows : [], rows });
+      const out = outputFor(shown(p));
+      assert.ok(out && !out.csv.includes("﻿") && out.csv.startsWith(ACTIONS[action].header[0]), action);
+      if (out.undo) assert.ok(!out.undoCsv.includes("﻿"));
+    }
+    assert.ok(toCsv([["a"]]).startsWith("﻿"), "shared toCsv is unchanged");
+  });
+
+  await test("changes: the page adds no null text to the pasted-name result, and keys profile picks without the assignment Id", () => {
+    const page = readFileSync(path.join(here, "..", "tools", "user-access", "user-access.js"), "utf-8");
+    const fn = page.slice(page.indexOf("async function findPasted"), page.indexOf("/** The text to copy by hand"));
+    assert.ok(fn.includes(".filter(Boolean)"), "null entries are dropped before append");
+    assert.ok(!/profileSel\.(has|add|delete)\(p\.id\)/.test(page), "the profile picks are not keyed by the placeholder Id");
+    assert.ok(/profileSel\.has\(profileKey\(p\)\)/.test(page));
+  });
+
+  await test("changes: the demo works with every action", () => {
+    const { rows, profileRows, noConfig } = buildEacRows(sample("eac_all_demo.json"));
+    assert.ok(profileRows.length && profileRows.every((p) => p.id && /DEMO/.test(p.id)), "a profile assignment row with its Id");
+    const known = knownConfigs(rows, profileRows);
+    assert.ok(known.length >= 3);
+    const [from, to] = [known[0], known[1]];
+    const members = rows.filter((r) => r.configId === from.id);
+    const add = planChange({ action: "add", targetId: to.id, entries: noConfig.map(entryFromUser), rows });
+    assert.ok(add.items.length >= 1, "users with access in no configuration can be added");
+    const move = planChange({ action: "move", targetId: to.id, entries: members.map(entryFromRow), rows });
+    assert.ok(move.items.length >= 1);
+    const remove = planChange({ action: "remove", entries: rows.filter((r) => !r.isActive).map(entryFromRow), profileItems: profileRows, rows });
+    assert.ok(remove.items.length + remove.profileItems.length >= 1);
+    for (const plan of [add, move, remove]) {
+      const out = outputFor(shown(plan));
+      assert.ok(out.text.split("\n").length >= 2 && !out.csv.startsWith("﻿"));
+      assert.equal(!!out.undo, plan.action !== "add");
+    }
+    assert.ok(validConfigId(known[0].id), "demo configuration Ids are valid 063 Ids");
+  });
+
 }

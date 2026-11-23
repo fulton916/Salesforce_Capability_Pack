@@ -12,7 +12,7 @@ export const TOOLS = [
     id: "user-access",
     page: "tools/user-access/user-access.html",
     title: "User access summary and comparison",
-    description: "See what a user can access, or compare two users",
+    description: "See what a user can access, compare two users, or see who is in each Einstein Activity Capture configuration",
   },
   {
     id: "hierarchy",
