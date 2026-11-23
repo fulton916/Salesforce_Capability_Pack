@@ -368,7 +368,8 @@ export async function run(test) {
     assert.equal(a.headline, "No errors found in this log");
     assert.match(a.subline, /Not recorded: Flows and workflow/);
     assert.ok(!/Recorded:[^.]*Flows and workflow/.test(a.subline), "flows are not listed as recorded");
-    assert.ok(a.notes.some((n) => /^Workflow: the log level for it is none, below Info\. Set Workflow to Info or finer/.test(n) && /flow errors cannot be seen/.test(n)));
+    assert.equal(a.notes.filter((n) => /debug level in Setup/.test(n)).length, 1);
+    assert.ok(a.notes.some((n) => /^To record what is missing, edit the debug level in Setup and set the categories named above \(Workflow\) to Info or finer, then repeat the action\.$/.test(n)), a.notes.join(" | "));
     assert.equal(a.coverage.find((c) => c.key === "WORKFLOW").ok, false);
     assert.equal(a.coverage.find((c) => c.key === "APEX_CODE").ok, true);
     // everything recorded: the claim names what was covered
@@ -380,7 +381,7 @@ export async function run(test) {
     assert.match(lean.subline, /Not recorded: Saves to the database, Validation rules, Flows and workflow/);
     // low Apex level
     const low = analyzeLog([HEADER.replace("APEX_CODE,FINEST", "APEX_CODE,ERROR"), TRIGGER_START].join("\n"));
-    assert.ok(low.notes.some((n) => /^Apex Code: the log level for it is error, below Info/.test(n)));
+    assert.ok(low.notes.some((n) => /categories named above \(Apex Code\) to Info or finer/.test(n)));
     // problems found while a category was missing still say there may be more
     const some = analyzeLog([noFlows, t(3, "FATAL_ERROR|System.MathException: Divide by 0"), "", "Class.Calc.run: line 4, column 1"].join("\n"));
     assert.match(some.subline, /Not recorded well enough to show errors: Flows and workflow/);
@@ -610,7 +611,7 @@ export async function run(test) {
     assert.equal(v.partial, true);
     assert.ok(!/Not recorded:[^.]*Validation rules/.test(a.subline), a.subline);
     assert.match(a.subline, /Recorded only in part: Validation rules/);
-    assert.ok(a.notes.some((n) => /^Validation: the log level for it is none, but some of its steps still show\. Set Validation to Info to see them all\.$/.test(n)), a.notes.join(" | "));
+    assert.ok(a.notes.some((n) => /categories named above \(Validation\) to Info or finer/.test(n)), a.notes.join(" | "));
     assert.ok(!a.notes.some((n) => /not recorded|only in part|though this log/.test(n)));
     // nothing of it in the log: still "not recorded"
     const none = analyzeLog([low, TRIGGER_START].join("\n"));
@@ -657,7 +658,7 @@ export async function run(test) {
       assert.ok(!/not recorded\.[^.]*were not recorded/i.test(n), n);
     }
     const v = analyzeLog(["62.0 APEX_CODE,FINEST;VALIDATION,NONE", t(9, "FATAL_ERROR|System.MathException: x")].join("\n"));
-    const note = v.notes.find((n) => /^Validation:/.test(n));
+    const note = v.notes.find((n) => /debug level in Setup/.test(n));
     assert.ok(note && !/were not recorded/.test(note), String(note));
   });
 
@@ -670,11 +671,28 @@ export async function run(test) {
       const a = analyzeLog(log);
       assert.match(a.subline, /cut off/);
       assert.ok(a.notes.length > 0);
+      // exactly one coverage note, and no per-area "X: the log level for it ..." notes
+      assert.equal(a.notes.filter((n) => /debug level in Setup/.test(n)).length, 1, a.notes.join(" | "));
+      assert.ok(!a.notes.some((n) => /^(Apex Code|Database|Validation|Workflow):|log level for it/.test(n)), a.notes.join(" | "));
       for (const n of a.notes) {
         for (const c of a.coverage) assert.ok(!n.includes(c.label), `${c.label} repeated in: ${n}`);
         assert.ok(!/cut off|recorded/i.test(n), `repeated in: ${n}`);
       }
     }
+  });
+
+  await test("wording: no full stop after a closing quote when the quoted message already ends in one", () => {
+    const withEnd = analyzeLog(mk(t(5, "FATAL_ERROR|System.CalloutException: The user was not assigned.")));
+    const m1 = withEnd.findings[0].message;
+    assert.ok(/not assigned\.”$/.test(m1), m1);
+    assert.ok(!/”\./.test(m1), m1);
+    const without = analyzeLog(mk(t(5, "FATAL_ERROR|System.CalloutException: The user was not assigned")));
+    assert.ok(/not assigned”\.$/.test(without.findings[0].message), without.findings[0].message);
+    let seen = 0;
+    for (const l of demo().logs) {
+      for (const f of analyzeLog(Array.isArray(l.body) ? l.body.join("\n") : l.body).findings) { seen++; assert.ok(!/[.!?]”\./.test(f.message), f.message); }
+    }
+    assert.ok(seen >= 4, "demo findings were read");
   });
 
   await test("wording: handled-error note is right for one and for many; one label for handled cards", () => {

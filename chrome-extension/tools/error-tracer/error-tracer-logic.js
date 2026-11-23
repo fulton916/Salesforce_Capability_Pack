@@ -166,6 +166,10 @@ function parseHeader(line) {
   return { version: m[1], levels };
 }
 
+const ENDS_STOP = /[.!?]\s*$/;
+/** A message in curly quotes, closed by a full stop only when the message does not already end in one. */
+function quoted(m) { return `“${m}”${ENDS_STOP.test(m) ? "" : "."}`; }
+
 function coverageOf(levels) {
   return CATEGORIES.map((c) => {
     const level = levels ? levels[c.key] || null : null;
@@ -288,23 +292,23 @@ export function analyzeLog(text, meta = {}) {
     if (f.kind === "limit") {
       const hint = (LIMIT_HINTS.find(([re]) => re.test(f.rawMessage)) || [])[1] || "The code went over a limit Salesforce sets for one request.";
       f.title = "A Salesforce limit was hit";
-      f.message = `${hint} Salesforce said: \u201c${f.rawMessage.replace(/^System\.LimitException:\s*/, "")}\u201d.`;
+      f.message = `${hint} Salesforce said: ${quoted(f.rawMessage.replace(/^System\.LimitException:\s*/, ""))}`;
     } else if (f.kind === "validation" && f.save) {
       f.title = f.handled ? "A validation rule stopped a save" : "A validation rule stopped the save";
       if (!f.object && f.dml && f.dml.type) f.object = f.dml.type;
       if (!f.object && f.unitObject) f.object = f.unitObject;
-      f.message = `${f.rule ? `The rule \u201c${f.rule}\u201d` : "A validation rule"} refused the save${f.object ? ` of ${aKind(f.object)} record` : ""}${f.save.message ? `. The message was: \u201c${f.save.message}\u201d` : ""}${f.save.fields ? ` (field: ${f.save.fields})` : ""}.`;
+      f.message = `${f.rule ? `The rule \u201c${f.rule}\u201d` : "A validation rule"} refused the save${f.object ? ` of ${aKind(f.object)} record` : ""}${f.save.message ? `. The message was: \u201c${f.save.message}\u201d` : ""}${f.save.fields ? ` (field: ${f.save.fields})` : ""}${!f.save.fields && f.save.message && ENDS_STOP.test(f.save.message) ? "" : "."}`;
     } else if (f.kind === "save") {
       f.title = f.handled ? "A save failed" : "A save failed";
       const unitWhat = !what && f.unitObject && f.save && f.save.code === "FIELD_CUSTOM_VALIDATION_EXCEPTION" ? aKind(f.unitObject) : "";
       if (unitWhat) f.object = f.unitObject;
-      f.message = `${what ? `Saving ${what} failed. ` : unitWhat ? `Saving ${unitWhat} record failed. ` : ""}${f.save ? f.save.plain : `Salesforce said: \u201c${f.rawMessage}\u201d.`}`;
+      f.message = `${what ? `Saving ${what} failed. ` : unitWhat ? `Saving ${unitWhat} record failed. ` : ""}${f.save ? f.save.plain : `Salesforce said: ${quoted(f.rawMessage)}`}`;
     } else {
       const cls = /^([A-Za-z_][\w.]*(?:Exception|Error)):\s*([\s\S]*)$/.exec(f.rawMessage);
       const short = cls ? cls[1].split(".").pop() : "";
       const hint = EXCEPTION_HINTS[short];
       f.title = f.handled ? "An error was raised in Apex" : "Apex code stopped with an error";
-      f.message = `${hint || (f.handled ? "The code raised an error." : "The code stopped with an error.")} Salesforce said: \u201c${f.rawMessage}\u201d.`;
+      f.message = `${hint || (f.handled ? "The code raised an error." : "The code stopped with an error.")} Salesforce said: ${quoted(f.rawMessage)}`;
     }
   }
 
@@ -350,8 +354,8 @@ export function analyzeLog(text, meta = {}) {
     f.title = f.handled ? "A flow step failed (the flow has a path for failures)" : "A flow failed";
     const nm = f.flow ? `The flow \u201c${f.flow}\u201d` : "A flow";
     const at = f.element ? ` at the step \u201c${f.element}\u201d${f.elementType ? ` (${words(f.elementType.replace(/^Flow/, ""))})` : ""}` : "";
-    f.message = `${nm} failed${at}. ${f.save ? f.save.plain : `Salesforce said: \u201c${f.rawMessage}\u201d.`}`;
-    f.where = f.flow ? `Flow ${f.flow}${f.element ? `, step ${f.element}` : ""}` : (f.steps.length ? f.steps[f.steps.length - 1] : "");
+    f.message = `${nm} failed${at}. ${f.save ? f.save.plain : `Salesforce said: ${quoted(f.rawMessage)}`}`;
+  f.where = f.flow ? `Flow ${f.flow}${f.element ? `, step ${f.element}` : ""}` : (f.steps.length ? f.steps[f.steps.length - 1] : "");
     if (f.flow) f.flowPointer = flowPointer(f.flow);
   }
 
@@ -450,7 +454,7 @@ export function analyzeLog(text, meta = {}) {
 
   function finishValidation(f) {
     f.title = "A validation rule stopped the save";
-    f.message = `${f.rule ? `The rule \u201c${f.rule}\u201d` : "A validation rule"} refused the save${f.object ? ` of ${aKind(f.object)} record` : ""}${f.rawMessage ? `. The message was: \u201c${f.rawMessage}\u201d` : ""}.`;
+    f.message = `${f.rule ? `The rule \u201c${f.rule}\u201d` : "A validation rule"} refused the save${f.object ? ` of ${aKind(f.object)} record` : ""}${f.rawMessage ? `. The message was: \u201c${f.rawMessage}\u201d` : ""}${f.rawMessage && ENDS_STOP.test(f.rawMessage) ? "" : "."}`;
     f.where = `Validation rule ${f.rule || "(name not in the log)"}${f.object ? ` on ${f.object}` : ""}`;
   }
 
@@ -517,15 +521,11 @@ function buildNotes(out, meta) {
     return;
   }
   if (!out.levels) notes.push("This log has no recording-levels line at the top, so the page cannot tell which areas were recorded. Do not read \u201cno errors\u201d as proof.");
-  for (const c of missing) {
-    const setup = SETUP_NAME[c.key] || c.label;
-    const lvl = c.level ? c.level.toLowerCase() : "none";
-    if (c.partial) {
-      notes.push(`${setup}: the log level for it is ${lvl}, but some of its steps still show. Set ${setup} to Info to see them all.`);
-      continue;
-    }
-    const hint = c.key === "WORKFLOW" ? " Until then, flow errors cannot be seen." : c.key === "VALIDATION" ? " Until then, a rule that stopped a save may not show." : c.key === "APEX_CODE" ? " Until then, errors that code handled, and where code ran, may be missing." : (out.findings.some((x) => x.object) ? "" : " Until then, the kind of record being saved may be missing.");
-    notes.push(`${setup}: the log level for it is ${c.level ? `${lvl}, below Info` : "not given"}. Set ${setup} to Info or finer.${hint}`);
+  // The headline line (subline) is the only place that names missing or partial areas.
+  // Notes gives one instruction, with the Setup names inside it.
+  if (missing.length) {
+    const names = missing.map((c) => SETUP_NAME[c.key] || c.label).join(", ");
+    notes.push(`To record what is missing, edit the debug level in Setup and set the categories named above (${names}) to Info or finer, then repeat the action.`);
   }
   if (out.cutOff) notes.push("To get the missing end, turn the debug level down, repeat the action and read the new log. Salesforce keeps only part of a very large log, and the error itself may be in the part it dropped.");
   if (out.moreFindings) notes.push(`${out.moreFindings} more problems were left out to keep this page quick (the first ${MAX_FINDINGS} are shown).`);
