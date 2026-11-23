@@ -65,6 +65,35 @@
           </div>
         </details>
       </div>
+      <details class="eac-change" id="eacChange">
+        <summary>Prepare a change: add, move or remove users</summary>
+        <p class="help" id="eacChangeNote"></p>
+        <p class="help">Pick users with the tick boxes below, with the buttons that select everything shown, by pasting names, or from the &ldquo;Has access but is in no configuration&rdquo; list. Then choose what to do and click Preview.</p>
+        <div class="actions">
+          <span id="eacSelCount" role="status"></span>
+          <button id="eacSelShown">Select everything shown</button>
+          <button id="eacSelClear">Clear selection</button>
+        </div>
+        <div class="eac-paste">
+          <label for="eacPaste">Or paste usernames or emails (one per line, or separated by commas)</label>
+          <textarea id="eacPaste" rows="4" spellcheck="false"></textarea>
+          <div class="actions"><button id="eacPasteGo">Find these users</button><span id="eacPasteStatus" role="status"></span></div>
+          <div id="eacPasteResult"></div>
+        </div>
+        <div class="eac-what">
+          <label for="eacAction">What to do</label>
+          <select id="eacAction"></select>
+          <span id="eacTargetWrap">
+            <label for="eacTarget" class="sr-label">Configuration</label>
+            <select id="eacTarget"></select>
+            <input type="text" id="eacTargetId" placeholder="063..." autocomplete="off" spellcheck="false" aria-label="Configuration Id" hidden>
+          </span>
+        </div>
+        <p class="help" id="eacTargetHelp"></p>
+        <div id="eacProfileList" hidden></div>
+        <div class="actions"><button id="eacPreview" class="primary">Preview</button></div>
+        <div id="eacPreviewBox" hidden></div>
+      </details>
       <div id="eacGroups"></div>
       <details class="eac-counts-box">
         <summary>Counts by configuration and status</summary>

@@ -109,18 +109,20 @@ export function buildEacRows({ statuses = [], assignments = [], configs = {}, us
   // Who is assigned what: direct assignments, and one task per member of an assigned profile.
   const tasks = [];
   const profileAssignments = []; // profiles whose members could not be listed
+  const profileAsg = []; // every profile assignment row (for "remove the whole profile assignment")
   for (const a of assignments) {
     const who = String(a.AssignedId || "");
     const cfgId = a.ConfigurationId || null;
-    if (who.startsWith("005")) tasks.push({ uid: who, cfgId, kind: "user" });
+    if (who.startsWith("005")) tasks.push({ uid: who, cfgId, kind: "user", asgId: a.Id || null });
     else if (who.startsWith("00e")) {
       const pname = profMap.get(id15(who)) || (single && id15(single.profileId) === id15(who) ? single.profileName : null) || null;
+      profileAsg.push({ id: a.Id || null, profileId: who, profileName: pname || "A profile", configId: cfgId, members: memberMap.has(id15(who)) ? memberMap.get(id15(who)).length : null });
       if (single) {
         if (id15(single.profileId) === id15(who)) tasks.push({ uid: single.userId, cfgId, kind: "profile", pname });
       } else if (memberMap.has(id15(who))) {
         for (const uid of memberMap.get(id15(who))) tasks.push({ uid, cfgId, kind: "profile", pname });
       } else {
-        profileAssignments.push({ profileId: who, profileName: pname || "A profile", configuration: cfgMap.get(id15(cfgId)) || unnamedConfig(cfgId) });
+        profileAssignments.push({ id: a.Id || null, profileId: who, profileName: pname || "A profile", configuration: cfgMap.get(id15(cfgId)) || unnamedConfig(cfgId) });
       }
     }
   }
@@ -164,23 +166,25 @@ export function buildEacRows({ statuses = [], assignments = [], configs = {}, us
       termsAccepted: boolOrNull(s.IsTermsOfServiceAccepted),
       globalTerms: textOrNull(s.GlobalOauthTermsState),
       onboarding: textOrNull(s.UserOnboardingStatus),
-      direct: false, profiles: [], configId: null, assigned: false,
+      direct: false, profiles: [], configId: null, assigned: false, assignmentIds: [],
     });
   }
 
   const blank = (userId, configuration) => ({
     userId, fallbackName: "", emailAddress: null, configuration, status: null, hasRow: false,
     recommendedTitle: null, recommendedDescription: null, contactsSynced: null, eventsSynced: null,
-    termsAccepted: null, globalTerms: null, onboarding: null, direct: false, profiles: [], configId: null, assigned: false,
+    termsAccepted: null, globalTerms: null, onboarding: null, direct: false, profiles: [], configId: null, assigned: false, assignmentIds: [],
   });
-  const attach = ({ uid, cfgId, kind, pname }) => {
+  const attach = ({ uid, cfgId, kind, pname, asgId }) => {
     const b = bucket(uid);
     const name = cfgName(cfgId);
     const label = name || (cfgId ? unnamedConfig(cfgId) : null);
     const mark = (r) => {
       r.assigned = true;
-      if (kind === "user") r.direct = true;
-      else {
+      if (kind === "user") {
+        r.direct = true;
+        if (asgId && !r.assignmentIds.includes(asgId)) r.assignmentIds.push(asgId);
+      } else {
         const p = pname || "(name not available)";
         if (!r.profiles.includes(p)) r.profiles.push(p);
       }
@@ -241,7 +245,9 @@ export function buildEacRows({ statuses = [], assignments = [], configs = {}, us
     }
     noConfig.sort((x, y) => x.name.localeCompare(y.name));
   }
-  return { rows, profileAssignments, noConfig };
+  const profileRows = profileAsg.map((p) => ({ ...p, configuration: cfgName(p.configId) || (p.configId ? unnamedConfig(p.configId) : UNNAMED_CONFIG) }));
+  profileRows.sort((x, y) => x.profileName.localeCompare(y.profileName) || x.configuration.localeCompare(y.configuration));
+  return { rows, profileAssignments, profileRows, noConfig };
 }
 
 /** Counts worked out from the rows (never from COUNT(), which reads 0 on these objects). */

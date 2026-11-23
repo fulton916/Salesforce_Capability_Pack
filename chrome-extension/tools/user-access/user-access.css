@@ -30,3 +30,19 @@
 .eac-counts-box { margin-top: 12px; }
 .eac-flag { font-size: 13px; color: var(--risk); }
 .toolbar label[for="eacShow"] { font-weight: 600; }
+
+/* Preparing a change (text to load with Salesforce Inspector or Data Loader) */
+.eac-change { border: 1px solid var(--border, #ddd); border-radius: 6px; padding: 10px 12px; margin: 0 0 14px; }
+.eac-change > summary { font-weight: 600; cursor: pointer; }
+.eac-paste { margin: 10px 0; }
+.eac-paste textarea, .eac-fallback textarea { display: block; width: 100%; box-sizing: border-box; font-family: ui-monospace, Consolas, monospace; font-size: 13px; margin: 4px 0; }
+.eac-what { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 10px 0 4px; }
+.eac-what label { font-weight: 600; }
+.eac-what .sr-label { position: absolute; left: -9999px; }
+.eac-pick { width: 1%; }
+.eac-names { max-height: 220px; overflow: auto; margin: 4px 0 10px; padding-left: 22px; font-size: 14px; }
+.eac-skip h4, .eac-preview h4 { margin: 12px 0 2px; font-size: 14px; }
+.eac-warn { background: var(--warn-bg); border-radius: 6px; padding: 8px 10px; margin: 8px 0; font-weight: 600; }
+.eac-steps { margin: 6px 0; padding-left: 22px; }
+.eac-out { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.eac-bad-text { color: var(--risk); font-size: 13px; }

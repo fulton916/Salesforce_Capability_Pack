@@ -3,7 +3,13 @@ import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
 import { readUserAccess } from "./user-access-read.js";
-import { readEacRaw } from "./user-access-eac-read.js";
+import { readEacRaw, readPastedUsers } from "./user-access-eac-read.js";
+import {
+  ACTION_LIST, ACTIONS, CONFIG_ID_HELP, CONFIG_ID_BAD, CHANGE_WARNING, NO_UNDO_ADD, AFTER_STEP, INSPECTOR_UNVERIFIED, READ_ONLY_NOTE, UNDO_HEADERS,
+  validConfigId, inspectorSteps, parsePasted, matchPasted, knownConfigs, entryFromRow, entryFromUser, entryFromRecord, entryKey,
+  planChange, planUserCount, skipGroups, skipHelp, previewSummary, outputFor, changeFileName, copyWithFallback,
+  usableId, profileKey, allNoRealId, duplicatesText, NO_REAL_ID_TEXT,
+} from "./user-access-eac-changes.js";
 import {
   buildEacRows, eacCounts, filterEacRows, filterNoConfig, groupByConfig, eacCsvRows, noConfigCsvRows, eacSummaryLine, profileNote,
   eacApiLine, assignedText, flagText, syncCell, SHOW_CHOICES, NO_CONFIG_TITLE, INACTIVE_TEXT, EAC_KEY, EAC_OFF_TEXT, EMPTY_CONFIG_NOTE, NO_EAC_USER_TEXT,
@@ -50,7 +56,7 @@ const state = {
   diffOnly: true,
   showApi: false,
   search: "",
-  eac: { rows: [], profileAssignments: [], noConfig: null, accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
+  eac: { rows: [], profileAssignments: [], profileRows: [], noConfig: null, sel: new Map(), profileSel: new Set(), plan: null, notFound: [], demoUsers: [], accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
 };
 
 const compareMode = () => !!(state.sides.a.access && state.sides.b.access);
@@ -570,7 +576,11 @@ const EAC_PAGE = 200; // members drawn per configuration at first; "Show more" a
 const NO_CONFIG_KEY = "\u0000noConfig";
 
 async function loadEacRaw() {
-  if (DEMO) return (await fetch("../../samples/eac_all_demo.json")).json();
+  if (DEMO) {
+    const raw = await (await fetch("../../samples/eac_all_demo.json")).json();
+    eac.demoUsers = raw.users || [];
+    return raw;
+  }
   return readEacRaw(state.api, { progress: (t) => { $("#eacProgress").textContent = t; } });
 }
 
@@ -582,9 +592,12 @@ async function showEveryone() {
     const raw = await loadEacRaw();
     const built = buildEacRows(raw);
     Object.assign(eac, {
-      rows: built.rows, profileAssignments: built.profileAssignments, noConfig: built.noConfig,
+      rows: built.rows, profileAssignments: built.profileAssignments, profileRows: built.profileRows, noConfig: built.noConfig,
       accessNote: raw.accessNote || "", loaded: true, note: raw.partial || "", limits: new Map(),
     });
+    // A fresh read: the old picks may no longer be true, so start the change again.
+    eac.sel = new Map(); eac.profileSel = new Set(); eac.notFound = []; eac.plan = null;
+    $("#eacPreviewBox").hidden = true; $("#eacPasteResult").replaceChildren(); $("#eacPasteStatus").textContent = "";
     renderEac();
   } catch (e) {
     $("#eacResult").hidden = true;
@@ -627,12 +640,23 @@ function renderEac() {
   $("#eacNote").hidden = !note;
   $("#eacNote").textContent = note;
   $("#eacCsvNoConfig").hidden = !eac.noConfig?.length;
+  renderChangeControls();
   renderEacGroups();
 }
 
+/** A tick box for one picked row. It changes the selection in place (no redraw), and a shown preview is dropped. */
+function pickBox(entry) {
+  return el("input", {
+    type: "checkbox", "aria-label": `Pick ${entry.name}`, checked: eac.sel.has(entryKey(entry)),
+    onchange: (ev) => { if (ev.target.checked) addSel(entry); else eac.sel.delete(entryKey(entry)); selectionChanged(); },
+  });
+}
+const addSel = (entry) => { eac.sel.set(entryKey(entry), entry); selectionChanged(); };
+
 function memberTable(rows, limit) {
-  const head = ["Name", "Username", "Email", "Active", "How assigned", "Connection status", "Contacts synced", "Events synced"];
+  const head = ["", "Name", "Username", "Email", "Active", "How assigned", "Connection status", "Contacts synced", "Events synced"];
   const body = rows.slice(0, limit).map((r) => el("tr", {},
+    el("td", { class: "eac-pick" }, pickBox(entryFromRow(r))),
     el("td", { class: "item", text: r.name }),
     el("td", { class: "how", text: r.username }),
     el("td", { class: "how", text: r.email }),
@@ -663,6 +687,7 @@ function configSection(group, total) {
     el("div", { class: "eac-group-head" },
       el("h3", { text: group.name }),
       el("span", { class: "count", text: `${num(total)} ${total === 1 ? "member" : "members"}${group.rows.length !== total ? `, ${num(group.rows.length)} shown` : ""}` }),
+      el("button", { text: `Select all ${num(group.rows.length)} shown`, onclick: () => { for (const r of group.rows) addSel(entryFromRow(r)); renderEacGroups(); } }),
       el("button", { text: "This configuration (CSV for Excel)", onclick: () => download(`email_calendar_${slug(group.name)}_${stamp()}.csv`, toCsv(eacCsvRows(csvRows)), "text/csv") })),
     memberTable(group.rows, limit),
     moreButton(group.name, group.rows.length, limit));
@@ -670,13 +695,14 @@ function configSection(group, total) {
 
 function noConfigSection(list) {
   const limit = eac.limits.get(NO_CONFIG_KEY) || EAC_PAGE;
-  const head = ["Name", "Username", "Email", "Active"];
-  const body = list.slice(0, limit).map((u) => el("tr", {}, el("td", { class: "item", text: u.name }), el("td", { class: "how", text: u.username }), el("td", { class: "how", text: u.email }), el("td", { text: u.isActive ? "Yes" : "No" })));
+  const head = ["", "Name", "Username", "Email", "Active"];
+  const body = list.slice(0, limit).map((u) => el("tr", {}, el("td", { class: "eac-pick" }, pickBox(entryFromUser(u))), el("td", { class: "item", text: u.name }), el("td", { class: "how", text: u.username }), el("td", { class: "how", text: u.email }), el("td", { text: u.isActive ? "Yes" : "No" })));
   const total = eac.noConfig.length;
   return el("div", { class: "eac-group" },
     el("div", { class: "eac-group-head" },
       el("h3", { text: NO_CONFIG_TITLE }),
       el("span", { class: "count", text: `${num(total)} ${total === 1 ? "user" : "users"}${list.length !== total ? `, ${num(list.length)} shown` : ""}` }),
+      el("button", { text: `Select all ${num(list.length)} shown`, onclick: () => { for (const u of list) addSel(entryFromUser(u)); renderEacGroups(); } }),
       el("button", { text: "These users (CSV for Excel)", onclick: () => download(`email_calendar_no_configuration_${stamp()}.csv`, toCsv(noConfigCsvRows(eac.noConfig)), "text/csv") })),
     el("div", { class: "tablewrap" }, el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {}, h)))), el("tbody", {}, body))),
     moreButton(NO_CONFIG_KEY, list.length, limit));
@@ -713,6 +739,217 @@ $("#eacCsvShown").addEventListener("click", () => {
 });
 $("#eacCsvAll").addEventListener("click", () => download(`email_calendar_everyone_${stamp()}.csv`, toCsv(eacCsvRows(eac.rows)), "text/csv"));
 $("#eacCsvNoConfig").addEventListener("click", () => download(`email_calendar_no_configuration_${stamp()}.csv`, toCsv(noConfigCsvRows(eac.noConfig || [])), "text/csv"));
+
+// ---------- prepare a change (text to load with Salesforce Inspector or Data Loader; this page never writes) ----------
+
+const TYPED = "__typed";
+
+function selectionChanged() {
+  eac.plan = null;
+  $("#eacPreviewBox").hidden = true;
+  const n = eac.sel.size;
+  $("#eacSelCount").textContent = `${num(n)} ${n === 1 ? "row" : "rows"} picked`;
+}
+
+const chosenAction = () => $("#eacAction").value;
+const chosenTarget = () => ($("#eacTarget").value === TYPED ? $("#eacTargetId").value.trim() : $("#eacTarget").value);
+
+function renderTargetHelp() {
+  const typed = $("#eacTarget").value === TYPED;
+  $("#eacTargetId").hidden = !typed;
+  const box = $("#eacTargetHelp");
+  box.replaceChildren();
+  if (!ACTIONS[chosenAction()]?.needsTarget) return;
+  if (typed) {
+    box.append(CONFIG_ID_HELP);
+    const t = $("#eacTargetId").value.trim();
+    if (t && !validConfigId(t)) box.append(el("div", { class: "eac-bad-text", text: CONFIG_ID_BAD }));
+  } else {
+    box.append("Configurations with no users are not in this list. To use one, choose “A configuration Id I type” and paste its Id.");
+  }
+}
+
+function renderProfileList() {
+  const box = $("#eacProfileList");
+  const show = chosenAction() === "remove" && eac.profileRows.length > 0;
+  box.hidden = !show;
+  box.replaceChildren();
+  if (!show) return;
+  box.append(el("h4", { text: "Profile assignments you can remove whole" }),
+    el("p", { class: "help", text: "A profile assignment puts everyone on the profile into a configuration. Removing it takes all of them out at once." }),
+    ...eac.profileRows.map((p) => el("label", { class: "check", style: "display:block" },
+      el("input", {
+        type: "checkbox", checked: usableId(p.id) ? eac.profileSel.has(profileKey(p)) : false, disabled: !usableId(p.id),
+        onchange: (ev) => { if (ev.target.checked) eac.profileSel.add(profileKey(p)); else eac.profileSel.delete(profileKey(p)); selectionChanged(); },
+      }),
+      ` Remove the whole profile assignment (every user on profile ${p.profileName}) from ${p.configuration}`,
+      p.members !== null ? ` (${num(p.members)} ${p.members === 1 ? "user" : "users"})` : "",
+      usableId(p.id) ? null : el("div", { class: "help", text: NO_REAL_ID_TEXT }))));
+}
+
+/** Rebuild the action and configuration lists after a read. Keeps what was chosen when it is still there. */
+function renderChangeControls() {
+  $("#eacChangeNote").textContent = READ_ONLY_NOTE;
+  const known = knownConfigs(eac.rows, eac.profileRows);
+  const keep = $("#eacTarget").value;
+  $("#eacTarget").replaceChildren(
+    el("option", { value: "", text: "Pick a configuration…" }),
+    ...known.map((c) => el("option", { value: c.id, text: `${c.name} (${num(c.count)} ${c.count === 1 ? "user" : "users"})` })),
+    el("option", { value: TYPED, text: "A configuration Id I type…" }));
+  if ([...$("#eacTarget").options].some((o) => o.value === keep)) $("#eacTarget").value = keep;
+  $("#eacTargetWrap").hidden = !ACTIONS[chosenAction()]?.needsTarget;
+  renderTargetHelp();
+  renderProfileList();
+  selectionChanged();
+}
+
+function onActionChange() {
+  $("#eacTargetWrap").hidden = !ACTIONS[chosenAction()]?.needsTarget;
+  renderTargetHelp();
+  renderProfileList();
+  selectionChanged();
+}
+
+async function findPasted() {
+  const { tokens, tooMany } = parsePasted($("#eacPaste").value);
+  const status = $("#eacPasteStatus");
+  const out = $("#eacPasteResult");
+  out.replaceChildren();
+  if (!tokens.length) { status.textContent = "Paste at least one username or email first."; return; }
+  $("#eacPasteGo").disabled = true;
+  status.textContent = "Looking them up…";
+  try {
+    const users = DEMO
+      ? eac.demoUsers.filter((u) => tokens.some((t) => [u.Username, u.Email].some((v) => String(v || "").toLowerCase() === t.toLowerCase())))
+      : await readPastedUsers(state.api, tokens);
+    const m = matchPasted(tokens, users);
+    for (const f of m.found) eac.sel.set(entryKey(entryFromRecord(f.user)), entryFromRecord(f.user));
+    eac.notFound = m.notFound;
+    selectionChanged();
+    renderEacGroups();
+    status.textContent = "";
+    // Element.append prints a null argument as the word "null", so only real nodes go in.
+    out.append(...[
+      el("p", { text: `${num(m.found.length)} of ${num(tokens.length)} found and picked.${tooMany ? " Only the first 500 lines were used." : ""}` }),
+      m.notFound.length ? el("div", {}, el("strong", { text: `Not found (${num(m.notFound.length)})` }), el("ul", { class: "eac-names" }, m.notFound.map((t) => el("li", { text: t })))) : null,
+      m.ambiguous.length ? el("div", {}, el("strong", { text: "Matches more than one user, so none was picked. Paste the username instead" }),
+        el("ul", { class: "eac-names" }, m.ambiguous.map((x) => el("li", { text: `${x.token} (${x.count} users)` })))) : null,
+    ].filter(Boolean));
+  } catch (e) {
+    status.textContent = "";
+    out.append(el("p", { class: "eac-bad-text", text: plainError(e, "The names could not be looked up. Your user may not have permission to read users.") }));
+  } finally {
+    $("#eacPasteGo").disabled = false;
+  }
+}
+
+/** The text to copy by hand when the browser does not allow copying. Set through .value, never as HTML. */
+function fallbackBox(text) {
+  const ta = el("textarea", { rows: "8", readonly: true, "aria-label": "Text to copy", spellcheck: "false" });
+  ta.value = text;
+  return el("div", { class: "eac-fallback" },
+    el("p", { class: "eac-bad-text", text: "Your browser did not allow copying. Select all and copy the text below." }),
+    ta,
+    el("button", { text: "Select all and copy", onclick: () => { ta.focus(); ta.select(); try { document.execCommand("copy"); } catch { /* the text stays selected for Ctrl+C */ } } }));
+}
+
+async function copyOut(text, label, holder, status) {
+  holder.replaceChildren();
+  const r = await copyWithFallback(text, navigator.clipboard);
+  if (r.copied) status.textContent = `Copied ${label}. Now paste it in Salesforce Inspector.`;
+  else { status.textContent = ""; holder.append(fallbackBox(text)); }
+}
+
+function nameList(items) {
+  return el("ul", { class: "eac-names" }, items.map((i) => el("li", { text: i })));
+}
+
+function renderPreview(plan) {
+  const box = $("#eacPreviewBox");
+  box.hidden = false;
+  box.replaceChildren();
+  box.className = "eac-preview";
+  if (plan.error) { box.append(el("p", { class: "eac-bad-text", text: plan.error })); return; }
+  const a = ACTIONS[plan.action];
+  const parts = [el("h4", { text: "Preview" }), el("p", { class: "eac-summary", text: previewSummary(plan) })];
+  if (plan.action !== "add") parts.push(el("div", { class: "eac-warn", text: CHANGE_WARNING }));
+  const users = [...plan.items].sort((x, y) => x.name.localeCompare(y.name));
+  if (users.length) {
+    parts.push(el("h4", { text: `${num(planUserCount(plan))} ${planUserCount(plan) === 1 ? "user" : "users"} will be changed` }),
+      nameList(users.map((i) => `${i.name}${i.fromName ? ` (now in ${i.fromName})` : ""}${i.note ? ` ${i.note}` : ""}`)));
+  }
+  if (plan.profileItems.length) {
+    parts.push(el("h4", { text: "Whole profile assignments to remove" }),
+      nameList(plan.profileItems.map((p) => `Remove the whole profile assignment (every user on profile ${p.profileName}) from ${p.configuration}`)));
+  }
+  for (const g of skipGroups(plan)) {
+    parts.push(el("div", { class: "eac-skip" }, el("h4", { text: `${g.title} (${num(g.entries.length)})` }), el("p", { class: "help", text: skipHelp(plan.action, g.code) }),
+      nameList(g.entries.map((e) => (e.detail ? `${e.name} (${e.detail})` : e.name)))));
+  }
+  if (plan.notFound.length) parts.push(el("div", { class: "eac-skip" }, el("h4", { text: `Not found (${num(plan.notFound.length)})` }), el("p", { class: "help", text: "These pasted names matched no user." }), nameList(plan.notFound)));
+  if (duplicatesText(plan)) parts.push(el("p", { class: "help", text: duplicatesText(plan) }));
+  box.append(...parts);
+
+  plan.previewed = true; // only now may any text be built
+  let out = null;
+  try { out = outputFor(plan); } catch (e) { box.append(el("p", { class: "eac-bad-text", text: e.message })); return; }
+  if (!out) { if (!allNoRealId(plan)) box.append(el("p", { text: "Nothing to load: every pick was skipped." })); return; }
+  const status = el("span", { role: "status" });
+  const holder = el("div", {});
+  const n = out.change.rows.length;
+  box.append(
+    el("h4", { text: `Load it: ${a.word} (${num(n)} ${n === 1 ? "row" : "rows"})` }),
+    el("div", { class: "eac-out" },
+      el("button", { class: "primary", text: `Copy for Salesforce Inspector: ${a.word}`, onclick: () => copyOut(out.text, `${a.word} text`, holder, status) }),
+      el("button", { text: `Download CSV (Data Loader): ${a.word}`, onclick: () => download(changeFileName(plan.action, stamp()), out.csv, "text/csv") }),
+      status),
+    holder,
+    el("p", { class: "help", text: `Steps in Salesforce Inspector. ${INSPECTOR_UNVERIFIED}` }),
+    el("ol", { class: "eac-steps" }, inspectorSteps(plan.action).map((t) => el("li", { text: t }))),
+    el("p", { class: "help", text: AFTER_STEP }));
+  if (out.undo) {
+    const ustatus = el("span", { role: "status" });
+    const uholder = el("div", {});
+    box.append(
+      el("h4", { text: `Undo the ${a.word}` }),
+      el("p", { class: "help", text: `The undo text keeps the old Ids so the ${a.word.toLowerCase()} can be reversed. Load it the same way, with Action: ${UNDO_HEADERS[plan.action].op}. Keep it until you have checked the result.` }),
+      el("div", { class: "eac-out" }, el("button", { text: `Copy undo text for the ${a.word}`, onclick: () => copyOut(out.undoText, "undo text", uholder, ustatus) }), ustatus),
+      uholder);
+  } else {
+    box.append(el("p", { class: "help", text: NO_UNDO_ADD }));
+  }
+}
+
+function runPreview() {
+  const plan = planChange({
+    action: chosenAction(), targetId: chosenTarget(), entries: [...eac.sel.values()],
+    profileItems: chosenAction() === "remove" ? eac.profileRows.filter((p) => eac.profileSel.has(profileKey(p))) : [],
+    rows: eac.rows, notFound: eac.notFound,
+  });
+  if (!plan.error && !eac.sel.size && !plan.profileItems.length) plan.error = "Pick at least one user first.";
+  eac.plan = plan;
+  renderPreview(plan);
+}
+
+function selectEverythingShown() {
+  if (eac.show === "noConfig") for (const u of noConfigShown()) eac.sel.set(entryKey(entryFromUser(u)), entryFromUser(u));
+  else {
+    for (const r of eacShown()) eac.sel.set(entryKey(entryFromRow(r)), entryFromRow(r));
+    if (eac.show === "all") for (const u of noConfigShown()) eac.sel.set(entryKey(entryFromUser(u)), entryFromUser(u));
+  }
+  selectionChanged();
+  renderEacGroups();
+}
+
+$("#eacAction").replaceChildren(...ACTION_LIST.map((x) => el("option", { value: x.value, text: x.label })));
+$("#eacAction").addEventListener("change", onActionChange);
+$("#eacTarget").addEventListener("change", () => { renderTargetHelp(); selectionChanged(); });
+$("#eacTargetId").addEventListener("input", () => { renderTargetHelp(); selectionChanged(); });
+$("#eacSelShown").addEventListener("click", selectEverythingShown);
+$("#eacSelClear").addEventListener("click", () => { eac.sel = new Map(); eac.profileSel = new Set(); selectionChanged(); renderProfileList(); renderEacGroups(); });
+$("#eacPasteGo").addEventListener("click", findPasted);
+$("#eacPreview").addEventListener("click", runPreview);
+selectionChanged();
 
 connect();
 startLiveReload();
