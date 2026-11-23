@@ -43,4 +43,10 @@ export const TOOLS = [
     description: "Copy who you are, which org and which page, to paste into a ticket",
     withPageAddress: true,
   },
+  {
+    id: "error-tracer",
+    page: "tools/error-tracer/error-tracer.html",
+    title: "Error Tracer: read a debug log",
+    description: "See what failed, where and for which user, from a debug log",
+  },
 ];

@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Error Tracer: read a debug log</title>
+<link rel="stylesheet" href="../../shared/pack.css">
+<link rel="stylesheet" href="error-tracer.css">
+</head>
+<body>
+<header class="top">
+  <h1>Error Tracer: read a debug log</h1>
+  <div class="org" id="org">Not connected</div>
+  <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
+</header>
+
+<main>
+  <section class="panel">
+    <details id="steps" open>
+      <summary><strong>Before you start: turn on a debug log</strong></summary>
+      <ol class="stepslist">
+        <li>In Salesforce, open Setup and type <b>Debug Logs</b> in Quick Find.</li>
+        <li>Under User Trace Flags, choose New. For Traced Entity Type choose User. For Traced Entity Name pick the person who will do the failing action (the person who repeats it). Set the Start Date and the Expiration Date so they cover the action (a trace flag can last up to 24 hours).</li>
+        <li>Debug Level is a lookup, so typing a name finds nothing ("No matches found"). Use the search icon to pick a debug level that already exists, or choose New Debug Level (a small window opens) to make one.</li>
+        <li>Set these levels: Apex Code at Debug or finer, Database at Info or finer, Validation at Info or finer, Workflow at Info or finer. Flows are only recorded when Workflow is at Info or finer.</li>
+        <li>Ask the user to repeat what failed.</li>
+        <li>Come back here and press <b>Refresh the list</b>, then pick the log.</li>
+      </ol>
+      <p class="hint">Salesforce keeps these logs only for a limited time (system debug logs about 24 hours) and cuts off very large logs. Logs made by running Apex from the Developer Console or the command line use their own levels, so some areas may not be recorded. This page only reads logs that already exist. It never turns logging on or changes any setting.</p>
+    </details>
+  </section>
+
+  <section class="panel">
+    <div class="actions top-actions">
+      <button id="refresh" class="primary">Refresh the list</button>
+      <label class="check"><input type="checkbox" id="onlyProblems"> Only logs whose result is not Success</label>
+      <span class="hint">Ticked, this hides logs whose result is Success. A save stopped by a validation rule can still say Success, so its log would be hidden too.</span>
+      <label class="check" for="whoFilter">User <select id="whoFilter"><option value="">Everyone</option></select></label>
+      <span id="listStatus" role="status" class="hint"></span>
+    </div>
+    <div id="error" class="error" hidden></div>
+    <div class="tablewrap">
+      <table id="logTable" hidden>
+        <thead><tr><th>When (your time)</th><th>Result</th><th>Whose log</th><th>What ran</th><th>Size</th></tr></thead>
+        <tbody id="logRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel" id="result" hidden aria-live="polite">
+    <div id="resultBody"></div>
+  </section>
+
+  <p class="footer">Read-only: this page only reads debug logs, it never changes anything in your org. Nothing is sent anywhere and nothing is saved. The session id is never kept.</p>
+</main>
+<script type="module" src="error-tracer.js"></script>
+</body>
+</html>

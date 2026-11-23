@@ -13,3 +13,20 @@
 /* One fact per line in the detail text (how a permission set is reached, license, muting). */
 .how { white-space: pre-line; }
 .chip.u { color: var(--muted); }
+
+/* Everyone's email and calendar connection */
+.eac-summary { font-weight: 600; margin: 12px 0 8px; }
+.eac-counts { display: flex; gap: 32px; flex-wrap: wrap; margin-bottom: 12px; font-size: 14px; }
+.eac-counts h3 { font-size: 13px; color: var(--muted); margin: 0 0 4px; font-weight: 600; }
+.eac-counts ul { list-style: none; margin: 0; padding: 0; }
+.eac-counts li { padding: 1px 0; }
+.eac-counts .n { font-weight: 700; }
+.eac-bad { color: var(--risk); }
+.eac-ok { color: var(--good); }
+.eac-group { border: 1px solid var(--border, #ddd); border-radius: 6px; padding: 10px 12px; margin: 0 0 14px; }
+.eac-group-head { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; margin-bottom: 8px; }
+.eac-group-head h3 { margin: 0; font-size: 16px; }
+.eac-group-head .count { color: var(--muted); font-size: 14px; flex: 1 1 auto; }
+.eac-counts-box { margin-top: 12px; }
+.eac-flag { font-size: 13px; color: var(--risk); }
+.toolbar label[for="eacShow"] { font-weight: 600; }

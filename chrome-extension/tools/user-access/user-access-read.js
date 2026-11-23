@@ -6,6 +6,8 @@
 
 import { chunk, soqlString } from "../../shared/sfconn.js";
 import { ACCESS_SCHEMA, settingItems, plural } from "./user-access-logic.js";
+import { readUserEac } from "./user-access-eac-read.js";
+import { EAC_OFF_TEXT } from "./user-access-eac.js";
 
 export { ACCESS_SCHEMA };
 
@@ -21,7 +23,7 @@ const CALL_CENTER_OFF_PATTERN = /INVALID_TYPE|INVALID_FIELD|not supported|sObjec
 /** Plain-words message for an area that could not be read. The raw error goes to the warnings. */
 function plainMessage(e, what, offText, offPattern = OFF_PATTERN) {
   const raw = `${e?.errorCode || ""} ${e?.message || ""}`;
-  if (offText && (e?.territoriesOff || (!e?.noOff && offPattern.test(raw)))) return offText;
+  if (offText && (e?.territoriesOff || e?.featureOff || (!e?.noOff && offPattern.test(raw)))) return offText;
   return `${what} could not be read. Your user may not have permission to see this. Ask an admin to check.`;
 }
 
@@ -279,7 +281,7 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
   const u = records[0];
   if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
 
-  const sections = { profile: [], role: [], callCenter: [], permissionSetGroups: [], permissionSets: [], permissionSetLicenses: [], publicGroups: [], queues: [], territories: [], customSettings: [] };
+  const sections = { profile: [], role: [], callCenter: [], permissionSetGroups: [], permissionSets: [], permissionSetLicenses: [], publicGroups: [], queues: [], territories: [], eac: [], customSettings: [] };
   let customSettingsInfo;
   if (u.Profile) sections.profile.push({ key: u.Profile.Name, label: u.Profile.Name, licence: u.Profile.UserLicense?.Name || null });
   if (u.UserRole) sections.role.push({ key: u.UserRole.DeveloperName || u.UserRole.Name, label: u.UserRole.Name });
@@ -290,7 +292,7 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     } catch (e) {
       const msg = plainMessage(e, what, offText, offPattern);
       for (const k of keys) unavailable[k] = msg;
-      if (!e.territoriesOff) warnings.push(`${what}: ${e.message}`); // a feature that is off is not a problem
+      if (!e.territoriesOff && !e.featureOff) warnings.push(`${what}: ${e.message}`); // a feature that is off is not a problem
     }
   };
 
@@ -301,6 +303,11 @@ export async function readUserAccess(api, userId, { progress = () => {} } = {}) 
     soft(["publicGroups", "queues"], "Public groups and queues", () => readMemberships(api, userId)),
     soft(["territories"], "Territories", async () => ({ territories: await readTerritories(api, userId) }), "Territories are not turned on in this org."),
     soft(["callCenter"], "Call center", async () => ({ callCenter: await readCallCenter(api, userId) }), "Call centers are not available in this org.", CALL_CENTER_OFF_PATTERN),
+    soft(["eac"], "Einstein Activity Capture", async () => {
+      const r = await readUserEac(api, { userId, profileId: u.ProfileId || null, profileName: u.Profile?.Name || null });
+      warnings.push(...r.warnings, ...(r.partial ? [r.partial] : []));
+      return { eac: r.items };
+    }, EAC_OFF_TEXT),
     soft(["customSettings"], "Custom settings", async () => {
       const r = await readCustomSettings(api, { userId, profileId: u.ProfileId || null }, warnings, unavailable, progress);
       customSettingsInfo = r.info;
