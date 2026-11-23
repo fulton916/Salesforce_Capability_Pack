@@ -6,6 +6,7 @@
 
 import { chunk, soqlString } from "../../shared/sfconn.js";
 import { EAC_OFF_TEXT, buildEacRows, eacItem } from "./user-access-eac.js";
+import { userLookupQueries } from "./user-access-eac-changes.js";
 
 const ID_CHUNK = 200;
 const OFF_PATTERN = /INVALID_TYPE|not supported|sObject type/i;
@@ -179,4 +180,17 @@ export async function readUserEac(api, { userId, profileId, profileName }) {
   const raw = await readEacRaw(api, { forUser: { userId, profileId } });
   const { rows } = buildEacRows({ ...raw, single: { userId, profileId, profileName } });
   return { items: rows.map(eacItem), warnings: raw.warnings, partial: raw.partial };
+}
+
+/**
+ * Look up pasted usernames or emails (issue #42): SELECT only, on User (a WHERE on User is fine; never on the two EAC
+ * objects), in batches, values escaped by soqlString inside userLookupQueries. Returns the User records found.
+ */
+export async function readPastedUsers(api, tokens, { onCount = () => {} } = {}) {
+  const out = [];
+  for (const soql of userLookupQueries(tokens)) {
+    out.push(...(await queryPaged(api, soql)));
+    onCount(out.length);
+  }
+  return out;
 }
