@@ -4,8 +4,8 @@
 
 ## What this is
 
-A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with six read-only tools,
-named in the toolbar menu "Compare permission set groups", "User access summary and comparison", "Territory & role hierarchy", "Why can a user see this record?", "Where is it used in flows?" and "Page details for a ticket". It reads the
+A Chrome MV3 extension (plain ES modules, no build step, no dependencies) with seven read-only tools,
+named in the toolbar menu "Compare permission set groups", "User access summary and comparison", "Territory & role hierarchy", "Why can a user see this record?", "Where is it used in flows?", "Page details for a ticket" and "Error Tracer: read a debug log". It reads the
 org through the REST API with the user's existing browser session and never writes to the org.
 Visible text says "license"; data keys keep the old `licence` spelling so saved files still load.
 Visible text avoids "PSG" and "snapshot" (say "saved group file"); code and developer docs may use them.
@@ -20,7 +20,7 @@ settings.html, settings.js           the Settings page (manifest `options_ui`): 
 shared/        tool-list.js (TOOLS: the one list the menu and Settings read), menu-settings.js (hidden-tool store; the only chrome.storage user), sfconn.js, sfread.js (readOrg), roles-read.js (readRoles), users-read.js (searchUsers), users-logic.js (matchUsers),
                recordid.js (recordIdFromUrl, looksLikeId), pageurl.js (cleanUrl), csv.js (toCsv), feedback.js, pick.js,
                urlcontext.js, livereload.js, pack.css, user-picker.css (user list and error box styles for user-access and record-access)
-tools/<tool>/  one folder per tool: compare-groups, user-access, hierarchy, record-access, flow-usage, page-details
+tools/<tool>/  one folder per tool: compare-groups, user-access, hierarchy, record-access, flow-usage, page-details, error-tracer
 icons/, samples/, tests/, dev/dev_server.py
 ```
 
@@ -41,7 +41,8 @@ Earlier names, for old notes: `extension/lib/snapshot.js` = compare-groups-read,
 ## Files
 
 - `shared/sfconn.js` — finds the API session from the `sid` cookie; `SfApi.query` pages
-  through `nextRecordsUrl`.
+  through `nextRecordsUrl`; `SfApi.getText(path)` is a GET-only read that returns plain text (used for a debug log body).
+  Both share one failure builder, so the 401 wording is the same.
 - `tools/compare-groups/compare-groups-read.js` — `takeSnapshot(api, psgId)` reads one group into a JSON snapshot
   (`schema: "sf-psg-snapshot/2"`; `/1` files still load, see `ACCEPTED_SCHEMAS`). Permissions come from the group's aggregate permission set
   (`PermissionSet.Type = 'Group'`, `PermissionSetGroupId = <psg>`).
@@ -49,7 +50,7 @@ Earlier names, for old notes: `extension/lib/snapshot.js` = compare-groups-read,
 - `shared/sfread.js` — `readOrg(api, apiHost)`: the org's name and edition for each page's header (one SELECT).
 - `shared/csv.js` — `toCsv(rows)`: RFC 4180 with a BOM; guards cells starting with = + - @ tab CR. Pure.
 - `shared/pick.js` — search words (punctuation is a separator) for the group box and lists. Pure.
-- `shared/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all six pages.
+- `shared/feedback.js` — `issueUrl({kind, tool, version})` builds the GitHub new-issue link (`bug.yml` / `enhancement.yml` in `.github/ISSUE_TEMPLATE/`; the query keys are the form field ids, the dropdown value is the exact option label). Only tool, extension version and browser go in. Pure. Used by the popup and the header links on all seven pages.
 - `shared/tool-list.js` — `TOOLS`, the one list of tools: `id` (the folder name, stable: it is what Settings remembers), `page`, `title`, `description`, and the menu flags (`needsRecord`, `context`, `withPageAddress`). To add a tool, add an entry here and ship its page.
 - `shared/menu-settings.js` — `visibleTools(tools, hidden)` (pure), `cleanHidden`, `createSettingsStore(tools, storage)` (`storage` is injectable; tests pass a fake). Stores one key, `hiddenTools` (ids of hidden tools, so a new tool is on by default), in `chrome.storage.local` (this computer only; never `chrome.storage.sync`, so the choice is not synced or sent anywhere, and another computer or another loaded copy of the extension starts with every tool on); drops unknown ids on read and write; with no storage every tool shows and changes stay in memory. `getHidden()` never throws: on a failed read it returns the last list read or saved in this page session, or `[]` (every tool shows) if there is none. `setToolOn` reads strictly and throws if that read fails, so a save is never built from a failed read (stored value unchanged). Reads and saves run through one promise queue inside the store, so quick changes each build on the one before; a failed save rejects only its own caller.
 - `menu.js` — the toolbar menu: one entry per tool that is on, enabled only on a Salesforce tab. It waits for the setting before drawing (no flash), shows "All tools are hidden" with a link when none is on, and has a Settings link in the footer (`openOptionsPage`, falling back to a new tab).
@@ -384,6 +385,51 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
 - An object name from the address must match `^[A-Za-z][A-Za-z0-9_]{0,79}$`, else the page is "other" (no reads). The
   failure texts are worded by cause (`failureCause`, `orgProblem`); the My Domain host shows even when that read fails.
 
+## Error Tracer: read a debug log (seventh tool)
+
+A read-only page, `tools/error-tracer/error-tracer.html`, for an admin chasing an error a user hit. The page
+lists the steps for turning on a debug log in Setup (done by the person, never by the page), reads the list of
+`ApexLog` rows and one log's body, and shows what failed, where and for which user in plain words, with the raw
+lines folded under each finding. Links `shared/pack.css` and adds `error-tracer.css`.
+
+- `shared/sfconn.js` `SfApi.getText(path)` — a GET that returns the body as text (a log body is not JSON). Same
+  Bearer header and the same errors as `get` (401 wording, Salesforce message in `detail`); never sets a method.
+- `tools/error-tracer/error-tracer-read.js` — `readLogList(api)` (one SELECT on `ApexLog`, `ORDER BY StartTime
+  DESC LIMIT 100`, rows `{id, userId, userName, operation, request, application, status, location, startTime,
+  durationMs, length}`), `readLogBody(api, id)` (checks `isLogId` first, then `getText` on
+  `/sobjects/ApexLog/<id>/Body`), `plainProblem(e, what)` -> `ReadProblem` (plain `message`, raw Salesforce text
+  in `raw` for the folded Technical details; the 403 wording says seeing logs, especially other people's, may need
+  extra permission and names no permission).
+- `tools/error-tracer/error-tracer-logic.js` — pure. `analyzeLog(text, {length})` is one pass over the lines with
+  a code-unit stack (no per-line work beyond one regex, so a 20 MB log is fine); returns `{version, levels,
+  coverage, user, findings, problemCount, handledCount, notes, cutOff, headline, subline, lines}`. Finding kinds:
+  `apex`, `save`, `validation`, `flow`, `limit`; each has `title`, `message`, `where`, `steps`, `time`,
+  `elapsedMs`, `handled`, `count`, and `start`/`end` line numbers for `rawAround(analysis, finding)`. Other
+  exports: `explainSaveError`, `frameWords`, `flowPointer`, `summaryText`, `isLogId`, `filterLogs`,
+  `userChoices`, `whatRan`, `statusWords`, `humanSize`.
+- `tools/error-tracer/error-tracer.js` — the page. `?host=`, `?dev=1`, `?demo=1`. Log lines are built when a "Log
+  lines" block is first opened. Nothing is kept beyond the page session.
+- Sample: `samples/error_tracer_demo.json` (five hand-written made-up logs, Ids `07L000000000001AAA`, example.com).
+- Tests: `tests/error_tracer_tests.mjs` (includes the GET-only guard: a recording fake fetch that fails on any
+  method but GET, and a static scan of the tool's files for write words and trace flag / debug level API names).
+- Rules that matter: **GET only. The tool never creates or changes a TraceFlag or DebugLevel** (the guard test fails
+  on those names and on `method:`); the steps text tells the person to do it in Setup. Org text only through
+  `textContent` / `el()`. The same error is one finding: an `EXCEPTION_THROWN` that is later followed by a
+  `FATAL_ERROR` with the same message is folded into it; thrown errors with no fatal error are shown as "may have
+  been handled", listed after the problems and never counted in the headline; a rule that fails and the save
+  error it causes are one card; a flow step error and the interview error after it are one card. "No errors found"
+  always says what the log recorded (`coverage`, from the levels line) and says what it did not record, so "no
+  flow errors" is never claimed when Workflow was below Info. The flow pointer is words only ("open Where is it
+  used in flows? from the toolbar menu"): no import or link into `tools/flow-usage/`.
+- Guessed or unchecked log layouts (not verified against a real org): `FLOW_ELEMENT_ERROR|message|type|name`,
+  `FLOW_START_INTERVIEW_BEGIN|orgId|flowName`, `FLOW_CREATE_INTERVIEW_END|interviewId|flowName`, `VALIDATION_ERROR|message`
+  (the page also copes when the rule's message only comes from the save error), the exact `CODE_UNIT_STARTED` shapes
+  for flows and validation, and the Setup wording in the steps. The log's own clock (user's time zone) is shown only in the folded
+  raw lines; cards say "N seconds after the log started" (from the nanosecond field; under 1 ms, "At the start of the log") so the page has one clock. Times from the list ("When", the result fact, Copy text) are the browser's time and always carry "(your time, <zone>)" (`whenText`); the user's own zone is the separate fact "User's time zone". An area the levels line says is too low but that the log itself shows (a `Validation:` code unit, flow events, `DML_BEGIN`) gets `coverage[].partial` and is worded "recorded only in part", never "not recorded". The coverage and cut-off warnings are said once, in the line under the headline (`subline`, labels such as "Validation rules"); Notes keep only one sentence of Setup advice for all missing or partial areas ("To record what is missing, edit the debug level in Setup and set the categories named above (Database, Validation, Workflow) to Info or finer, then repeat the action."; Setup names inside it only), never one note per area, and never restate an area or the cut-off. A quoted message that already ends in . ! or ? gets no extra full stop after the closing quote (`quoted()`). A validation save error takes its record type from an earlier `Validation:` unit only if no other code unit and no `DML_BEGIN` ran since (`valClean`). One label for handled errors: "May have been handled". The list stacks into cards under 640px (CSS `data-label`), Result right after When. A flow code unit
+  that names only an object is worded "a flow on Case records" until a FLOW_START_INTERVIEW_BEGIN gives the flow's name. Text with no
+  header and no events gets `notLog` and the headline "This does not look like a debug log". When adding native `append`/`replaceChildren`
+  calls, never pass null (it becomes the text "null").
+
 ## When to use it
 
 - "What's the difference between these two PSGs?", "does group X give anything group Y doesn't?",
@@ -396,6 +442,7 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
 - "Which flows use this field?", "what does each flow do with it?", "which flows mention this record Id?",
   "which flows run when an Account is saved, and in what order?", "which flows change or read Accounts?" → Where is it used in flows?
 - "I need to raise a ticket and give support my org, user and page" → Page details for a ticket.
+- "A user hit an error: what failed, where, and for which user?" (from a debug log) → Error Tracer: read a debug log.
 
 ## Working on the code
 

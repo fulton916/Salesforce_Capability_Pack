@@ -2,9 +2,9 @@
 
 (Formerly the `sf-psg-compare` folder. Saved group files still use the schema ids `sf-psg-snapshot/1` and `/2`.)
 
-A Chrome extension with six read-only tools: **Compare permission set groups**, **User access summary and
-comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**
-and **Page details for a ticket**.
+A Chrome extension with seven read-only tools: **Compare permission set groups**, **User access summary and
+comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**,
+**Page details for a ticket** and **Error Tracer: read a debug log**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -38,6 +38,10 @@ Where is it used in flows?:
 
 Page details for a ticket:
 - Who am I, which org is this, and which page was I on, in a form I can paste into a support ticket?
+
+Error Tracer: read a debug log:
+- What failed, where, and for which user, in a debug log a user's failing action left behind?
+- Which validation rule, flow step or line of Apex was it?
 
 ## Known limits
 
@@ -217,6 +221,52 @@ Try it: `python dev/dev_server.py --no-org`, then open
 <http://127.0.0.1:8765/tools/page-details/page-details.html?demo=1> (made-up details). The toolbar menu opens it as
 `tools/page-details/page-details.html?host=<org host>&url=<cleaned address>`. Checked read-only against a sandbox (org, user, record pages, a list view, a Setup page and home). Not checked: opening it from the toolbar button in Chrome, and the real clipboard.
 
+## Error Tracer: read a debug log
+
+Use it when a user hit an error and you want to know **what failed, where, and for which user**
+without reading a debug log by hand. The page does not turn logging on (you do that in Setup, see
+below); it reads logs Salesforce has already written.
+
+1. In Setup, type **Debug Logs** in Quick Find. Under User Trace Flags choose **New**. The traced user must be
+   the person who does the failing action: for **Traced Entity Type** choose User, and for **Traced Entity Name** pick that person. Set **Start Date** and
+   **Expiration Date** to cover the action (a trace flag lasts up to 24 hours). **Debug Level** is a
+   lookup: typing a name finds nothing, so use the search icon to pick an existing level, or **New Debug
+   Level** (a small window) to make one. Set Apex Code at Debug or finer, and Database, Validation and
+   Workflow at Info or finer (flows are only recorded when Workflow is at Info or finer). Logs made by
+   running Apex from the Developer Console or the command line use their own levels, so some areas may
+   not be recorded.
+2. Ask the user to repeat what failed.
+3. Open **Error Tracer: read a debug log** from the toolbar menu, press **Refresh the list**, and pick the log.
+
+The list shows the newest logs first: when (your local time, with the time zone named), the result, whose log, what ran and the
+size. You can show only logs whose result is not Success (ticked, the box hides logs whose result is Success, and a save stopped by a validation rule can still say Success), or only one user's. Picking a log shows a
+headline ("2 problems found in this log" or "No errors found in this log"), who and when, and one card per
+finding with the message in plain words, how long after the log started it happened (the log's own clock stays in the folded lines), where it happened (for example "Apex trigger AccountTrigger,
+line 3"), what was running at the time, and a folded **Log lines** block with the raw lines around it.
+**Copy what failed** copies the same thing as plain text for a ticket.
+
+What it picks out: unhandled Apex errors (with the stack trace turned into "Apex class X, method y, line
+n"), saves that failed (a validation rule, a required field, a duplicate, a locked record, missing
+access and so on, with the kind of record being saved), validation rules (which rule, on which
+object, the message the user saw), flows that failed (the flow, the failing step; to find other
+flows that use the same flow, open "Where is it used in flows?" from the menu), Salesforce limits (too
+many queries, CPU time), and errors that were raised but may have been handled by the code (listed
+separately, never as the cause). The line under the headline says once when the log was cut off, or when a category was not
+recorded at a level high enough; Notes say what to change in Setup (so "no flow errors" is never claimed when flows were not recorded).
+
+What it reads: `ApexLog` (one `SELECT` for the list, newest 100, and one `GET` of a log's body). GET and
+`SELECT` only. It never creates or changes a trace flag, a debug level or anything else.
+
+Known limits: Salesforce keeps logs only for a limited time (system debug logs about 24 hours) and cuts
+off very large logs (the part after the cut, which may hold the error, is missing). Seeing other
+people's logs may need extra permission in the org. Some flow and validation messages are read from the
+documented log layout and have not been checked against every org's logs. Nothing is kept after you
+close the page.
+
+Try it: `python dev/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up logs: a trigger error, a
+validation rule, a failed flow, a clean log and a cut-off one). Not checked against a real org's logs.
+
 ## Install (unpacked, for your own browser)
 
 New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
@@ -236,6 +286,7 @@ push it by policy.
 - API Enabled.
 - View Setup and Configuration (to read permission sets, groups and their permissions).
 - For User access summary and comparison, also access to see users.
+- For Error Tracer, permission to see debug logs (seeing other people's logs may need more; ask your administrator).
 - To name Apex classes and pages: read access to them is normal with View Setup. Items it cannot
   name are kept by Id with a note at the top.
 
@@ -243,13 +294,14 @@ push it by policy.
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
-   and six buttons: **Compare permission set groups** ("Find out how two permission set groups
+   and seven buttons: **Compare permission set groups** ("Find out how two permission set groups
    differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
    **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
    **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id") and
    **Page details for a ticket** ("Copy who you are, which org and which page, to paste into a
-   ticket"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
+   ticket") and **Error Tracer: read a debug log** ("See what failed, where and for which user, from a
+   debug log"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
    The record button reads the record Id from the address of the tab. On a Salesforce tab with no
    record open it stays enabled, says "Open a record first", and the page opens with an empty record
    box.
@@ -581,7 +633,7 @@ one again, or press **Show all tools**, to bring it back. Each change saves at o
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.8.0", and all six pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.9.0", and all seven pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -610,7 +662,8 @@ python dev/dev_server.py --no-org
 
 Open <http://127.0.0.1:8765/tools/compare-groups/compare-groups.html?demo=1> (two made-up groups from `samples/`)
 or <http://127.0.0.1:8765/tools/user-access/user-access.html?demo=1> (two made-up users) or
-<http://127.0.0.1:8765/tools/record-access/record-access.html?demo=1> (a made-up account and two made-up users).
+<http://127.0.0.1:8765/tools/record-access/record-access.html?demo=1> (a made-up account and two made-up users) or
+<http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up debug logs).
 
 ## Developing without reloading Chrome
 
@@ -664,11 +717,14 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/flow-usage/flow-usage-scan.js` | Looks inside one flow version for a field, text or an Id; also lists each record element's object and operation (get, create, update, delete), the trigger and how the flow starts (`startInfo`). Pure, no browser APIs |
 | `tools/flow-usage/flow-usage-object.js` | The object view: groups, run order, entry conditions in words, changes and reads, CSV. Pure, no browser APIs |
 | `tools/flow-usage/flow-usage-read.js` | Reads the flow list (`FlowDefinitionView`) and one flow version at a time (Tooling `Flow.Metadata`), `SELECT` only |
+| `tools/error-tracer/error-tracer.*` | The Error Tracer: read a debug log page (html, js, extra css on top of `shared/pack.css`) |
+| `tools/error-tracer/error-tracer-logic.js` | Reads one debug log text in a single pass into plain findings (what failed, where, which rule or flow step, notes); Copy text. Pure, no browser APIs |
+| `tools/error-tracer/error-tracer-read.js` | Reads the log list (one `SELECT` on `ApexLog`) and one log's body (`GET`). GET only; never touches a trace flag or debug level |
 | `shared/urlcontext.js` | Turns a Salesforce page address into an object and field. Pure |
 | `shared/sfread.js` | `readOrg`: the org name and edition shown in each page's header |
 | `shared/csv.js` | `toCsv`: CSV with a BOM, formula-guarded. Pure |
 | `shared/pack.css` | The stylesheet every page loads first |
-| `shared/sfconn.js` | Session lookup and REST client (query with paging, describe) |
+| `shared/sfconn.js` | Session lookup and REST client (query with paging, describe, and `getText` for a plain-text GET such as a log body) |
 | `tools/compare-groups/compare-groups-read.js` | Reads one group into a snapshot |
 | `tools/compare-groups/compare-groups-logic.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
 | `shared/feedback.js` | Builds the GitHub new-issue link (tool, version, browser only). Pure, no browser APIs |
@@ -681,5 +737,5 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `shared/pick.js` | Matching for the group search box |
 | `shared/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `dev/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
+| `samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`) and five made-up debug logs (`error_tracer_demo.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |
