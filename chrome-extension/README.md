@@ -189,12 +189,18 @@ extension icon, then **Page details for a ticket**. A page opens with plain labe
 - **You**: name, username, profile, role, language, locale, time zone and user type.
 - **Page**: record page, list view, Setup page, home or other; the object, and for a record page the
   record Id, name, record type, owner, and who last changed it and when. For a list view, its name.
+  A Setup page is named as Salesforce's Setup shows it (for example "Company Information"): the name is read
+  from the title on the browser tab (only that name, never the page contents), or from a built-in list when
+  the tab cannot be read, or made from the address as a last resort. Object Manager pages read like the
+  breadcrumb, for example "Object Manager > Fields & Relationships".
 - **Browser and extension**: browser and extension version.
 
 Type what happened in the box at the top (optional; it goes first in the text), then click **Copy**
 or **Download (.txt)** and paste or attach it in your ticket. If one part cannot be read (for example
 you are not allowed to see the record), the rest still shows, that part says why, and the raw message
-is under "Technical details" on the page only.
+is under "Technical details" on the page only. A failure says why in plain words: Salesforce could not be
+reached (check your connection, reload the Salesforce tab and try again), your session expired, your user
+may not be allowed, or simply that it could not be read.
 
 What it never includes: the session id, cookies, the page contents, or any address parameter other
 than the list view name. Only the page's path is used, so tokens and login parameters in the address

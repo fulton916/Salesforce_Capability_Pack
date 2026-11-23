@@ -338,16 +338,34 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
 - `tools/page-details/page-details-logic.js` — pure, tested: `parsePageUrl` (record / list / setup / home / other; classic `/<Id>`
   has no object; Experience Cloud `/s/` is other), `snapshotText` (the ticket text; note first; missing areas
   worded plainly), `scrub` (last guard against session-like strings), `whenText`, `fileName`, `sandboxNameFromHost`.
+  Setup page name, in order: (1) the Salesforce tab's own title: `setupTitleFromTabs(tabs, host, cleanedUrl)` picks the tab
+  (same host name, same `cleanUrl`, newest `lastAccessed`, first one whose title survives cleaning) and `cleanTabTitle(title)` strips
+  " | Salesforce" / " ~ Salesforce - <edition>", caps at 120 characters and rejects generic or loading titles; (2) the built-in
+  `SETUP_TITLES` (Lightning address segment to Salesforce's title) and `OBJECT_MANAGER_SUBPAGES` ("Object Manager > Fields & Relationships";
+  `parsePageUrl` keeps the sub-page as `setupSub`); (3) `setupPageName`, the name made from the address. `setupDisplayName(parsed, tabTitle)`
+  does the choosing; the tab title is not used on Object Manager object pages (their titles are not known), and the text never says which source was used.
+  `cleanTabTitle` also rejects (case-insensitively) error and sign-in titles that name no page: "Page not found", "Login", anything starting
+  with "Error", and titles containing "Insufficient privileges", "Something went wrong", "Sorry to interrupt" or "Verify your identity".
+  An Object Manager object's own page (`ObjectManager/<Object>/view`) is "Object Manager > Details"; Object Manager's home is "Object Manager".
+  Checked live in a developer org on 2026-11-22: every `SETUP_TITLES` entry except `DataManagementCreateTestInstance` (Sandboxes; not in a
+  developer org). `SetupOneHome`'s tab title is "Home" (rejected as generic); "Setup Home" is its sidebar name. Object Manager sub-pages checked:
+  FieldsAndRelationships, PageLayouts, LightningPages, ButtonsLinksActions, CompactLayouts, FieldSets, RecordTypes, ValidationRules,
+  ApexTriggers, MySearchLayouts, AlohaSearchLayouts, Limits, and the Details page (the object's `/view`). Other sub-pages fall back to the
+  address-made name. Re-check when touching the table.
 - `tools/page-details/page-details-read.js` — `readOrgDetails` (`Organization`), `readCurrentUser`, `readPageDetails`
   (describe, one `SELECT` for a record using only fields the object has, a `ListView` name lookup),
-  `readIssueSnapshot`. Each area returns `{data, problem, raw}` and never throws. Current user: REST
+  `readIssueSnapshot` (`{host, url, setupTitle}`). Each area returns `{data, problem, raw}` and never throws. `failureCause(e)` ->
+  "session" | "denied" | "unreachable" | "other" is the one classifier; `orgProblem` and the user and record reads word their `problem` by it
+  (unreachable: could not be reached, check connection, reload the tab; denied: "may not be allowed"; other: neutral "could not be read";
+  session: the 401 message). The who-are-you step keeps the causes of both tries (session first, then unreachable). A record that returns no row is not a failure. Current user: REST
   `chatter/users/me` for the Id, then `/services/oauth2/userinfo` as a fallback, then a `SELECT` on `User`; if
   only the User query fails the Chatter fields are used with a note. Verified read-only against a sandbox through the dev server: org, user, record pages (Account, Case, Opportunity), a list view, a Setup page and home. Not verified: the real popup → browser-session path and the real clipboard.
 - `tools/page-details/page-details.js` — the page. `?host=`, `?dev=1`, `?demo=1` as elsewhere; `?url=` is the cleaned
-  address from the popup and is cleaned again on the page. The "What happened" note is read at click time and never kept.
-- Sample: `samples/issue_snapshot_demo.json` (made-up; a test checks it stays synthetic).
-- Tests: `tests/issue_snapshot_tests.mjs` (includes the no-innerHTML, no-storage guard).
-- Rules that matter: reads only; never the session id, cookies or page body; no values beyond name, record type,
+  address from the popup and is cleaned again on the page. For a Setup page (not in dev or demo mode) it calls `chrome.tabs.query({})`
+  once and passes only the matching tab's cleaned title on; a failure falls through silently (raw note under Technical details only). The "What happened" note is read at click time and never kept.
+- Sample: `samples/page_details_demo.json` (made-up; a test checks it stays synthetic).
+- Tests: `tests/page_details_tests.mjs` (includes the no-innerHTML, no-storage guard).
+- Rules that matter: reads only; never the session id, cookies or page body (the one tab read is the tab's title, for Setup pages only); no values beyond name, record type,
   owner and dates; the popup passes `cleanUrl(tab.url)` (`shared/pageurl.js`) only; the page says to paste only into the company's own
   ticket system. A hash-based address (old `/one/one.app#/...`) loses its record because the hash is dropped;
   `parsePageUrl` sets `hashAddress` (kind "other" and cleaned path `/one/one.app`) and the Page area says to open the record again.
@@ -355,7 +373,7 @@ adds `page-details.css`. "Snapshot" is the file/code name only; the visible titl
   `refresh_token=` / `id_token=` / `oauth_token=`); `code=` and bare `token=` stay. When it removes something the page
   shows one line near the buttons. Everything else (org text, address) still goes through the stricter `scrub`.
 - An object name from the address must match `^[A-Za-z][A-Za-z0-9_]{0,79}$`, else the page is "other" (no reads). The
-  Org read's failure text is worded by cause (`orgProblem`); the My Domain host shows even when that read fails.
+  failure texts are worded by cause (`failureCause`, `orgProblem`); the My Domain host shows even when that read fails.
 
 ## Error Tracer: read a debug log (seventh tool)
 

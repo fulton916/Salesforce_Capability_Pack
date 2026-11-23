@@ -1,7 +1,7 @@
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readIssueSnapshot } from "./page-details-read.js";
 import { cleanUrl } from "../../shared/pageurl.js";
-import { snapshotText, fileName, whenText, scrubNote, objectText, NOTE_REMOVED_TEXT, HASH_HINT, KIND_TEXT } from "./page-details-logic.js";
+import { snapshotText, fileName, parsePageUrl, setupTitleFromTabs, whenText, scrubNote, objectText, NOTE_REMOVED_TEXT, HASH_HINT, KIND_TEXT } from "./page-details-logic.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
 
@@ -110,6 +110,14 @@ function applyReads(r, rawUrl) {
   model.tech = { org: r.org.raw, user: r.user.raw, page: r.page.raw };
 }
 
+/** The Setup page's name as the browser tab shows it. Reads only the tab title (never the page); {title, raw}. */
+async function readSetupTitle(cleaned) {
+  if (!HOST || typeof chrome === "undefined" || !chrome.tabs?.query || parsePageUrl(cleaned).kind !== "setup") return { title: "", raw: "" };
+  try {
+    return { title: setupTitleFromTabs(await chrome.tabs.query({}), HOST, cleaned), raw: "" };
+  } catch (e) { return { title: "", raw: `Tab title: ${e?.message || e}` }; }
+}
+
 async function start() {
   const rawUrl = cleanUrl(params.get("url") || ""); // cleaned again here, whatever the opener passed
   if (DEMO) {
@@ -141,7 +149,9 @@ async function start() {
   const host = DEV ? (HOST || "") : (HOST || session.apiHost);
   model.host = host;
   $("#org").textContent = DEV ? "Dev server" : host;
-  applyReads(await readIssueSnapshot(api, { host, url: rawUrl }), rawUrl);
+  const setup = DEV ? { title: "", raw: "" } : await readSetupTitle(rawUrl);
+  applyReads(await readIssueSnapshot(api, { host, url: rawUrl, setupTitle: setup.title }), rawUrl);
+  if (setup.raw) model.tech.page = [model.tech.page, setup.raw].filter(Boolean).join("\n");
   if (model.org) $("#org").textContent = `${model.org.name} (${model.org.kind})`;
   render();
 }
