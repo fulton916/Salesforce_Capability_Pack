@@ -126,4 +126,16 @@ export async function run(test) {
       }
     }
   });
+  await test("start-up: every tool page script still starts itself, live-reloads and wires its feedback links", () => {
+    const tools = readdirSync(ext("tools"), { withFileTypes: true }).filter((d) => d.isDirectory()).map((d) => d.name);
+    assert.ok(tools.length >= 6);
+    for (const t of tools) {
+      const f = ext("tools", t, `${t}.js`);
+      const text = read(f);
+      // A top-level (unindented) start-up call: connect(); or start()... (the page's own entry point).
+      assert.ok(/^(?:connect|start)\(.*\);\s*$/m.test(text), `${t}.js has no top-level connect() or start() call`);
+      assert.ok(/^startLiveReload\(\);\s*$/m.test(text), `${t}.js has no top-level startLiveReload() call`);
+      assert.ok(/\$\("#feedback"\)\.replaceChildren\(/.test(text), `${t}.js does not wire the feedback links`);
+    }
+  });
 }

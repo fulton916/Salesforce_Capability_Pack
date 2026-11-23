@@ -4,6 +4,7 @@
 // (schema "sf-user-access/1"). Items are matched across users by API name (key), never by Id.
 
 import { toCsv } from "../../shared/csv.js";
+import { EAC_KEY, EAC_TITLE, EAC_ONE, EAC_NOUN, EAC_HELP, eacDetailText } from "./user-access-eac.js";
 
 export { toCsv };
 export const ACCESS_SCHEMA = "sf-user-access/1";
@@ -19,13 +20,14 @@ export const SECTIONS = [
   { key: "publicGroups", title: "Public groups", one: "public group", noun: "public groups", help: "Only groups the user was added to directly. Groups they get through a role or another group are not shown." },
   { key: "queues", title: "Queues", one: "queue", noun: "queues", help: "Only queues the user was added to directly. Queues they get through a role or a group are not shown." },
   { key: "territories", title: "Territories", one: "territory", noun: "territories", help: "Sales territories the user is assigned to." },
+  { key: EAC_KEY, title: EAC_TITLE, one: EAC_ONE, noun: EAC_NOUN, help: EAC_HELP },
   { key: "customSettings", title: "Custom settings", one: "custom setting value", noun: "custom setting values", help: "Custom settings can switch things on or off for one user or one profile, for example a “bypass validation rules” box. This list shows only the values that are different from the org default for this user, including values they get from their profile. Settings that are the same for everyone are not shown." },
 ];
 
 /** Areas that hold a single value (shown as the name, or "no ..."), not a list. */
 export const SINGLE_VALUE_KEYS = ["profile", "role", "callCenter"];
 /** Areas that older files may not have; they load as empty. */
-const OPTIONAL_KEYS = ["callCenter", "customSettings"];
+const OPTIONAL_KEYS = ["callCenter", "customSettings", EAC_KEY];
 /** "1 queue", "3 queues". `one` and `many` are the singular and plural nouns. */
 export const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
@@ -230,6 +232,8 @@ export function detailText(sectionKey, item, other = null) {
   } else if (sectionKey === "permissionSetGroups") {
     if (item.muting?.length) parts.push(`Muting permission set${item.muting.length > 1 ? "s" : ""}: ${item.muting.join(", ")}`);
     if (item.status && item.status !== "Updated") parts.push(`Not up to date (${item.status}). In Setup, open this group and wait for its status to say Updated.`);
+  } else if (sectionKey === EAC_KEY) {
+    parts.push(eacDetailText(item));
   } else if (sectionKey === "profile") {
     if (item.licence) parts.push(`User license: ${item.licence}`);
   }
@@ -288,6 +292,7 @@ export function compareUsers(a, b) {
       else if (!ia && ib) status = "onlyB";
       else if (k === "permissionSets" && howText(ia) !== howText(ib)) status = "differ";
       else if (k === "customSettings" && !sameItemValue(ia, ib)) status = "differ";
+      else if (k === EAC_KEY && eacDetailText(ia) !== eacDetailText(ib)) status = "differ";
       let detailA = detailText(k, ia, ib);
       let detailB = detailText(k, ib, ia);
       if (status === "unreadA") detailA = `Could not be read for ${names.a}`;
@@ -338,6 +343,7 @@ export function userCardLines(result, key) {
   ];
   if (key === "permissionSets") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those assigned differently (directly or through a group)")));
   if (key === "customSettings") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those with a different value for each")));
+  if (key === EAC_KEY) lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those with a different status or settings")));
   if (c.unread) lines.push(line("", { text: fmt(c.unread), bold: true }, T(` not compared (a setting could not be read for one user)`)));
   if (!c.onlyA && !c.onlyB && !c.differ && !c.unread) lines.push(line("same", T("✓ Same in both")));
   return [...lines, ...failed];

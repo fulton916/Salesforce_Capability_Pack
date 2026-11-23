@@ -110,6 +110,24 @@
     ],
     "territories": [],
     "callCenter": [],
+    "eac": [
+      {
+        "key": "Sales Team Standard",
+        "label": "Sales Team Standard",
+        "status": "ACTIVE",
+        "statusText": "Connected",
+        "hasRow": true,
+        "connected": true,
+        "recommendedTitle": null,
+        "recommendedDescription": null,
+        "contactsSynced": true,
+        "eventsSynced": false,
+        "termsAccepted": true,
+        "globalTerms": "ACCEPTED",
+        "via": "user",
+        "profileName": null
+      }
+    ],
     "customSettings": [
       {
         "key": "Automation_Settings__c.Bypass_Validation_Rules__c",

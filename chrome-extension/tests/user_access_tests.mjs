@@ -25,7 +25,7 @@ function fakeFetch(routes, log = []) {
     const u = new URL(url);
     if (/\/sobjects\/$/.test(u.pathname)) {
       log.push({ method: opts.method || "GET", path: u.pathname, q: null });
-      const sobjects = (globalThis.__sobjects || ["User", "UserTerritory2Association"]).map((name) => ({ name }));
+      const sobjects = (globalThis.__sobjects || ["User", "UserTerritory2Association"]).map((o) => (typeof o === "string" ? { name: o } : o));
       return { ok: true, status: 200, text: async () => JSON.stringify({ sobjects }) };
     }
     const desc = /\/sobjects\/([\w]+)\/describe\/$/.exec(u.pathname);
@@ -87,6 +87,8 @@ function userRoutes(over = {}) {
       { Group: { DeveloperName: "Lead_Triage", Name: "Lead Triage", Type: "Queue" } },
     ]],
     [/FROM UserTerritory2Association/, () => [{ Territory2: { DeveloperName: "North", Name: "North" } }]],
+    [/FROM ActivityUsrConnectionStatus/, () => []],
+    [/FROM UserEmailCalendarSync/, () => []],
   ];
   for (const [re, fn] of over.routes || []) routes.unshift([re, fn]);
   routes.describes = over.describes || {};

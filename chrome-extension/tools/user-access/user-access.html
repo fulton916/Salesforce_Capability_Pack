@@ -18,7 +18,7 @@
 <main>
   <section class="panel">
     <h2 class="step">Choose a user to look at</h2>
-    <p class="hint">Type part of a name or username. You can add a second user to compare the two side by side. It covers profile, role, call center, permission sets and groups, licenses, public groups, queues, territories, and custom settings that have a different value for the user or their profile.</p>
+    <p class="hint">Type part of a name or username. You can add a second user to compare the two side by side. It covers profile, role, call center, permission sets and groups, licenses, public groups, queues, territories, email and calendar connection (Einstein Activity Capture), and custom settings that have a different value for the user or their profile. To see everyone's email and calendar connection at once, use the panel further down.</p>
     <div class="pickers">
       <div class="picker" data-side="a">
         <label class="pick-label" for="input-a"><span class="side a">A</span> First user</label>
@@ -39,6 +39,38 @@
     </div>
     <div class="actions"><span id="progress" role="status"></span></div>
     <div id="error" class="error" hidden></div>
+  </section>
+
+  <section class="panel org-only" id="eacPanel">
+    <h2 class="step">Who is in each email and calendar configuration? (Einstein Activity Capture)</h2>
+    <p class="hint">Lists every user in each Einstein Activity Capture configuration, with no 500-user limit: users assigned directly, and everyone on a profile that is assigned. It also shows who is not connected, inactive users who are still assigned, users who are connected but have synced nothing, and users who have Einstein Activity Capture access but are in no configuration. Only &ldquo;Connected&rdquo; counts as connected: a blank status means the user has not connected yet. Every list can be downloaded for Excel. This reads every user, so it can take a moment in a large org.</p>
+    <div class="actions"><button id="eacLoad" class="primary">Show everyone</button><span id="eacProgress" role="status"></span></div>
+    <div id="eacError" class="error" hidden></div>
+    <div id="eacResult" hidden>
+      <p class="eac-summary" id="eacSummary"></p>
+      <p class="help" id="eacConfigNote"></p>
+      <p class="help" id="eacExtra"></p>
+      <p class="help" id="eacNote" hidden></p>
+      <div class="toolbar">
+        <label for="eacShow">Show</label>
+        <select id="eacShow"></select>
+        <input type="search" id="eacSearch" placeholder="Search by name, username or email…" aria-label="Search the lists">
+        <label class="check"><input type="checkbox" id="eacShowApi"> Show API names</label>
+        <details class="menu">
+          <summary class="button">Download ▾</summary>
+          <div class="menu-items">
+            <button id="eacCsvAll">Everyone in a configuration (CSV for Excel)</button>
+            <button id="eacCsvShown">What is shown now (CSV for Excel)</button>
+            <button id="eacCsvNoConfig">Users in no configuration (CSV for Excel)</button>
+          </div>
+        </details>
+      </div>
+      <div id="eacGroups"></div>
+      <details class="eac-counts-box">
+        <summary>Counts by configuration and status</summary>
+        <div class="eac-counts" id="eacCounts"></div>
+      </details>
+    </div>
   </section>
 
   <section id="results" hidden>
