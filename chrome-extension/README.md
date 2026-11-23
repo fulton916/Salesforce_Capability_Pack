@@ -468,8 +468,20 @@ different record, paste its link or Id into the box and click "Use this record".
   gives no access to those records, there is no route. A contact whose org-wide default is Controlled by Parent gets no account routes: its access follows the account itself, as shown by the parent. Salesforce's own View Sharing
   Hierarchy page may list more reasons for a user than this page does.
 
-Not covered, and the page does not say it cannot exist: restriction and scoping rules, and
-Experience Cloud sharing sets.
+Restriction rules and scoping rules: the page reads the active ones on the record's object and names them for each user. A
+restriction rule that applies to the user and whose filter leaves the record out is worded by its criteria ("should hide"; the page
+only reads the rule, nobody checked by logging in as the user), with its criteria as Salesforce stores them. When Salesforce already says the
+user cannot see the record, such a rule "would also hide" it and is not offered as the reason; a rule that applies but lets the record through, or does not apply to the
+user, is said so. Scoping rules are shown as changing what the user sees by default in list views and searches, never as taking access
+away. Rules with criteria too complex to check (parentheses, IN, dates, fields through a relationship) are shown as "may hide it". An
+object with no active rules says so; if the rules could not be read the page says that instead of "none". Salesforce's own answer at
+the top may not include restriction rules (in a test it still said "can view" for a user a rule should hide), so when it says "can view" the
+headline says so in the same sentence ("Salesforce says M can view this record, but restriction rule 'X' should hide it from them."). With two
+users, a rule that hides the record for one and not the other shows in "Why the difference" (short form), and the headline does not say
+"They have the same access" but that Salesforce gives them the same access and the rule should hide it from one only. A text compared
+with a number in a rule is "could not be checked" (may hide).
+
+Not covered, and the page does not say it cannot exist: Experience Cloud sharing sets.
 
 Routes it looks for: no Read on the object at all (then nothing else matters, but never when
 Salesforce says the user can see the record, and not for Task and Event, which have no object
@@ -493,7 +505,7 @@ A read that fails for a passing reason (the connection drops, or Salesforce answ
 "server unavailable") is tried again up to twice, after 0.3 and 1 second. An expired session, a bad request, no
 permission and query errors are not tried again. Only reads are repeated, so nothing changes in the org.
 
-Not checked (also listed in the page's Notes): restriction rules and scoping rules, Experience Cloud
+Not checked (also listed in the page's Notes): Experience Cloud
 sharing sets, field-level access, and which specific sharing rule gave access (Salesforce's share row
 does not name it, so the page says "a sharing rule"). Manager groups are not checked. The headline follows what the
 user can actually do (view, edit, full); when sharing gives more than that (for example all access but

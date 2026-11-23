@@ -149,7 +149,32 @@ takes a pasted link or Id, which is also how the dev server is used).
   softly into `notes` / `warnings`). SELECT, COUNT and describe only.
 - `tools/record-access/record-access.js` — the page. `?host=`, `?dev=1`, `?demo=1`, plus `&record=`. Demo:
   `http://127.0.0.1:8765/tools/record-access/record-access.html?demo=1` (`samples/record_access_demo.json`, made up).
-- Tests: `tests/record_access_tests.mjs` (reasoning, mismatches, a faked org, the guard).
+- `tools/record-access/record-access-rules.js` — pure, tested: restriction and scoping rules. `parseCriteria(text, forUser)` (one or more
+  `field op value` joined by AND, or all by OR; ops = != < <= > >=; value a quoted text, number, true/false/null or `$User.Field`; anything
+  else, such as parentheses, IN, LIKE, mixed AND/OR, `Owner.Name` paths, is "too complex" and gives `ok: false` with a reason),
+  `neededFields(rules)`, `checkRule(rule, userVals, recVals)` (outcome `hides` / `passes` / `notApplies` / `maybe` for restriction rules,
+  `scopes` / `notApplies` / `maybe` for scoping rules; text compares ignore case, 15 and 18 character Ids are equal), `ruleSentences`.
+- Restriction and scoping rules: `readRecordAccess` reads, once per Explain (org-wide cache key `rules:<object>`), Tooling API
+  `SELECT Id, DeveloperName, MasterLabel, IsActive, TargetEntity, EnforcementType, UserCriteria, RecordFilter, Description FROM
+  RestrictionRule WHERE TargetEntity = '<API name>' AND IsActive = true` (`api.query(soql, {tooling: true})`). Facts:
+  `facts.rules = {read, error, items:[{id, devName, label, type: "Restrict"|"Scoping", userCriteria, recordFilter, description}],
+  recordValues}` and `user.ruleValues` (one extra SELECT on User per user and one on the object for the record, only fields the rules use,
+  validated against describe and limited to comparable types). A failed read is `read: false` with the cause, never "none". `explain`
+  gives each user `rules = {state: none|found|failed|unread, header, lines}` and `ruleSfNote`; a user Salesforce says cannot see the record
+  gets the hiding (or may-hide) restriction rules as the first causes instead of the old generic one (omitted when the rules were read and
+  none can hide it); `difference.rules` lists a rule that hides or may hide the record for one user and not the other (and turns "same
+  access" into a difference). Scoping rules are only ever worded as changing the default list views and searches, never as hiding.
+  Confirmed live (developer org `sf-dev-org`, custom object `ZZ_Test_Rec__c`, 2026-11-22): `EnforcementType` is `Restrict` or `Scoping`;
+  `UserCriteria` and `RecordFilter` are stored exactly as typed in the metadata (for example `$User.Department = 'X'`, `Region__c = 'East'`,
+  `OwnerId = $User.Id`); the Metadata API accepted only a single condition on each side in that org (AND, OR, !=, IN, parentheses, dates all
+  failed on deploy), so the AND / OR / other-operator support is written for what Salesforce documents, not seen live. And
+  `UserRecordAccess` did NOT reflect a restriction rule: for a user matching the rule's criteria, on a record outside its filter, it still
+  said the user can read the record. The page therefore says "Salesforce's answer above may not include restriction rules (in a test it still said 'can view' ...)" (only when a
+  rule hides it by its criteria), and the headline carries the same caveat in one sentence. Wording is always "by its criteria" / "should hide",
+  never observed fact; when Salesforce already says no access the rule "would also hide" and is not a likely reason (`wouldAlso`); with two users
+  the headline never says "same access" when the rules differ; a text-vs-number comparison (`<`, `>`) is `maybe`, not false. Not confirmed: that the rule really hid the record for that user (no way to run a query as that user from
+  the CLI here).
+- Tests: `tests/record_access_tests.mjs` (reasoning, mismatches, a faked org, rules, the guard).
 - Rules that matter: **the verdict comes only from `UserRecordAccess`**; routes are explanation. When
   they do not agree, `mismatch` says so with likely causes, never as fact. Route levels are capped by
   the user's object permissions. A user with no Read on the object has no routes (`gate`), unless
@@ -184,8 +209,7 @@ takes a pasted link or Id, which is also how the dev server is used).
   Manual, Rule, Territory and Territory2AssociationManual rows carry their own levels; ImplicitParent
   rows are None. Consistent with the data but not proven: people above an account holder or the account
   owner in the role hierarchy get the same level. Not tested: that role-above route for Cases.
-- Still not covered: restriction and scoping rules, Experience Cloud sharing sets, which specific
-  sharing rule. Access through the account is only as complete as the account's first 2000 share rows.
+- Still not covered: Experience Cloud sharing sets, which specific sharing rule. Access through the account is only as complete as the account's first 2000 share rows.
 - Routes may carry a `topic` (same way in reached differently: a territory through a share row or the
   territory list, one group share as member or as manager, the owner queue as member or as boss, a
   direct share of the same RowCause). The difference matches by topic and, before printing any
@@ -226,7 +250,7 @@ takes a pasted link or Id, which is also how the dev server is used).
   area collects its notes in its own `blank()` and they are merged in a fixed order (roles, territories, shares, account, names,
   members, permissions, then each user), so notes read the same whatever finished first. Per-user notes are worded with the
   picked name and renamed to Salesforce's name if it differs. The user's territory assignments are asked for while the territory
-  list is still loading and used only when territories are on. Progress is "Reading… (n of m)", counted per area (7 + users).
+  list is still loading and used only when territories are on. Progress is "Reading… (n of m)", counted per area (8 + users).
 - Page-session cache (`createReadCache()`, `clearRecordFacts(cache)`; the page holds one in `state.cache`): `org` (roles,
   territories) and `rec` (share rows, record territories, account rows/owner/owner role, group and share-user names, manager-group
   members, permission count; keyed by record Id and emptied when the record changes, and by `useRecord`). A read that failed is
@@ -253,7 +277,7 @@ takes a pasted link or Id, which is also how the dev server is used).
   it could not tell. Do not state "whoever can see the parent can see them" as a general rule.
 - The two-user difference compares by what sharing gives first, lists every route the other user
   lacks (even when both have routes) and a `levelNote`.
-- Not covered (also in the page's Notes and the README): restriction and scoping rules, Experience
+- Not covered (also in the page's Notes and the README): Experience
   Cloud sharing sets, field-level access, which sharing rule (the share row does not name it), shares to
   manager groups, the custom-object "Grant Access Using Hierarchies" setting (assumed on), members
   beyond the walk caps. Not verified live: share-table field names,
