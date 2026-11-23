@@ -170,7 +170,7 @@ export async function run(test) {
     assert.equal(a.findings.length, 1);
     assert.equal(a.findings[0].handled, true);
     assert.equal(a.findings[0].count, 3);
-    assert.match(a.findings[0].title, /may have been handled/);
+    assert.match(a.findings[0].title, /^An error was raised in Apex$/);
     assert.equal(a.problemCount, 0);
     assert.equal(a.handledCount, 1);
     assert.equal(a.headline, "No unhandled errors found in this log");
@@ -352,7 +352,7 @@ export async function run(test) {
   await test("errors: a cut-off log is reported, by its marker or by the size from the list", () => {
     const a = analyzeLog(mk(TRIGGER_START, t(2, "USER_DEBUG|[1]|DEBUG|x"), "*********** MAXIMUM DEBUG LOG SIZE REACHED ***********"));
     assert.equal(a.cutOff, true);
-    assert.ok(a.notes.some((n) => /cut off/.test(n)));
+    assert.ok(a.notes.some((n) => /turn the debug level down/.test(n)));
     assert.match(a.subline, /cut off/);
     const b = analyzeLog(mk(TRIGGER_START), { length: 20000000 });
     assert.equal(b.cutOff, true);
@@ -368,7 +368,7 @@ export async function run(test) {
     assert.equal(a.headline, "No errors found in this log");
     assert.match(a.subline, /Not recorded: Flows and workflow/);
     assert.ok(!/Recorded:[^.]*Flows and workflow/.test(a.subline), "flows are not listed as recorded");
-    assert.ok(a.notes.some((n) => /Flows and workflow: recorded at none, below Info/.test(n) && /flow errors cannot be seen/.test(n)));
+    assert.ok(a.notes.some((n) => /^Workflow: the log level for it is none, below Info\. Set Workflow to Info or finer/.test(n) && /flow errors cannot be seen/.test(n)));
     assert.equal(a.coverage.find((c) => c.key === "WORKFLOW").ok, false);
     assert.equal(a.coverage.find((c) => c.key === "APEX_CODE").ok, true);
     // everything recorded: the claim names what was covered
@@ -380,7 +380,7 @@ export async function run(test) {
     assert.match(lean.subline, /Not recorded: Saves to the database, Validation rules, Flows and workflow/);
     // low Apex level
     const low = analyzeLog([HEADER.replace("APEX_CODE,FINEST", "APEX_CODE,ERROR"), TRIGGER_START].join("\n"));
-    assert.ok(low.notes.some((n) => /Apex code: recorded at error/.test(n)));
+    assert.ok(low.notes.some((n) => /^Apex Code: the log level for it is error, below Info/.test(n)));
     // problems found while a category was missing still say there may be more
     const some = analyzeLog([noFlows, t(3, "FATAL_ERROR|System.MathException: Divide by 0"), "", "Class.Calc.run: line 4, column 1"].join("\n"));
     assert.match(some.subline, /Not recorded well enough to show errors: Flows and workflow/);
@@ -610,8 +610,8 @@ export async function run(test) {
     assert.equal(v.partial, true);
     assert.ok(!/Not recorded:[^.]*Validation rules/.test(a.subline), a.subline);
     assert.match(a.subline, /Recorded only in part: Validation rules/);
-    assert.ok(a.notes.some((n) => /Validation rules: recorded only in part/.test(n)));
-    assert.ok(!a.notes.some((n) => /Validation rules: not recorded/.test(n)));
+    assert.ok(a.notes.some((n) => /^Validation: the log level for it is none, but some of its steps still show\. Set Validation to Info to see them all\.$/.test(n)), a.notes.join(" | "));
+    assert.ok(!a.notes.some((n) => /not recorded|only in part|though this log/.test(n)));
     // nothing of it in the log: still "not recorded"
     const none = analyzeLog([low, TRIGGER_START].join("\n"));
     assert.equal(none.coverage.find((c) => c.key === "VALIDATION").partial, false);
@@ -620,6 +620,90 @@ export async function run(test) {
     const bad = analyzeLog([low, t(5, "CODE_UNIT_STARTED|[EXTERNAL]|Validation:SFTL_Widget:new"), t(9, "FATAL_ERROR|System.MathException: x")].join("\n"));
     assert.ok(!/Not recorded well enough[^.]*Validation rules/.test(bad.subline), bad.subline);
     assert.match(bad.subline, /Recorded only in part: Validation rules/);
+  });
+
+  await test("final fixes: command-line log names the record type from the finished Validation code unit", () => {
+    const msg = "System.DmlException: Insert failed. First exception on row 0; first error: FIELD_CUSTOM_VALIDATION_EXCEPTION, Shipped widgets need a paint color.: [SFTL_Color__c]";
+    const body = (unit) => [
+      t(5, `CODE_UNIT_STARTED|[EXTERNAL]|${unit}`),
+      t(6, `CODE_UNIT_FINISHED|${unit}`),
+      t(7, `EXCEPTION_THROWN|[1]|${msg}`),
+      t(8, `FATAL_ERROR|${msg}`)];
+    const shapes = {
+      "no levels line": body("Validation:SFTL_Widget:new").join("\n"),
+      "full levels": mk(...body("Validation:SFTL_Widget:new")),
+      "VALIDATION,INFO;DB,NONE": ["62.0 VALIDATION,INFO;DB,NONE", ...body("Validation:SFTL_Widget:new")].join("\n"),
+    };
+    for (const [name, log] of Object.entries(shapes)) {
+      const a = analyzeLog(log);
+      assert.equal(a.findings.length, 1, name);
+      assert.match(a.findings[0].message, /Shipped widgets need a paint color/, name);
+      assert.match(a.findings[0].message, /Saving a SFTL_Widget record failed/, name);
+      assert.ok(!a.notes.some((n) => /kind of record being saved may be missing/.test(n)), `${name}: ${a.notes}`);
+    }
+    // namespace and __c object names
+    const ns = analyzeLog(["62.0 VALIDATION,INFO", ...body("Validation:ns__Thing__c:a0B000000000001AAA")].join("\n"));
+    assert.match(ns.findings[0].message, /Saving a ns__Thing__c record failed/);
+    // no unit and no DML_BEGIN: wording unchanged
+    const none = analyzeLog(["62.0 VALIDATION,INFO", t(7, `EXCEPTION_THROWN|[1]|${msg}`), t(8, `FATAL_ERROR|${msg}`)].join("\n"));
+    assert.ok(!/ of an? \w+ record/.test(none.findings[0].message), none.findings[0].message);
+  });
+
+  await test("final fixes: notes say each thing once", () => {
+    const a = analyzeLog(["62.0 APEX_CODE,FINEST;DB,NONE;WORKFLOW,INFO", t(9, "FATAL_ERROR|System.MathException: x")].join("\n"));
+    for (const n of a.notes) {
+      const sentences = n.split(/(?<=\.)\s+/).map((x) => x.toLowerCase());
+      assert.equal(new Set(sentences).size, sentences.length, n);
+      assert.ok(!/not recorded\.[^.]*were not recorded/i.test(n), n);
+    }
+    const v = analyzeLog(["62.0 APEX_CODE,FINEST;VALIDATION,NONE", t(9, "FATAL_ERROR|System.MathException: x")].join("\n"));
+    const note = v.notes.find((n) => /^Validation:/.test(n));
+    assert.ok(note && !/were not recorded/.test(note), String(note));
+  });
+
+  await test("wording: coverage and cut-off warnings are said once (headline line), never again in Notes", () => {
+    const logs = [
+      ["62.0 APEX_CODE,FINEST;DB,NONE;VALIDATION,NONE;WORKFLOW,NONE", t(5, "CODE_UNIT_STARTED|[EXTERNAL]|Validation:SFTL_Widget:new"), t(6, "CODE_UNIT_FINISHED|Validation:SFTL_Widget:new"), t(9, "FATAL_ERROR|System.MathException: x"), "*********** MAXIMUM DEBUG LOG SIZE REACHED ***********"].join("\n"),
+      ["62.0 APEX_CODE,FINEST;DB,NONE;VALIDATION,NONE;WORKFLOW,NONE", t(5, "CODE_UNIT_STARTED|[EXTERNAL]|Validation:SFTL_Widget:new"), "*********** MAXIMUM DEBUG LOG SIZE REACHED ***********"].join("\n"),
+    ];
+    for (const log of logs) {
+      const a = analyzeLog(log);
+      assert.match(a.subline, /cut off/);
+      assert.ok(a.notes.length > 0);
+      for (const n of a.notes) {
+        for (const c of a.coverage) assert.ok(!n.includes(c.label), `${c.label} repeated in: ${n}`);
+        assert.ok(!/cut off|recorded/i.test(n), `repeated in: ${n}`);
+      }
+    }
+  });
+
+  await test("wording: handled-error note is right for one and for many; one label for handled cards", () => {
+    const one = (n) => analyzeLog(["62.0 APEX_CODE,FINEST", ...Array.from({ length: n }, (_, i) => t(5 + i, `EXCEPTION_THROWN|[${i + 1}]|System.MathException: Divide by 0 ${i}`))].join("\n"));
+    const a = one(1), b = one(2);
+    assert.ok(a.notes.includes("1 error was raised but may have been handled by the code. It is listed after the problems and is usually not the cause."), a.notes.join("|"));
+    assert.ok(b.notes.some((n) => /^2 errors were raised but may have been handled by the code\. They are listed /.test(n)), b.notes.join("|"));
+    const js = readFileSync(new URL("../tools/error-tracer/error-tracer.js", import.meta.url), "utf8");
+    assert.ok(!/possibly handled|MAY HAVE BEEN|\(it may have been handled\)/.test(js));
+    for (const f of [...a.findings, ...b.findings]) assert.ok(!/handled/.test(f.title), f.title);
+  });
+
+  await test("wording: the clock note has no doubled brackets", () => {
+    const a = analyzeLog(["62.0 APEX_CODE,FINEST", t(1, "USER_INFO|[EXTERNAL]|005000000000001|a@b.test|(GMT-08:00) Pacific Standard Time|GMT-08:00"), t(9, "FATAL_ERROR|System.MathException: x")].join("\n"));
+    const n = a.notes.find((x) => /clock/.test(x));
+    assert.ok(n, a.notes.join("|"));
+    assert.ok(!/\(\(/.test(n) && !/\)\)/.test(n), n);
+    assert.match(n, /Pacific Standard Time/);
+  });
+
+  await test("wording: a validation object comes from an earlier unit only when nothing ran in between", () => {
+    const msg = "System.DmlException: Insert failed. First exception on row 0; first error: FIELD_CUSTOM_VALIDATION_EXCEPTION, Stop.: []";
+    const real = analyzeLog(["62.0 VALIDATION,INFO", t(5, "CODE_UNIT_STARTED|[EXTERNAL]|Validation:SFTL_Widget:new"), t(6, "CODE_UNIT_FINISHED|Validation:SFTL_Widget:new"), t(7, `EXCEPTION_THROWN|[1]|${msg}`), t(8, `FATAL_ERROR|${msg}`)].join("\n"));
+    assert.match(real.findings[0].message, /SFTL_Widget/);
+    for (const between of [t(6, "CODE_UNIT_STARTED|[EXTERNAL]|01p000000000001|Other.run()"), t(6, "DML_BEGIN|[2]|Op:Insert|Type:Contact|Rows:1")]) {
+      const wrong = analyzeLog(["62.0 VALIDATION,INFO", t(4, "CODE_UNIT_STARTED|[EXTERNAL]|Validation:Account:new"), t(5, "CODE_UNIT_FINISHED|Validation:Account:new"), between, t(7, `EXCEPTION_THROWN|[1]|${msg}`), t(8, `FATAL_ERROR|${msg}`)].join("\n"));
+      assert.ok(!/Account/.test(wrong.findings[0].message), wrong.findings[0].message);
+      assert.ok(!wrong.findings[0].object || wrong.findings[0].object === "Contact", String(wrong.findings[0].object));
+    }
   });
 
   await test("final fixes: a validation card says which kind of record was being saved", () => {

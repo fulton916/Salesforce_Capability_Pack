@@ -183,7 +183,7 @@ export function analyzeLog(text, meta = {}) {
     cutOff: false, lineCount: lines.length, lines, headline: "", subline: "",
   };
   const st = {
-    stack: [], dml: null, rule: null, lastVal: null, pendingValMsg: null, valFindings: [],
+    stack: [], dml: null, lastValObject: null, valClean: false, rule: null, lastVal: null, pendingValMsg: null, valFindings: [],
     flowStack: [], interviewFlow: new Map(), lastElementInterview: null, flowFindings: [],
     excByKey: new Map(), handledByKey: new Map(), flowByKey: new Map(),
     seen: new Set(), // areas the log itself shows activity for, whatever its levels line says
@@ -230,6 +230,7 @@ export function analyzeLog(text, meta = {}) {
     f.frames = frames;
     f.line = line;
     f.dml = dmlWords();
+    f.unitObject = st.valClean ? st.lastValObject : null;
     if (save) f.save = { code: save.code, message: save.message, fields: save.fields, op: save.op, recordId: save.recordId, plain: save.plain };
     if (fatal) {
       const earlier = st.excByKey.get(key);
@@ -239,6 +240,7 @@ export function analyzeLog(text, meta = {}) {
           e.absorbed = true;
           if (f.line == null) f.line = e.line;
           if (!f.dml) f.dml = e.dml;
+          if (!f.unitObject) f.unitObject = e.unitObject;
           if (!f.rule && e.rule) { f.rule = e.rule; f.object = e.object; f.recordId = e.recordId; }
           if (e.kind === "validation" && f.kind === "save") f.kind = "validation";
           f.start = Math.min(f.start, e.start);
@@ -288,17 +290,20 @@ export function analyzeLog(text, meta = {}) {
       f.title = "A Salesforce limit was hit";
       f.message = `${hint} Salesforce said: \u201c${f.rawMessage.replace(/^System\.LimitException:\s*/, "")}\u201d.`;
     } else if (f.kind === "validation" && f.save) {
-      f.title = f.handled ? "A validation rule stopped a save (the code may have handled it)" : "A validation rule stopped the save";
+      f.title = f.handled ? "A validation rule stopped a save" : "A validation rule stopped the save";
       if (!f.object && f.dml && f.dml.type) f.object = f.dml.type;
+      if (!f.object && f.unitObject) f.object = f.unitObject;
       f.message = `${f.rule ? `The rule \u201c${f.rule}\u201d` : "A validation rule"} refused the save${f.object ? ` of ${aKind(f.object)} record` : ""}${f.save.message ? `. The message was: \u201c${f.save.message}\u201d` : ""}${f.save.fields ? ` (field: ${f.save.fields})` : ""}.`;
     } else if (f.kind === "save") {
-      f.title = f.handled ? "A save failed (the code may have handled it)" : "A save failed";
-      f.message = `${what ? `Saving ${what} failed. ` : ""}${f.save ? f.save.plain : `Salesforce said: \u201c${f.rawMessage}\u201d.`}`;
+      f.title = f.handled ? "A save failed" : "A save failed";
+      const unitWhat = !what && f.unitObject && f.save && f.save.code === "FIELD_CUSTOM_VALIDATION_EXCEPTION" ? aKind(f.unitObject) : "";
+      if (unitWhat) f.object = f.unitObject;
+      f.message = `${what ? `Saving ${what} failed. ` : unitWhat ? `Saving ${unitWhat} record failed. ` : ""}${f.save ? f.save.plain : `Salesforce said: \u201c${f.rawMessage}\u201d.`}`;
     } else {
       const cls = /^([A-Za-z_][\w.]*(?:Exception|Error)):\s*([\s\S]*)$/.exec(f.rawMessage);
       const short = cls ? cls[1].split(".").pop() : "";
       const hint = EXCEPTION_HINTS[short];
-      f.title = f.handled ? "An error was raised in Apex (it may have been handled)" : "Apex code stopped with an error";
+      f.title = f.handled ? "An error was raised in Apex" : "Apex code stopped with an error";
       f.message = `${hint || (f.handled ? "The code raised an error." : "The code stopped with an error.")} Salesforce said: \u201c${f.rawMessage}\u201d.`;
     }
   }
@@ -367,12 +372,14 @@ export function analyzeLog(text, meta = {}) {
       case "CODE_UNIT_STARTED": {
         const u = describeUnit(ev.rest.split("|"));
         st.stack.push(u);
-        if (u.kind === "validation") st.seen.add("VALIDATION");
-        else if (u.kind === "flow" || u.kind === "workflow") st.seen.add("WORKFLOW");
+        // The record type of a validation unit counts only while nothing else has run since.
+        if (u.kind === "validation") { st.seen.add("VALIDATION"); st.lastValObject = u.object; st.valClean = true; }
+        else { st.valClean = false; if (u.kind === "flow" || u.kind === "workflow") st.seen.add("WORKFLOW"); }
         break;
       }
       case "CODE_UNIT_FINISHED": st.stack.pop(); break;
       case "DML_BEGIN": {
+        st.valClean = false;
         const f = ev.rest.split("|");
         const get = (p) => { const x = f.find((s) => s.startsWith(p)); return x ? x.slice(p.length) : null; };
         st.dml = { op: get("Op:"), type: get("Type:"), rows: Number(get("Rows:")) || null };
@@ -495,6 +502,8 @@ export function flowPointer(name) {
   return `To see which other flows use \u201c${name}\u201d, open \u201cWhere is it used in flows?\u201d from the toolbar menu and search for ${name}.`;
 }
 
+const SETUP_NAME = { APEX_CODE: "Apex Code", DB: "Database", VALIDATION: "Validation", WORKFLOW: "Workflow" };
+
 function levelWords(c) { return `${c.label} (${c.level ? c.level.toLowerCase() : "not recorded"})`; }
 
 function buildNotes(out, meta) {
@@ -509,17 +518,21 @@ function buildNotes(out, meta) {
   }
   if (!out.levels) notes.push("This log has no recording-levels line at the top, so the page cannot tell which areas were recorded. Do not read \u201cno errors\u201d as proof.");
   for (const c of missing) {
+    const setup = SETUP_NAME[c.key] || c.label;
+    const lvl = c.level ? c.level.toLowerCase() : "none";
     if (c.partial) {
-      notes.push(`${c.label}: recorded only in part${c.level ? ` (the levels line says ${c.level.toLowerCase()})` : ""}, though this log does show some of it. Errors there may be missing.`);
+      notes.push(`${setup}: the log level for it is ${lvl}, but some of its steps still show. Set ${setup} to Info to see them all.`);
       continue;
     }
-    const hint = c.key === "WORKFLOW" ? " Flows need Flows and workflow at Info or finer, so flow errors cannot be seen in this log." : c.key === "VALIDATION" ? " Validation rules were not recorded, so a rule that stopped a save may not show." : c.key === "APEX_CODE" ? " Errors that code handled, and where code ran, may be missing." : " The kind of record being saved may be missing.";
-    notes.push(`${c.label}: ${c.level ? `recorded at ${c.level.toLowerCase()}, below Info` : "not recorded"}.${hint}`);
+    const hint = c.key === "WORKFLOW" ? " Until then, flow errors cannot be seen." : c.key === "VALIDATION" ? " Until then, a rule that stopped a save may not show." : c.key === "APEX_CODE" ? " Until then, errors that code handled, and where code ran, may be missing." : (out.findings.some((x) => x.object) ? "" : " Until then, the kind of record being saved may be missing.");
+    notes.push(`${setup}: the log level for it is ${c.level ? `${lvl}, below Info` : "not given"}. Set ${setup} to Info or finer.${hint}`);
   }
-  if (out.cutOff) notes.push("This log was cut off (Salesforce keeps only part of a very large log). Anything after the cut, possibly the error itself, is missing. Turn the debug level down, repeat the action and read the new log.");
+  if (out.cutOff) notes.push("To get the missing end, turn the debug level down, repeat the action and read the new log. Salesforce keeps only part of a very large log, and the error itself may be in the part it dropped.");
   if (out.moreFindings) notes.push(`${out.moreFindings} more problems were left out to keep this page quick (the first ${MAX_FINDINGS} are shown).`);
-  if (out.handledCount) notes.push(`${out.handledCount} error${out.handledCount === 1 ? " was" : "s were"} raised but may have been handled by the code. They are listed after the problems and are usually not the cause.`);
-  if (out.user.timeZone) notes.push(`The raw lines under \u201cLog lines\u201d show the log's own clock, which is in the user's time zone (${out.user.timeZone}). The cards say how long after the log started each problem happened.`);
+  if (out.handledCount) notes.push(out.handledCount === 1
+    ? "1 error was raised but may have been handled by the code. It is listed after the problems and is usually not the cause."
+    : `${out.handledCount} errors were raised but may have been handled by the code. They are listed after the problems and are usually not the cause.`);
+  if (out.user.timeZone) notes.push(`The raw lines under \u201cLog lines\u201d show the log's own clock, which is in the user's time zone, ${out.user.timeZone}. The cards say how long after the log started each problem happened.`);
   const n = out.problemCount;
   if (n > 0) {
     out.headline = `${n} problem${n === 1 ? "" : "s"} found in this log`;
@@ -527,7 +540,8 @@ function buildNotes(out, meta) {
     out.subline = [
       none.length ? `Not recorded well enough to show errors: ${none.map((c) => c.label).join(", ")}.` : "",
       part.length ? `Recorded only in part: ${part.map((c) => c.label).join(", ")}.` : "",
-      missing.length ? "There may be more." : "",
+      out.cutOff ? "The log was cut off, so the end is missing." : "",
+      missing.length || out.cutOff ? "There may be more." : "",
     ].filter(Boolean).join(" ");
   } else {
     out.headline = out.handledCount ? "No unhandled errors found in this log" : "No errors found in this log";

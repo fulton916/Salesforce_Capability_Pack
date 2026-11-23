@@ -162,7 +162,7 @@ function renderResult(row, analysis, meta) {
   const soft = analysis.findings.filter((f) => f.handled);
   for (const f of real) box.append(findingCard(analysis, f));
   if (soft.length) {
-    box.append(el("h2", { text: real.length ? "Also raised, and possibly handled" : "Raised, and possibly handled" }));
+    box.append(el("h2", { text: "May have been handled" }));
     for (const f of soft) box.append(findingCard(analysis, f));
   }
   if (analysis.notes.length) {

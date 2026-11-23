@@ -250,8 +250,8 @@ access and so on, with the kind of record being saved), validation rules (which 
 object, the message the user saw), flows that failed (the flow, the failing step; to find other
 flows that use the same flow, open "Where is it used in flows?" from the menu), Salesforce limits (too
 many queries, CPU time), and errors that were raised but may have been handled by the code (listed
-separately, never as the cause). Notes say when the log was cut off, or when a category was not
-recorded at a level high enough (so "no flow errors" is never claimed when flows were not recorded).
+separately, never as the cause). The line under the headline says once when the log was cut off, or when a category was not
+recorded at a level high enough; Notes say what to change in Setup (so "no flow errors" is never claimed when flows were not recorded).
 
 What it reads: `ApexLog` (one `SELECT` for the list, newest 100, and one `GET` of a log's body). GET and
 `SELECT` only. It never creates or changes a trace flag, a debug level or anything else.
