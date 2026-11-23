@@ -609,8 +609,12 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
 
   const total = 7 + users.length;
   let done = 0;
-  const tick = (p) => p.then((v) => { done++; progress(`Reading… (${done} of ${total})`); return v; });
-  progress(`Reading… (0 of ${total})`);
+  // Once the run has ended (answered or failed) no more progress is told: reads still under way after an early failure
+  // must not write "Reading… (7 of 8)" next to the error.
+  let open = true;
+  const say = (t) => { if (open) progress(t); };
+  const tick = (p) => p.then((v) => { done++; say(`Reading… (${done} of ${total})`); return v; });
+  say(`Reading… (0 of ${total})`);
 
   // Org-wide lists.
   const rolesU = tick((async () => {
@@ -799,7 +803,13 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
   const userUs = users.map((pick) => tick(readUser(pick)));
 
   // Everything is under way. Gather it, always in the same order, so the notes read the same way every time.
-  const [R, T, S, A, N, M, P, ...U] = await Promise.all([rolesU, terrU, sharesU, accountU, namesU, membersU, permU, ...userUs]);
+  let gathered;
+  try {
+    gathered = await Promise.all([rolesU, terrU, sharesU, accountU, namesU, membersU, permU, ...userUs]);
+  } finally {
+    open = false;
+  }
+  const [R, T, S, A, N, M, P, ...U] = gathered;
   const out = blank();
   out.notes.push(...ctx.notes);
   out.warnings.push(...ctx.warnings);
