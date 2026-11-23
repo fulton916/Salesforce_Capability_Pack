@@ -26,4 +26,11 @@ same change.
 
 ## Open items
 
-None.
+### Mention Einstein Activity Capture in the User access tool's descriptions
+- Date: 2026-11-22
+- File(s): chrome-extension/shared/tool-list.js (the `user-access` entry's `description`); root README.md and root CLAUDE.md (the `chrome-extension` line that describes "User access summary and comparison")
+- Change: add that the tool also shows each user's email and calendar connection (Einstein Activity Capture), and lists who is in each Einstein Activity Capture configuration (past Setup's 500-user limit), who is not connected, and who has access but is in no configuration, for Excel. For example, append: "; also shows Einstein Activity Capture (email and calendar): one user's connection, or who is in each configuration". Keep the menu text short.
+- Deferred because: those files are being edited by other sessions on the same night (brief for issue #31 put them out of scope)
+- Belongs to: claude/issue-31-eac
+- Added by: developer
+

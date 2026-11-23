@@ -1,0 +1,559 @@
+{
+  "schema": "sf-eac-demo/1",
+  "note": "Made-up users and configurations for the demo page. The configuration 063DEMO00000004AAA has no name on purpose.",
+  "statuses": [
+    {
+      "Id": "0DEMO00000000000AAA",
+      "UserId": "005DEMO00000001AAA",
+      "UserName": "Avery Example",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail1@example.com",
+      "ConnectivityStatus": "ACTIVE",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": true,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000001AAA",
+      "UserId": "005DEMO00000002AAA",
+      "UserName": "Blake Sample",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail2@example.com",
+      "ConnectivityStatus": "ACTIVE",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": true,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000002AAA",
+      "UserId": "005DEMO00000003AAA",
+      "UserName": "Casey Demo",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail3@example.com",
+      "ConnectivityStatus": null,
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": null,
+      "GlobalOauthTermsState": null,
+      "ContactsSynced": null,
+      "EventsSynced": null,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000003AAA",
+      "UserId": "005DEMO00000004AAA",
+      "UserName": "Drew Placeholder",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail4@example.com",
+      "ConnectivityStatus": "PENDING",
+      "RecommendedActionTitle": "Finish connecting your account",
+      "RecommendedActionDescription": "Sign in to your email account from Settings to start syncing.",
+      "IsTermsOfServiceAccepted": false,
+      "GlobalOauthTermsState": "PENDING",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000004AAA",
+      "UserId": "005DEMO00000005AAA",
+      "UserName": "Emery Test",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail5@example.com",
+      "ConnectivityStatus": "NEEDSATTENTION",
+      "RecommendedActionTitle": "Reconnect your account",
+      "RecommendedActionDescription": "The connection to the email account was lost. Reconnect it to resume syncing.",
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000005AAA",
+      "UserId": "005DEMO00000006AAA",
+      "UserName": "Finley Fictional",
+      "ConfigurationName": "Executive Assistants",
+      "EmailAddress": "mail6@example.com",
+      "ConnectivityStatus": "ACTIVE",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": true,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000006AAA",
+      "UserId": "005DEMO00000007AAA",
+      "UserName": "Gray Madeup",
+      "ConfigurationName": "Executive Assistants",
+      "EmailAddress": "mail7@example.com",
+      "ConnectivityStatus": "INITIALIZING",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000007AAA",
+      "UserId": "005DEMO00000008AAA",
+      "UserName": "Harper Imaginary",
+      "ConfigurationName": "Executive Assistants",
+      "EmailAddress": "mail8@example.com",
+      "ConnectivityStatus": null,
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": false,
+      "GlobalOauthTermsState": "PENDING",
+      "ContactsSynced": null,
+      "EventsSynced": null,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000008AAA",
+      "UserId": "005DEMO00000009AAA",
+      "UserName": "Indy Sample",
+      "ConfigurationName": "Executive Assistants",
+      "EmailAddress": "mail9@example.com",
+      "ConnectivityStatus": "DISABLED",
+      "RecommendedActionTitle": "Turn the connection back on",
+      "RecommendedActionDescription": "An admin turned this connection off.",
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000009AAA",
+      "UserId": "005DEMO00000010AAA",
+      "UserName": "Jordan Example",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail10@example.com",
+      "ConnectivityStatus": "ACTIVE",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": true,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000010AAA",
+      "UserId": "005DEMO00000011AAA",
+      "UserName": "Kai Demo",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail11@example.com",
+      "ConnectivityStatus": "PROCESSING",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000011AAA",
+      "UserId": "005DEMO00000012AAA",
+      "UserName": "Logan Placeholder",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail12@example.com",
+      "ConnectivityStatus": "IDLE_STREAMING",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": true,
+      "EventsSynced": true,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000012AAA",
+      "UserId": "005DEMO00000013AAA",
+      "UserName": "Morgan Test",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail13@example.com",
+      "ConnectivityStatus": "NEEDSATTENTIONGLOBAL",
+      "RecommendedActionTitle": "Ask your admin to check the connection",
+      "RecommendedActionDescription": "A setting for the whole org needs attention.",
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000013AAA",
+      "UserId": "005DEMO00000014AAA",
+      "UserName": "Noel Fictional",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail14@example.com",
+      "ConnectivityStatus": "NEEDSATTENTIONHYBRID",
+      "RecommendedActionTitle": "Check the hybrid connection",
+      "RecommendedActionDescription": "The on-premises connection needs attention.",
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000014AAA",
+      "UserId": "005DEMO00000015AAA",
+      "UserName": "Oakley Madeup",
+      "ConfigurationName": "Service Reps",
+      "EmailAddress": "mail15@example.com",
+      "ConnectivityStatus": null,
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": null,
+      "GlobalOauthTermsState": null,
+      "ContactsSynced": null,
+      "EventsSynced": null,
+      "UserOnboardingStatus": null
+    },
+    {
+      "Id": "0DEMO00000000015AAA",
+      "UserId": "005DEMO00000026AAA",
+      "UserName": "Lane Quiet",
+      "ConfigurationName": "Sales Team Standard",
+      "EmailAddress": "mail26@example.com",
+      "ConnectivityStatus": "ACTIVE",
+      "RecommendedActionTitle": null,
+      "RecommendedActionDescription": null,
+      "IsTermsOfServiceAccepted": true,
+      "GlobalOauthTermsState": "ACCEPTED",
+      "ContactsSynced": false,
+      "EventsSynced": false,
+      "UserOnboardingStatus": null
+    }
+  ],
+  "assignments": [
+    {
+      "Id": "0DEMOASG00000000AAA",
+      "AssignedId": "005DEMO00000001AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00000001AAA",
+      "AssignedId": "005DEMO00000002AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00000002AAA",
+      "AssignedId": "005DEMO00000003AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00000003AAA",
+      "AssignedId": "005DEMO00000004AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00000004AAA",
+      "AssignedId": "005DEMO00000005AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00000005AAA",
+      "AssignedId": "005DEMO00000006AAA",
+      "ConfigurationId": "063DEMO00000002AAA"
+    },
+    {
+      "Id": "0DEMOASG00000006AAA",
+      "AssignedId": "005DEMO00000007AAA",
+      "ConfigurationId": "063DEMO00000002AAA"
+    },
+    {
+      "Id": "0DEMOASG00000007AAA",
+      "AssignedId": "005DEMO00000008AAA",
+      "ConfigurationId": "063DEMO00000002AAA"
+    },
+    {
+      "Id": "0DEMOASG00000008AAA",
+      "AssignedId": "005DEMO00000009AAA",
+      "ConfigurationId": "063DEMO00000002AAA"
+    },
+    {
+      "Id": "0DEMOASG00000009AAA",
+      "AssignedId": "005DEMO00000010AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00000010AAA",
+      "AssignedId": "005DEMO00000011AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00000011AAA",
+      "AssignedId": "005DEMO00000012AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00000012AAA",
+      "AssignedId": "005DEMO00000013AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00000013AAA",
+      "AssignedId": "005DEMO00000014AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00000014AAA",
+      "AssignedId": "005DEMO00000015AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00009001AAA",
+      "AssignedId": "005DEMO00000016AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    },
+    {
+      "Id": "0DEMOASG00009002AAA",
+      "AssignedId": "005DEMO00000017AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00009003AAA",
+      "AssignedId": "005DEMO00000018AAA",
+      "ConfigurationId": "063DEMO00000002AAA"
+    },
+    {
+      "Id": "0DEMOASG00009004AAA",
+      "AssignedId": "00eDEMO0000000001AAA",
+      "ConfigurationId": "063DEMO00000003AAA"
+    },
+    {
+      "Id": "0DEMOASG00009005AAA",
+      "AssignedId": "005DEMO00000025AAA",
+      "ConfigurationId": "063DEMO00000004AAA"
+    },
+    {
+      "Id": "0DEMOASG00009006AAA",
+      "AssignedId": "005DEMO00000026AAA",
+      "ConfigurationId": "063DEMO00000001AAA"
+    }
+  ],
+  "configs": {
+    "063DEMO00000001AAA": "Sales Team Standard",
+    "063DEMO00000002AAA": "Executive Assistants",
+    "063DEMO00000003AAA": "Service Reps"
+  },
+  "users": [
+    {
+      "Id": "005DEMO00000001AAA",
+      "Name": "Avery Example",
+      "Username": "avery.example@example.com",
+      "IsActive": true,
+      "Email": "avery.example@example.com"
+    },
+    {
+      "Id": "005DEMO00000002AAA",
+      "Name": "Blake Sample",
+      "Username": "blake.sample@example.com",
+      "IsActive": true,
+      "Email": "blake.sample@example.com"
+    },
+    {
+      "Id": "005DEMO00000003AAA",
+      "Name": "Casey Demo",
+      "Username": "casey.demo@example.com",
+      "IsActive": true,
+      "Email": "casey.demo@example.com"
+    },
+    {
+      "Id": "005DEMO00000004AAA",
+      "Name": "Drew Placeholder",
+      "Username": "drew.placeholder@example.com",
+      "IsActive": true,
+      "Email": "drew.placeholder@example.com"
+    },
+    {
+      "Id": "005DEMO00000005AAA",
+      "Name": "Emery Test",
+      "Username": "emery.test@example.com",
+      "IsActive": true,
+      "Email": "emery.test@example.com"
+    },
+    {
+      "Id": "005DEMO00000006AAA",
+      "Name": "Finley Fictional",
+      "Username": "finley.fictional@example.com",
+      "IsActive": true,
+      "Email": "finley.fictional@example.com"
+    },
+    {
+      "Id": "005DEMO00000007AAA",
+      "Name": "Gray Madeup",
+      "Username": "gray.madeup@example.com",
+      "IsActive": true,
+      "Email": "gray.madeup@example.com"
+    },
+    {
+      "Id": "005DEMO00000008AAA",
+      "Name": "Harper Imaginary",
+      "Username": "harper.imaginary@example.com",
+      "IsActive": true,
+      "Email": "harper.imaginary@example.com"
+    },
+    {
+      "Id": "005DEMO00000009AAA",
+      "Name": "Indy Sample",
+      "Username": "indy.sample@example.com",
+      "IsActive": true,
+      "Email": "indy.sample@example.com"
+    },
+    {
+      "Id": "005DEMO00000010AAA",
+      "Name": "Jordan Example",
+      "Username": "jordan.example@example.com",
+      "IsActive": true,
+      "Email": "jordan.example@example.com"
+    },
+    {
+      "Id": "005DEMO00000011AAA",
+      "Name": "Kai Demo",
+      "Username": "kai.demo@example.com",
+      "IsActive": true,
+      "Email": "kai.demo@example.com"
+    },
+    {
+      "Id": "005DEMO00000012AAA",
+      "Name": "Logan Placeholder",
+      "Username": "logan.placeholder@example.com",
+      "IsActive": true,
+      "Email": "logan.placeholder@example.com"
+    },
+    {
+      "Id": "005DEMO00000013AAA",
+      "Name": "Morgan Test",
+      "Username": "morgan.test@example.com",
+      "IsActive": true,
+      "Email": "morgan.test@example.com"
+    },
+    {
+      "Id": "005DEMO00000014AAA",
+      "Name": "Noel Fictional",
+      "Username": "noel.fictional@example.com",
+      "IsActive": true,
+      "Email": "noel.fictional@example.com"
+    },
+    {
+      "Id": "005DEMO00000015AAA",
+      "Name": "Oakley Madeup",
+      "Username": "oakley.madeup@example.com",
+      "IsActive": true,
+      "Email": "oakley.madeup@example.com"
+    },
+    {
+      "Id": "005DEMO00000016AAA",
+      "Name": "Parker Imaginary",
+      "Username": "parker.imaginary@example.com",
+      "IsActive": true,
+      "Email": "parker.imaginary@example.com"
+    },
+    {
+      "Id": "005DEMO00000017AAA",
+      "Name": "Quinn Example",
+      "Username": "quinn.example@example.com",
+      "IsActive": true,
+      "Email": "quinn.example@example.com"
+    },
+    {
+      "Id": "005DEMO00000018AAA",
+      "Name": "Riley Sample",
+      "Username": "riley.sample@example.com",
+      "IsActive": false,
+      "Email": "riley.sample@example.com"
+    },
+    {
+      "Id": "005DEMO00000019AAA",
+      "Name": "Sage Demo",
+      "Username": "sage.demo@example.com",
+      "IsActive": true,
+      "Email": "sage.demo@example.com"
+    },
+    {
+      "Id": "005DEMO00000020AAA",
+      "Name": "Tatum Test",
+      "Username": "tatum.test@example.com",
+      "IsActive": true,
+      "Email": "tatum.test@example.com"
+    },
+    {
+      "Id": "005DEMO00000021AAA",
+      "Name": "Harper Sample",
+      "Username": "harper.sample@example.com",
+      "Email": "harper.sample@example.com",
+      "IsActive": true
+    },
+    {
+      "Id": "005DEMO00000022AAA",
+      "Name": "Indy Placeholder",
+      "Username": "indy.placeholder@example.com",
+      "Email": "indy.placeholder@example.com",
+      "IsActive": true
+    },
+    {
+      "Id": "005DEMO00000023AAA",
+      "Name": "Jules Retired",
+      "Username": "jules.retired@example.com",
+      "Email": "jules.retired@example.com",
+      "IsActive": false
+    },
+    {
+      "Id": "005DEMO00000025AAA",
+      "Name": "Kai Newcomer",
+      "Username": "kai.newcomer@example.com",
+      "Email": "kai.newcomer@example.com",
+      "IsActive": true
+    },
+    {
+      "Id": "005DEMO00000026AAA",
+      "Name": "Lane Quiet",
+      "Username": "lane.quiet@example.com",
+      "Email": "lane.quiet@example.com",
+      "IsActive": true
+    }
+  ],
+  "profiles": {
+    "00eDEMO0000000001AAA": "Service Standard"
+  },
+  "warnings": [],
+  "partial": "",
+  "profileMembers": {
+    "00eDEMO0000000001AAA": [
+      "005DEMO00000015AAA",
+      "005DEMO00000021AAA",
+      "005DEMO00000022AAA",
+      "005DEMO00000023AAA"
+    ]
+  },
+  "accessUserIds": [
+    "005DEMO00000001AAA",
+    "005DEMO00000002AAA",
+    "005DEMO00000015AAA",
+    "005DEMO00000019AAA",
+    "005DEMO00000020AAA",
+    "005DEMO00000021AAA",
+    "005DEMO00000022AAA",
+    "005DEMO00000025AAA"
+  ],
+  "accessNote": ""
+}

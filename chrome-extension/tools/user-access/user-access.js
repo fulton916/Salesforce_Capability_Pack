@@ -3,6 +3,11 @@ import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
 import { readUserAccess } from "./user-access-read.js";
+import { readEacRaw } from "./user-access-eac-read.js";
+import {
+  buildEacRows, eacCounts, filterEacRows, filterNoConfig, groupByConfig, eacCsvRows, noConfigCsvRows, eacSummaryLine, profileNote,
+  eacApiLine, assignedText, flagText, syncCell, SHOW_CHOICES, NO_CONFIG_TITLE, INACTIVE_TEXT, EAC_KEY, EAC_OFF_TEXT, EMPTY_CONFIG_NOTE, NO_EAC_USER_TEXT,
+} from "./user-access-eac.js";
 import {
   SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
   statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
@@ -45,6 +50,7 @@ const state = {
   diffOnly: true,
   showApi: false,
   search: "",
+  eac: { rows: [], profileAssignments: [], noConfig: null, accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
 };
 
 const compareMode = () => !!(state.sides.a.access && state.sides.b.access);
@@ -403,7 +409,14 @@ function itemCell(r) {
   return el("td", { class: "item" }, el("span", { text: r.label }), state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
 }
 
+/** On the email and calendar tab, "Show API names" adds the status's API name under the details. */
+function withApi(item, detail) {
+  if (!state.showApi || state.tab !== EAC_KEY || !item) return detail;
+  return [detail, eacApiLine(item)].filter(Boolean).join("\n");
+}
+
 function presence(item, detail) {
+  detail = withApi(item, detail);
   if (!item) return detail ? el("td", { class: "no" }, el("div", { class: "how", text: detail })) : el("td", { class: "no", text: NO });
   return el("td", {}, el("span", { class: "yes", text: YES }), detail ? el("div", { class: "how", text: detail }) : null);
 }
@@ -458,7 +471,7 @@ function columns() {
     return { head: [SECTION_TITLES[state.tab], headA, headB, "Difference"], row: (r) => [itemCell(r), presence(r.a, r.detailA), presence(r.b, r.detailB), el("td", {}, statusChip(r))] };
   }
   if (!hasDetails(currentRows())) return { head: [SECTION_TITLES[state.tab]], row: (r) => [itemCell(r)] };
-  return { head: [SECTION_TITLES[state.tab], "Details"], row: (r) => [itemCell(r), el("td", { class: "how", text: r.detail })] };
+  return { head: [SECTION_TITLES[state.tab], "Details"], row: (r) => [itemCell(r), el("td", { class: "how", text: withApi(r.item, r.detail) })] };
 }
 
 function visibleRows() {
@@ -492,7 +505,7 @@ function renderTable() {
   }
   if (!rows.length) {
     const total = currentRows().length;
-    let msg = na ? "" : state.tab === "customSettings" && !state.result ? "No custom setting has a value for this user or their profile that differs from the org default." : "Nothing here.";
+    let msg = na ? "" : state.tab === "customSettings" && !state.result ? "No custom setting has a value for this user or their profile that differs from the org default." : state.tab === EAC_KEY && !state.result ? NO_EAC_USER_TEXT : "Nothing here.";
     if (!na && state.search) msg = "Nothing matches your search.";
     else if (!na && total && state.diffOnly && state.result) msg = `No differences: ${total === 1 ? "the 1 item is" : `all ${total} items are`} the same for both users. Choose “Everything” to see them.`;
     wrap.replaceChildren(...parts, msg ? el("div", { class: "empty", text: msg }) : "");
@@ -527,7 +540,7 @@ function download(name, text, type) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  $(".menu").open = false;
+  $$(".menu").forEach((m) => { m.open = false; });
 }
 
 const safe = (s) => String(s || "").replace(/[^\w.-]+/g, "_").slice(0, 60);
@@ -548,7 +561,158 @@ $("#csvTab").addEventListener("click", () => {
   download(`${baseName()}${only ? "_" + safe(SECTION_TITLES[only]) : ""}.csv`, csv(only), "text/csv");
 });
 $("#csvAll").addEventListener("click", () => download(`${baseName()}.csv`, csv(null), "text/csv"));
-document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) $(".menu").open = false; });
+document.addEventListener("click", (e) => { if (!e.target.closest(".menu")) $$(".menu").forEach((m) => { m.open = false; }); });
+
+// ---------- who is in each email and calendar configuration (Einstein Activity Capture) ----------
+
+const eac = state.eac;
+const EAC_PAGE = 200; // members drawn per configuration at first; "Show more" adds this many; downloads have everything
+const NO_CONFIG_KEY = "\u0000noConfig";
+
+async function loadEacRaw() {
+  if (DEMO) return (await fetch("../../samples/eac_all_demo.json")).json();
+  return readEacRaw(state.api, { progress: (t) => { $("#eacProgress").textContent = t; } });
+}
+
+async function showEveryone() {
+  $("#eacError").hidden = true;
+  $("#eacLoad").disabled = true;
+  $("#eacProgress").textContent = "Reading…";
+  try {
+    const raw = await loadEacRaw();
+    const built = buildEacRows(raw);
+    Object.assign(eac, {
+      rows: built.rows, profileAssignments: built.profileAssignments, noConfig: built.noConfig,
+      accessNote: raw.accessNote || "", loaded: true, note: raw.partial || "", limits: new Map(),
+    });
+    renderEac();
+  } catch (e) {
+    $("#eacResult").hidden = true;
+    const box = $("#eacError");
+    box.replaceChildren(e?.featureOff ? EAC_OFF_TEXT : plainError(e, "Einstein Activity Capture could not be read. Your user may not have permission to see it. Ask an admin to check."));
+    if (!e?.featureOff && rawOf(e)) box.append(el("details", { class: "tech" }, el("summary", { text: "Technical details" }), el("div", { text: rawOf(e) })));
+    box.hidden = false;
+  } finally {
+    $("#eacLoad").disabled = false;
+    $("#eacLoad").textContent = eac.loaded ? "Read again" : "Show everyone";
+    $("#eacProgress").textContent = "";
+  }
+}
+
+const eacShown = () => filterEacRows(eac.rows, { show: eac.show, search: eac.search });
+const noConfigShown = () => filterNoConfig(eac.noConfig, { search: eac.search });
+const slug = (s) => safe(s).toLowerCase();
+const num = (n) => n.toLocaleString("en-US");
+
+function countList(title, items, text) {
+  return el("div", {}, el("h3", { text: title }), el("ul", {}, items.map((i) => el("li", {}, el("span", { class: "n", text: String(i.count) }), ` ${text(i)}`))));
+}
+
+function renderEac() {
+  $("#eacResult").hidden = false;
+  const c = eacCounts(eac.rows);
+  $("#eacConfigNote").textContent = EMPTY_CONFIG_NOTE;
+  $("#eacSummary").textContent = eac.rows.length ? eacSummaryLine(c) : "No one has an email and calendar connection or assignment.";
+  const extra = [
+    `${num(c.inactive)} inactive ${c.inactive === 1 ? "user" : "users"} still assigned`,
+    `${num(c.nothingSynced)} connected with nothing synced yet`,
+    eac.noConfig ? `${num(eac.noConfig.length)} with access but in no configuration` : "",
+  ].filter(Boolean);
+  $("#eacExtra").textContent = `${extra.join(". ")}.`;
+  $("#eacCounts").replaceChildren(
+    countList("By configuration", c.byConfig, (i) => `${i.name}${i.notConnected ? ` (${i.notConnected} not connected)` : ""}`),
+    countList("By status", c.byStatus, (i) => i.text),
+  );
+  const note = [profileNote(eac.profileAssignments), eac.accessNote, eac.note].filter(Boolean).join(" ");
+  $("#eacNote").hidden = !note;
+  $("#eacNote").textContent = note;
+  $("#eacCsvNoConfig").hidden = !eac.noConfig?.length;
+  renderEacGroups();
+}
+
+function memberTable(rows, limit) {
+  const head = ["Name", "Username", "Email", "Active", "How assigned", "Connection status", "Contacts synced", "Events synced"];
+  const body = rows.slice(0, limit).map((r) => el("tr", {},
+    el("td", { class: "item", text: r.name }),
+    el("td", { class: "how", text: r.username }),
+    el("td", { class: "how", text: r.email }),
+    el("td", {}, r.isActive ? "Yes" : el("span", { class: "eac-bad", text: INACTIVE_TEXT })),
+    el("td", { text: assignedText(r) }),
+    el("td", {},
+      el("span", { class: r.connected ? "eac-ok" : "eac-bad", text: r.statusText }),
+      r.nothingSynced ? el("div", { class: "eac-flag", text: flagText({ isActive: true, nothingSynced: true }) }) : null,
+      r.recommendedTitle ? el("div", { class: "how", text: r.recommendedTitle }) : null,
+      eac.showApi && r.hasRow ? el("div", { class: "api", text: r.status || "(blank)" }) : null),
+    el("td", { text: syncCell(r, r.contactsSynced) }),
+    el("td", { text: syncCell(r, r.eventsSynced) })));
+  return el("div", { class: "tablewrap" }, el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {}, h)))), el("tbody", {}, body)));
+}
+
+function moreButton(key, total, limit) {
+  if (total <= limit) return null;
+  return el("div", { class: "more" },
+    `Showing ${num(limit)} of ${num(total)}. `,
+    el("button", { onclick: () => { eac.limits.set(key, limit + EAC_PAGE); renderEacGroups(); }, text: `Show ${EAC_PAGE} more` }),
+    " Or search to narrow the list, or download it to get everyone.");
+}
+
+function configSection(group, total) {
+  const limit = eac.limits.get(group.name) || EAC_PAGE;
+  const csvRows = eac.rows.filter((r) => r.configuration === group.name);
+  return el("div", { class: "eac-group" },
+    el("div", { class: "eac-group-head" },
+      el("h3", { text: group.name }),
+      el("span", { class: "count", text: `${num(total)} ${total === 1 ? "member" : "members"}${group.rows.length !== total ? `, ${num(group.rows.length)} shown` : ""}` }),
+      el("button", { text: "This configuration (CSV for Excel)", onclick: () => download(`email_calendar_${slug(group.name)}_${stamp()}.csv`, toCsv(eacCsvRows(csvRows)), "text/csv") })),
+    memberTable(group.rows, limit),
+    moreButton(group.name, group.rows.length, limit));
+}
+
+function noConfigSection(list) {
+  const limit = eac.limits.get(NO_CONFIG_KEY) || EAC_PAGE;
+  const head = ["Name", "Username", "Email", "Active"];
+  const body = list.slice(0, limit).map((u) => el("tr", {}, el("td", { class: "item", text: u.name }), el("td", { class: "how", text: u.username }), el("td", { class: "how", text: u.email }), el("td", { text: u.isActive ? "Yes" : "No" })));
+  const total = eac.noConfig.length;
+  return el("div", { class: "eac-group" },
+    el("div", { class: "eac-group-head" },
+      el("h3", { text: NO_CONFIG_TITLE }),
+      el("span", { class: "count", text: `${num(total)} ${total === 1 ? "user" : "users"}${list.length !== total ? `, ${num(list.length)} shown` : ""}` }),
+      el("button", { text: "These users (CSV for Excel)", onclick: () => download(`email_calendar_no_configuration_${stamp()}.csv`, toCsv(noConfigCsvRows(eac.noConfig)), "text/csv") })),
+    el("div", { class: "tablewrap" }, el("table", {}, el("thead", {}, el("tr", {}, head.map((h) => el("th", {}, h)))), el("tbody", {}, body))),
+    moreButton(NO_CONFIG_KEY, list.length, limit));
+}
+
+function renderEacGroups() {
+  const parts = [];
+  if (eac.show === "noConfig") {
+    const list = noConfigShown();
+    if (!eac.noConfig) parts.push(el("div", { class: "empty", text: eac.accessNote || "Who has Einstein Activity Capture access could not be read." }));
+    else if (!eac.noConfig.length) parts.push(el("div", { class: "empty", text: "Everyone with Einstein Activity Capture access is in a configuration." }));
+    else if (!list.length) parts.push(el("div", { class: "empty", text: "Nothing matches your search." }));
+    else parts.push(noConfigSection(list));
+  } else {
+    const totals = new Map(groupByConfig(eac.rows).map((g) => [g.name, g.rows.length]));
+    for (const g of groupByConfig(eacShown())) parts.push(configSection(g, totals.get(g.name)));
+    if (eac.show === "all" && eac.noConfig?.length && noConfigShown().length) parts.push(noConfigSection(noConfigShown()));
+    if (!parts.length) {
+      parts.push(el("div", { class: "empty", text: !eac.rows.length ? "Nothing to show." : eac.search ? "Nothing matches your search."
+        : eac.show === "notConnected" ? "Everyone is connected." : eac.show === "inactive" ? "No inactive user is still assigned." : "Nothing to show here." }));
+    }
+  }
+  $("#eacGroups").replaceChildren(...parts);
+}
+
+$("#eacShow").replaceChildren(...SHOW_CHOICES.map((c) => el("option", { value: c.value, text: c.label })));
+$("#eacLoad").addEventListener("click", showEveryone);
+$("#eacShow").addEventListener("change", (e) => { eac.show = e.target.value; eac.limits = new Map(); renderEacGroups(); });
+$("#eacSearch").addEventListener("input", (e) => { eac.search = e.target.value; eac.limits = new Map(); renderEacGroups(); });
+$("#eacShowApi").addEventListener("change", (e) => { eac.showApi = e.target.checked; renderEacGroups(); });
+$("#eacCsvShown").addEventListener("click", () => {
+  if (eac.show === "noConfig") download(`email_calendar_no_configuration_${stamp()}.csv`, toCsv(noConfigCsvRows(noConfigShown())), "text/csv");
+  else download(`email_calendar_${eac.show}_${stamp()}.csv`, toCsv(eacCsvRows(eacShown())), "text/csv");
+});
+$("#eacCsvAll").addEventListener("click", () => download(`email_calendar_everyone_${stamp()}.csv`, toCsv(eacCsvRows(eac.rows)), "text/csv"));
+$("#eacCsvNoConfig").addEventListener("click", () => download(`email_calendar_no_configuration_${stamp()}.csv`, toCsv(noConfigCsvRows(eac.noConfig || [])), "text/csv"));
 
 connect();
 startLiveReload();
