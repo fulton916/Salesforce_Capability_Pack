@@ -46,3 +46,6 @@
 .eac-steps { margin: 6px 0; padding-left: 22px; }
 .eac-out { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
 .eac-bad-text { color: var(--risk); font-size: 13px; }
+.eac-load { margin: 6px 0 12px; padding-left: 10px; border-left: 3px solid var(--line, #ccc); }
+.eac-load h5 { margin: 6px 0 2px; font-size: 1em; }
+.eac-warn-text { font-weight: 600; }

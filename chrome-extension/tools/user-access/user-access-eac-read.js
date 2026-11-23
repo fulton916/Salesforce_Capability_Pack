@@ -6,9 +6,9 @@
 
 import { chunk, soqlString } from "../../shared/sfconn.js";
 import { EAC_OFF_TEXT, buildEacRows, eacItem } from "./user-access-eac.js";
-import { userLookupQueries } from "./user-access-eac-changes.js";
+import { userLookupQueries, permissionQuery, permissionRowFrom, PERMISSION_BATCH, PERMISSION_READ_FAILED } from "./user-access-eac-changes.js";
 
-const ID_CHUNK = 200;
+const ID_CHUNK = 200; // PERMISSION_BATCH (changes file) is also 200
 const OFF_PATTERN = /INVALID_TYPE|not supported|sObject type/i;
 const SAFE_ID = /^[A-Za-z0-9]{15,18}$/;
 const id15 = (v) => (v ? String(v).slice(0, 15) : "");
@@ -193,4 +193,37 @@ export async function readPastedUsers(api, tokens, { onCount = () => {} } = {}) 
     onCount(out.length);
   }
   return out;
+}
+
+/**
+ * The permission assignments that give these users Einstein Activity Capture (issue #42, for Remove and Move). SELECT only; the
+ * WHERE is on PermissionSetAssignment (never on the two EAC objects); users go in batches of 200. If a permission field does not
+ * exist in this org, the other is used (the same fallback as readEacAccessUserIds); if both fail it throws a plain error.
+ * Returns the rows as permissionRowFrom gives them.
+ */
+export async function readEacPermissionAssignments(api, userIds, { onCount = () => {} } = {}) {
+  const [a, b] = EAC_PERMISSION_FIELDS;
+  const both = `PermissionSet.${a} = true OR PermissionSet.${b} = true`;
+  const alone = [`PermissionSet.${a} = true`, `PermissionSet.${b} = true`];
+  const byId = new Map();
+  const add = (list) => { for (const r of list) byId.set(r.Id, r); onCount(byId.size); };
+  let separate = false;
+  let first = null;
+  for (const part of chunk(safeIds(userIds), PERMISSION_BATCH)) {
+    if (!separate) {
+      try { add(await queryPaged(api, permissionQuery(part, both))); continue; } catch (e) { first = e; separate = true; }
+    }
+    // One of the two fields may not exist in this org: ask each alone and use every answer that works.
+    let worked = false;
+    for (const cond of alone) {
+      try { add(await queryPaged(api, permissionQuery(part, cond))); worked = true; } catch { /* the other field may still work */ }
+    }
+    if (!worked) {
+      const err = new Error(PERMISSION_READ_FAILED);
+      err.cause = first;
+      err.raw = first?.message || "";
+      throw err;
+    }
+  }
+  return [...byId.values()].map(permissionRowFrom);
 }

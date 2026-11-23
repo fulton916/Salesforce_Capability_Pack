@@ -1,15 +1,13 @@
 // Build Einstein Activity Capture changes as text (issue #42). Pure: no browser or network APIs, and nothing here writes to the org.
 //
 // The extension only READS. It prepares rows for the admin to load themselves: pasted into Salesforce Inspector's Data Import,
-// or downloaded as a CSV for Data Loader. UserEmailCalendarSync fields (read-only describe in a sandbox):
-//   Id               not createable, not updateable
-//   AssignedId       createable and updateable: a 005 user or a 00e profile
-//   ConfigurationId  createable and updateable: a 063 Id
-//   ExternalId       left out
-// The three changes:
-//   Add     insert  AssignedId, ConfigurationId
-//   Move    update  Id, ConfigurationId      (Id = the user's own assignment row)
-//   Remove  delete  Id                       (describe says deletable=false, but Inspector deletes work; confirmed by the user)
+// or downloaded as a CSV for Data Loader.
+//   Add     insert  UserEmailCalendarSync    AssignedId, ConfigurationId
+//   Remove  delete  PermissionSetAssignment  Id   (the user's own assignments that grant Einstein Activity Capture)
+//   Move    Remove, then give the permission back (insert PermissionSetAssignment), then Add to the target
+// Why: every UserEmailCalendarSync row has the placeholder Id 000000000000000AAA, so its rows cannot be updated or deleted by
+// Id. Per the person who asked for this, a user in a configuration of more than 500 users leaves it when their Einstein
+// Activity Capture permission is removed. NOT verified in a real org.
 // The output holds only API column names and Ids: never a name, username or email.
 
 import { toCsv } from "../../shared/csv.js";
@@ -18,7 +16,7 @@ import { unnamedConfig, UNNAMED_CONFIG } from "./user-access-eac.js";
 
 const id15 = (v) => (v ? String(v).slice(0, 15) : "");
 const SAFE_ID = /^[A-Za-z0-9]{15,18}$/;
-/** An Id that is valid AND real. Real orgs give every UserEmailCalendarSync row the placeholder 000000000000000AAA (all zeros in the first 15 characters). */
+/** An Id that is valid AND real (not the all-zero placeholder that UserEmailCalendarSync rows have). */
 export const usableId = (v) => typeof v === "string" && SAFE_ID.test(v) && !/^0{15}/.test(v);
 const num = (n) => Number(n).toLocaleString("en-US");
 /** The key of a profile assignment row. Not its Id: in real orgs every row has the same placeholder Id. */
@@ -27,23 +25,42 @@ const CONFIG_ID = /^063[A-Za-z0-9]{12}(?:[A-Za-z0-9]{3})?$/;
 
 export const MAX_PASTED = 500;
 export const LOOKUP_BATCH = 50;
+export const PERMISSION_BATCH = 200;
 
-/** The three changes. `word` goes in every button label; `op` is Salesforce Inspector's Action. */
+/** The three changes. `word` goes in every button label. `op` and `object` are Inspector's Action and Object for the (first) load. */
 export const ACTIONS = {
-  add: { value: "add", label: "Add to", word: "Add", op: "Insert", header: ["AssignedId", "ConfigurationId"], needsTarget: true },
-  move: { value: "move", label: "Move to", word: "Move", op: "Update", header: ["Id", "ConfigurationId"], needsTarget: true },
-  remove: { value: "remove", label: "Remove from its configuration", word: "Remove", op: "Delete", header: ["Id"], needsTarget: false },
+  add: { value: "add", label: "Add to", word: "Add", op: "Insert", object: "UserEmailCalendarSync", header: ["AssignedId", "ConfigurationId"], needsTarget: true, needsPermissions: false },
+  move: { value: "move", label: "Move to", word: "Move", op: "Delete", object: "PermissionSetAssignment", header: ["Id"], needsTarget: true, needsPermissions: true },
+  remove: { value: "remove", label: "Remove from its configuration", word: "Remove", op: "Delete", object: "PermissionSetAssignment", header: ["Id"], needsTarget: false, needsPermissions: true },
 };
 export const ACTION_LIST = [ACTIONS.add, ACTIONS.move, ACTIONS.remove];
-export const UNDO_HEADERS = { remove: { op: "Insert", header: ["AssignedId", "ConfigurationId"] }, move: { op: "Update", header: ["Id", "ConfigurationId"] } };
+
+/** Every table that can be loaded: Inspector's Action, Object and the column names. */
+export const LOADS = {
+  add: { object: "UserEmailCalendarSync", op: "Insert", header: ["AssignedId", "ConfigurationId"], label: "Add to the configuration" },
+  delete: { object: "PermissionSetAssignment", op: "Delete", header: ["Id"], label: "Delete the permission assignments" },
+  giveSet: { object: "PermissionSetAssignment", op: "Insert", header: ["AssigneeId", "PermissionSetId"], label: "Give back the permission sets" },
+  giveGroup: { object: "PermissionSetAssignment", op: "Insert", header: ["AssigneeId", "PermissionSetGroupId"], label: "Give back the permission set groups" },
+};
 
 export const CONFIG_ID_HELP = "To use a configuration that has no users yet, copy its Id from Setup > Einstein Activity Capture > Configurations. It starts with 063 and is 15 or 18 characters long.";
 export const CONFIG_ID_BAD = "That does not look like a configuration Id. It starts with 063 and has 15 or 18 letters and digits in all.";
 export const CHANGE_WARNING = "This changes who captures email and calendar activity. Check the preview first.";
+export const NOT_VERIFIED_NOTE = "We have not verified this load in a real org. Try it on one user first.";
 export const NO_UNDO_ADD = "To undo an add, read again and use Remove.";
 export const AFTER_STEP = "Then click Show everyone again here to check the result.";
 export const INSPECTOR_UNVERIFIED = "The menu words are how Salesforce Inspector names them, as far as we know. We have not checked them in your version.";
 export const READ_ONLY_NOTE = "This page does not change anything in your org. You load the text yourself, in the step below.";
+export const HOW_REMOVE_WORKS = "A user in a configuration of more than 500 users leaves it when their Einstein Activity Capture permission is removed. So Remove deletes the permission assignments that give them that permission. Data Loader cannot remove the configuration row itself.";
+export const GIVE_BACK_NOTE = "Giving the permission back does not put them back in the configuration by itself. Add them to the configuration as well.";
+export const MOVE_ORDER_NOTE = "Load each step only after the one before has finished. After step 1, click Show everyone to check that they have left the old configuration.";
+export const MOVE_UNDO_NOTE = "To undo a move, read again and use Move with their old configuration as the target.";
+export const PROFILE_ASSIGNMENT_NOTE = "A profile assigned to a configuration cannot be removed here. Change it in Setup > Einstein Activity Capture > Configurations.";
+export const PERMISSION_READ_FAILED = "Which permissions give these users Einstein Activity Capture could not be read. Your user may not have permission to see permission assignments.";
+
+/** What deleting an assignment takes away besides Einstein Activity Capture. */
+export const permissionWarning = (kind) =>
+  `Deleting this assignment takes away everything else in this permission ${kind === "group" ? "set group" : "set"} from these users, not only Einstein Activity Capture.`;
 
 /** A typed configuration Id: 063 plus 12 or 15 letters or digits. Returns the trimmed Id, or null. */
 export function validConfigId(text) {
@@ -51,14 +68,14 @@ export function validConfigId(text) {
   return CONFIG_ID.test(t) ? t : null;
 }
 
-/** The on-page steps for loading one change. `op` is Insert, Update or Delete. */
-export function inspectorSteps(action) {
-  const a = ACTIONS[action];
-  if (!a) return [];
+/** The on-page steps for loading one table. `load` is a load (op, object), or "add" / "remove" / "move" for the first table of that change. */
+export function inspectorSteps(load) {
+  const l = typeof load === "string" ? (load === "add" ? LOADS.add : load === "remove" || load === "move" ? LOADS.delete : null) : load;
+  if (!l) return [];
   return [
     "Open Salesforce Inspector, then Data Import.",
-    `Action: ${a.op}.`,
-    "Object: UserEmailCalendarSync.",
+    `Action: ${l.op}.`,
+    `Object: ${l.object}.`,
     "Format: Excel.",
     "Paste the copied text.",
     "Import.",
@@ -108,6 +125,39 @@ export function matchPasted(tokens, users) {
   return { found, notFound, ambiguous };
 }
 
+// ---------- the permission assignments that give Einstein Activity Capture ----------
+
+const PERMISSION_SELECT = "SELECT Id, AssigneeId, PermissionSetId, PermissionSet.Name, PermissionSet.Label, PermissionSet.IsOwnedByProfile, PermissionSet.Profile.Name, " +
+  "PermissionSet.Type, PermissionSetGroupId, PermissionSetGroup.DeveloperName, PermissionSetGroup.MasterLabel FROM PermissionSetAssignment";
+
+/**
+ * One read-only query: the assignments of these users whose permission set grants Einstein Activity Capture. `cond` is the
+ * permission part (for example "PermissionSet.PermissionsAutomaticActivityCapture = true"). The WHERE is on PermissionSetAssignment
+ * only (never on the two EAC objects). Ids that do not look like Ids are left out; values go through soqlString.
+ */
+export function permissionQuery(userIds, cond) {
+  const ids = [...new Set((userIds || []).filter((i) => typeof i === "string" && SAFE_ID.test(i)))];
+  return `${PERMISSION_SELECT} WHERE AssigneeId IN (${ids.map(soqlString).join(", ")}) AND (${cond})`;
+}
+
+/** A PermissionSetAssignment record as the page uses it. A permission set group's assignment has `groupId` filled in. */
+export function permissionRowFrom(r) {
+  const set = r.PermissionSet || {};
+  const group = r.PermissionSetGroup || null;
+  return {
+    id: r.Id,
+    userId: r.AssigneeId,
+    setId: r.PermissionSetId || "",
+    groupId: r.PermissionSetGroupId || "",
+    ownedByProfile: set.IsOwnedByProfile === true || set.Type === "Profile",
+    profileName: set.Profile?.Name || "",
+    setName: set.Name || "",
+    setLabel: set.Label || set.Name || "",
+    groupName: group?.DeveloperName || "",
+    groupLabel: group?.MasterLabel || group?.DeveloperName || "",
+  };
+}
+
 // ---------- who and what can be picked ----------
 
 /** The configurations that are known from the data (an assignment row names them): [{id, name, count}], by name. */
@@ -141,11 +191,9 @@ const SKIP_TITLES = {
   profileOnly: "Skipped: in only through a profile",
   notIn: "Skipped: not in any configuration",
   severalRows: "Skipped: more than one assignment of their own",
-  noRealId: "Skipped: Salesforce gives this assignment no real Id",
-  sameTarget: "Skipped: the same user is already moving from another row",
+  noPermission: "Skipped: no Einstein Activity Capture permission found",
+  profilePermission: "Skipped: their profile gives them Einstein Activity Capture",
 };
-export const NO_REAL_ID_TEXT = "Salesforce gives this assignment no real Id (every row shows 000000000000000AAA), so it can't be moved or removed with Inspector. Use Setup for now.";
-export const NO_REAL_ID_ALL = "Salesforce gives these assignments no real Id (every row shows 000000000000000AAA), so they can't be moved or removed with Inspector. Use Setup for now. Nothing was built.";
 export const skipTitle = (code) => SKIP_TITLES[code] || "Skipped";
 
 const names = (list) => [...new Set(list)].join(", ");
@@ -155,13 +203,15 @@ const names = (list) => [...new Set(list)].join(", ");
  *   action        "add" | "move" | "remove"
  *   targetId      the configuration Id (a known one, or typed); not needed for Remove
  *   entries       the picked users (entryFrom...)
- *   profileItems  Remove only: profile assignment rows (from buildEacRows `profileRows`) to remove whole
  *   rows          buildEacRows rows
+ *   permissions   Move and Remove: the permission assignments read for the picked users (permissionRowFrom rows)
  *   notFound      pasted names that matched nobody (shown in the preview)
+ * An item of Move or Remove is one user: `removals` lists the assignments to delete (`kind` "set" or "group"), `configs` the
+ * configurations they are in directly (for the Add-back text).
  */
-export function planChange({ action, targetId = "", entries = [], profileItems = [], rows = [], notFound = [], configs = null } = {}) {
+export function planChange({ action, targetId = "", entries = [], rows = [], notFound = [], configs = null, permissions = null } = {}) {
   const a = ACTIONS[action];
-  const plan = { action, targetId: null, targetName: "", items: [], profileItems: [], skipped: [], notFound: [...notFound], duplicates: 0, error: "", previewed: false };
+  const plan = { action, targetId: null, targetName: "", items: [], skipped: [], notFound: [...notFound], duplicates: 0, error: "", previewed: false };
   if (!a) { plan.error = "Pick what to do: Add, Move or Remove."; return plan; }
   const known = configs || knownConfigs(rows);
   const nameOfConfig = (id) => known.find((c) => id15(c.id) === id15(id))?.name || (id ? unnamedConfig(id) : UNNAMED_CONFIG);
@@ -171,6 +221,7 @@ export function planChange({ action, targetId = "", entries = [], profileItems =
     plan.targetId = tid;
     plan.targetName = nameOfConfig(tid);
   }
+  if (a.needsPermissions && !Array.isArray(permissions)) { plan.error = "The permission assignments were not read, so nothing can be prepared."; return plan; }
   const t15 = id15(plan.targetId);
 
   const assignedRows = (userId) => rows.filter((r) => id15(r.userId) === id15(userId) && r.assigned);
@@ -178,8 +229,7 @@ export function planChange({ action, targetId = "", entries = [], profileItems =
   const goodUser = (e) => typeof e.userId === "string" && SAFE_ID.test(e.userId) && e.userId.startsWith("005");
 
   const done = new Set();
-  const seenAsg = new Set();
-  const movedUsers = new Set();
+  const handled = new Set();
   // A pick with no configuration (pasted, or from a list) for a user who also has a ticked row is covered by the ticked row.
   const tickedUsers = new Set(entries.filter((e) => e.configId).map((e) => id15(e.userId)));
   for (const e of entries) {
@@ -200,52 +250,69 @@ export function planChange({ action, targetId = "", entries = [], profileItems =
       continue;
     }
 
-    // Move and Remove work on the user's own assignment rows.
+    // Move and Remove: one result per user. Removing the permission takes the user out of every configuration they are in directly.
+    if (handled.has(id15(e.userId))) { plan.duplicates++; continue; }
+    handled.add(id15(e.userId));
     const own = e.configId ? all.filter((r) => id15(r.configId) === id15(e.configId)) : all;
     if (!own.length) { skip(e, "notIn"); continue; }
     if (action === "move" && inTarget) { skip(e, "alreadyThere"); continue; }
+    if (action === "move" && !e.isActive) { skip(e, "inactive"); continue; }
     const direct = own.filter((r) => r.direct);
     if (!direct.length) {
       skip(e, "profileOnly", own.map((r) => `${r.configuration} through the profile ${r.profiles.join(", ") || "(name not available)"}`).join("; "));
       continue;
     }
-    const ids = direct.flatMap((r) => (r.assignmentIds || []).map((id) => ({ id, row: r })));
-    if (direct.some((r) => !r.assignmentIds?.length) || ids.some((x) => !usableId(x.id) && SAFE_ID.test(x.id))) { skip(e, "noRealId", names(direct.map((r) => r.configuration))); continue; }
-    if (action === "move" && ids.length > 1) { skip(e, "severalRows", names(direct.map((r) => r.configuration))); continue; }
-    if (action === "remove" && !e.configId && new Set(direct.map((r) => id15(r.configId))).size > 1) { skip(e, "severalRows", names(direct.map((r) => r.configuration))); continue; }
-    if (ids.some((x) => !SAFE_ID.test(x.id))) { skip(e, "badId"); continue; }
-    if (action === "move" && movedUsers.has(id15(e.userId))) { skip(e, "sameTarget", names(direct.map((r) => r.configuration))); continue; }
-    if (action === "move") movedUsers.add(id15(e.userId));
-    const stillIn = own.filter((r) => r.profiles?.length);
-    for (const { id, row } of ids) {
-      if (seenAsg.has(id15(id))) { plan.duplicates++; continue; }
-      seenAsg.add(id15(id));
-      plan.items.push({
-        userId: e.userId, name: e.name, assignmentId: id, fromConfigId: row.configId, fromName: row.configuration,
-        note: action === "remove" && stillIn.length ? `Still in ${names(stillIn.map((r) => r.configuration))} through the profile ${names(stillIn.flatMap((r) => r.profiles))}.` : "",
-      });
-    }
-  }
+    const allDirect = all.filter((r) => r.direct);
+    if (new Set(allDirect.map((r) => id15(r.configId))).size > 1) { skip(e, "severalRows", names(allDirect.map((r) => r.configuration))); continue; }
 
-  if (action === "remove") {
-    const seenProfile = new Set();
-    for (const p of profileItems) {
-      const pname = `Profile ${p.profileName || ""}`.trim();
-      if (!p.id || (!usableId(p.id) && SAFE_ID.test(p.id))) { plan.skipped.push({ name: pname, code: "noRealId", detail: "" }); continue; }
-      if (!SAFE_ID.test(p.id) || !SAFE_ID.test(p.profileId || "") || !SAFE_ID.test(p.configId || "")) {
-        plan.skipped.push({ name: pname, code: "badId", detail: "" });
-        continue;
-      }
-      if (seenProfile.has(id15(p.id))) { plan.duplicates++; continue; }
-      seenProfile.add(id15(p.id));
-      plan.profileItems.push({ id: p.id, profileId: p.profileId, profileName: p.profileName, configId: p.configId, configuration: p.configuration, members: p.members ?? null });
+    const mine = permissions.filter((p) => id15(p.userId) === id15(e.userId));
+    if (!mine.length) { skip(e, "noPermission"); continue; }
+    const fromProfile = mine.filter((p) => p.ownedByProfile);
+    if (fromProfile.length) { skip(e, "profilePermission", names(fromProfile.map((p) => p.profileName || "(profile name not available)"))); continue; }
+    const removals = [];
+    const seenAsg = new Set();
+    let bad = false;
+    for (const p of mine) {
+      const group = !!p.groupId;
+      if (!SAFE_ID.test(p.id || "") || !SAFE_ID.test((group ? p.groupId : p.setId) || "")) { bad = true; break; }
+      if (seenAsg.has(id15(p.id))) continue;
+      seenAsg.add(id15(p.id));
+      removals.push({ id: p.id, kind: group ? "group" : "set", setId: p.setId, groupId: p.groupId, label: group ? p.groupLabel : p.setLabel, apiName: group ? p.groupName : p.setName });
     }
+    if (bad) { skip(e, "badId"); continue; }
+    const stillIn = own.filter((r) => r.profiles?.length);
+    plan.items.push({
+      userId: e.userId, name: e.name, fromConfigId: direct[0].configId, fromName: names(direct.map((r) => r.configuration)),
+      configs: [...new Map(direct.map((r) => [id15(r.configId), { id: r.configId, name: r.configuration }])).values()],
+      removals,
+      note: stillIn.length ? `Still in ${names(stillIn.map((r) => r.configuration))} through the profile ${names(stillIn.flatMap((r) => r.profiles))}.` : "",
+    });
   }
   return plan;
 }
 
 /** Users counted once, however many rows. */
 export const planUserCount = (plan) => new Set(plan.items.map((i) => id15(i.userId))).size;
+
+/** How many permission assignments are to be deleted (Move and Remove). */
+export const planRemovalCount = (plan) => plan.items.reduce((n, i) => n + (i.removals?.length || 0), 0);
+
+/**
+ * The permission sets and groups involved in a Move or Remove: [{kind, key, label, apiName, users}], by label. `users` is how many
+ * picked users lose that assignment.
+ */
+export function involvedPermissions(plan) {
+  const m = new Map();
+  for (const i of plan.items) {
+    for (const r of i.removals || []) {
+      const key = r.kind === "group" ? `group:${id15(r.groupId)}` : `set:${id15(r.setId)}`;
+      const c = m.get(key) || { kind: r.kind, key, label: r.label, apiName: r.apiName, users: new Set() };
+      c.users.add(id15(i.userId));
+      m.set(key, c);
+    }
+  }
+  return [...m.values()].map((c) => ({ kind: c.kind, key: c.key, label: c.label, apiName: c.apiName, users: c.users.size })).sort((x, y) => x.label.localeCompare(y.label));
+}
 
 /** The skipped users, grouped by reason: [{code, title, entries: [{name, detail}]}]. */
 export function skipGroups(plan) {
@@ -257,25 +324,20 @@ export function skipGroups(plan) {
 /** Plain words for the reason of a skip group, per action. */
 export function skipHelp(action, code) {
   const t = {
-    inactive: "An inactive user cannot be added.",
+    inactive: action === "move" ? "An inactive user cannot be added to the new configuration, so they cannot be moved." : "An inactive user cannot be added.",
     alreadyThere: "They are already in the target configuration (directly or through a profile).",
     useMove: "Use Move for them, so they are not in two configurations.",
     profileOnly: action === "add"
       ? "They are in a configuration only through a profile, and adding them would put them in two. Change the profile's assignment in Setup."
-      : action === "move"
-        ? "They have no assignment row of their own, only the profile's, so they cannot be moved here. Change the profile's configuration in Setup."
-        : "They have no assignment row of their own. The profile's assignment is removed in Setup, or as its own row in the list below.",
+      : "They are in a configuration only through a profile's assignment, which cannot be removed here. Change it in Setup > Einstein Activity Capture > Configurations.",
     notIn: action === "move" ? "They are in no configuration. Use Add for them." : "They are in no configuration, so there is nothing to remove.",
-    severalRows: "They have more than one assignment of their own. Tick their row in the list for the one you mean.",
-    noRealId: NO_REAL_ID_TEXT,
-    sameTarget: "Only one assignment per user can go to the same configuration, so this row was left out. The user's other row was moved.",
+    severalRows: "They are directly in more than one configuration. Removing the permission would take them out of all of them, so they were left out. Change them in Setup > Einstein Activity Capture > Configurations.",
+    noPermission: "No Einstein Activity Capture permission was found for them. It may already be removed; click Show everyone to read again.",
+    profilePermission: "Their profile gives them Einstein Activity Capture. Deleting assignments would not remove it: change it on the profile, or the user's profile, in Setup.",
     badId: "The Id is missing or does not look right.",
   };
   return t[code] || "";
 }
-
-/** True when there is nothing to load and every pick was skipped because its assignment has no real Id. */
-export const allNoRealId = (plan) => !plan.items.length && !plan.profileItems.length && plan.skipped.length > 0 && plan.skipped.every((s) => s.code === "noRealId");
 
 /** "N picks were the same assignment and are listed once", or "" when nothing repeated. */
 export function duplicatesText(plan) {
@@ -287,18 +349,13 @@ export function duplicatesText(plan) {
 export function previewSummary(plan) {
   const a = ACTIONS[plan.action];
   if (!a || plan.error) return plan.error || "";
-  if (allNoRealId(plan)) return NO_REAL_ID_ALL;
   const n = planUserCount(plan);
   const users = `${num(n)} ${n === 1 ? "user" : "users"}`;
-  const parts = [];
-  if (n || !plan.profileItems.length) {
-    if (plan.action === "add") parts.push(`Add ${users} to ${plan.targetName}`);
-    else if (plan.action === "move") parts.push(`Move ${users} to ${plan.targetName}`);
-    else parts.push(`Remove ${users} from their configuration`);
-  }
-  if (plan.profileItems.length) parts.push(`remove ${num(plan.profileItems.length)} whole profile ${plan.profileItems.length === 1 ? "assignment" : "assignments"}`);
-  const s = parts.join(" and ");
-  return `${s[0].toUpperCase()}${s.slice(1)}.`;
+  const r = planRemovalCount(plan);
+  const asg = `${num(r)} permission ${r === 1 ? "assignment" : "assignments"}`;
+  if (plan.action === "add") return `Add ${users} to ${plan.targetName}.`;
+  if (plan.action === "move") return `Move ${users} to ${plan.targetName}: delete ${asg}, give the permission back, then add them to the configuration.`;
+  return `Remove ${users} from their configuration by deleting ${asg}.`;
 }
 
 // ---------- the text to load ----------
@@ -310,45 +367,70 @@ const checkTable = (t) => {
   return t;
 };
 
-/** The rows of the change itself: {op, header, rows}. */
-export function changeTable(plan) {
-  const a = ACTIONS[plan.action];
-  let rows;
-  if (plan.action === "add") rows = plan.items.map((i) => [i.userId, plan.targetId]);
-  else if (plan.action === "move") rows = plan.items.map((i) => [i.assignmentId, plan.targetId]);
-  else rows = [...plan.items.map((i) => [i.assignmentId]), ...plan.profileItems.map((p) => [p.id])];
-  return checkTable({ op: a.op, header: [...a.header], rows });
+/** One table to load: {key, label, object, op, header, rows}; null when it has no rows. */
+function makeLoad(key, rows) {
+  if (!rows.length) return null;
+  return checkTable({ key, ...LOADS[key], header: [...LOADS[key].header], rows });
 }
 
-/** The rows that reverse a Remove or a Move; null for Add (its new Ids exist only after the load). */
-export function undoTable(plan) {
-  const u = UNDO_HEADERS[plan.action];
-  if (!u) return null;
-  let rows;
-  if (plan.action === "remove") rows = [...plan.items.map((i) => [i.userId, i.fromConfigId]), ...plan.profileItems.map((p) => [p.profileId, p.configId])];
-  else rows = plan.items.map((i) => [i.assignmentId, i.fromConfigId]);
-  return checkTable({ op: u.op, header: [...u.header], rows });
+const removalRows = (plan) => plan.items.flatMap((i) => (i.removals || []).map((r) => [r.id]));
+function giveBackLoads(plan) {
+  const sets = [];
+  const groups = [];
+  for (const i of plan.items) {
+    for (const r of i.removals || []) {
+      if (r.kind === "group") groups.push([i.userId, r.groupId]);
+      else sets.push([i.userId, r.setId]);
+    }
+  }
+  return [makeLoad("giveSet", sets), makeLoad("giveGroup", groups)].filter(Boolean);
+}
+
+/**
+ * The steps to load, each with its tables: [{title, note, loads}]. Add is one step, Remove one, Move three. A step with no rows is
+ * left out.
+ */
+export function changeSteps(plan) {
+  if (plan.action === "add") return [{ title: "Add them to the configuration", note: "", loads: [makeLoad("add", plan.items.map((i) => [i.userId, plan.targetId]))].filter(Boolean) }];
+  const del = makeLoad("delete", removalRows(plan));
+  if (plan.action === "remove") return [{ title: "Take the permission away (delete the permission assignments)", note: HOW_REMOVE_WORKS, loads: [del].filter(Boolean) }];
+  return [
+    { title: "Step 1: take the permission away (delete the permission assignments)", note: HOW_REMOVE_WORKS, loads: [del].filter(Boolean) },
+    { title: "Step 2: give the permission back", note: GIVE_BACK_NOTE, loads: giveBackLoads(plan) },
+    { title: `Step 3: add them to ${plan.targetName}`, note: "", loads: [makeLoad("add", plan.items.map((i) => [i.userId, plan.targetId]))].filter(Boolean) },
+  ];
+}
+
+/** The steps that reverse a Remove: give the permission back, then put them in their old configuration. Empty for Add and Move. */
+export function undoSteps(plan) {
+  if (plan.action !== "remove") return [];
+  return [
+    { title: "Undo step 1: give the permission back", note: GIVE_BACK_NOTE, loads: giveBackLoads(plan) },
+    { title: "Undo step 2: put them back in their configuration", note: "", loads: [makeLoad("add", plan.items.flatMap((i) => (i.configs || []).map((c) => [i.userId, c.id])))].filter(Boolean) },
+  ];
 }
 
 /** Tab-separated text with the API names as the first line: what Excel puts on the clipboard. */
 export const tabText = (t) => [t.header, ...t.rows].map((r) => r.join("\t")).join("\n");
-// toCsv starts with a byte order mark; Data Loader may then read the first header as "\uFEFFId", so the change files drop it.
-export const csvText = (t) => toCsv([t.header, ...t.rows]).replace(/^\uFEFF/, "");
+// toCsv starts with a byte order mark; Data Loader may then read the first header as "﻿Id", so the change files drop it.
+export const csvText = (t) => toCsv([t.header, ...t.rows]).replace(/^﻿/, "");
+
+const withText = (steps) => steps.map((s) => ({ ...s, loads: s.loads.map((l) => ({ ...l, text: tabText(l), csv: csvText(l) })) }));
 
 /**
- * Everything the buttons need. Throws until the preview has been shown (`plan.previewed`), so no output exists before it.
+ * Everything the buttons need: {steps, undoSteps}, each step with `loads` (every load has `text` and `csv`). Throws until the
+ * preview has been shown (`plan.previewed`), so no output exists before it. Null when there is nothing to load.
  */
 export function outputFor(plan) {
   if (!plan?.previewed) throw new Error("Show the preview first.");
   if (plan.error) throw new Error(plan.error);
-  const change = changeTable(plan);
-  if (!change.rows.length) return null;
-  const undo = undoTable(plan);
-  return { change, text: tabText(change), csv: csvText(change), undo, undoText: undo ? tabText(undo) : "", undoCsv: undo ? csvText(undo) : "" };
+  const steps = withText(changeSteps(plan));
+  if (!steps.some((s) => s.loads.length)) return null;
+  return { steps, undoSteps: withText(undoSteps(plan)) };
 }
 
-/** A file name for the CSV (no names or users in it). */
-export const changeFileName = (action, stamp) => `eac_${action}_${stamp}.csv`;
+/** A file name for the CSV (no names or users in it). `part` tells the tables of one change apart. */
+export const changeFileName = (action, stamp, part = "") => `eac_${action}${part ? `_${part}` : ""}_${stamp}.csv`;
 
 /** Copy text; on any failure (no clipboard, blocked, rejected) say so and the page shows the text to copy by hand. */
 export async function copyWithFallback(text, clipboard) {
