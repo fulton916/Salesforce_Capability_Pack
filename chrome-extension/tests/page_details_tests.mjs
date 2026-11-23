@@ -5,8 +5,8 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 import { cleanUrl } from "../shared/pageurl.js";
-import { parsePageUrl, snapshotText, fileName, sandboxNameFromHost, whenText, scrub, scrubNote, objectText, NOTE_REMOVED_TEXT } from "../tools/page-details/page-details-logic.js";
-import { readIssueSnapshot, readCurrentUser, orgProblem } from "../tools/page-details/page-details-read.js";
+import { parsePageUrl, setupDisplayName, setupTitleFromTabs, cleanTabTitle, snapshotText, fileName, sandboxNameFromHost, whenText, scrub, scrubNote, objectText, NOTE_REMOVED_TEXT } from "../tools/page-details/page-details-logic.js";
+import { readIssueSnapshot, readCurrentUser, readPageDetails, orgProblem, failureCause } from "../tools/page-details/page-details-read.js";
 import { SfApi } from "../shared/sfconn.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -14,7 +14,14 @@ const ext = (...p) => path.join(here, "..", ...p);
 const read = (f) => readFileSync(f, "utf-8");
 const demo = () => JSON.parse(read(ext("samples", "page_details_demo.json")));
 
-/** Fake REST API: `routes` is a list of [matcher, handler]; a handler may throw. */
+/** A route handler may throw (a TypeError acts as a dropped connection) or return failure(...) for a non-OK answer. */
+const failure = (status, errorCode, message) => ({ __status: status, __body: [{ errorCode, message }] });
+const dropped = () => { throw new TypeError("Failed to fetch"); };
+const denied = () => failure(403, "INSUFFICIENT_ACCESS", "insufficient access rights on object id");
+const ACCOUNT_URL = "/lightning/r/Account/001000000000001AAA/view";
+const ACCOUNT_DESCRIBE = ["/sobjects/Account/describe", () => ({ name: "Account", label: "Account", queryable: true, fields: [{ name: "Id" }, { name: "Name", nameField: true }] })];
+
+/** Fake REST API: `routes` is a list of [matcher, handler]. */
 function fakeApi(routes) {
   const seen = [];
   const fetchImpl = async (url) => {
@@ -24,6 +31,7 @@ function fakeApi(routes) {
     for (const [m, h] of routes) {
       if (key.includes(m)) {
         const body = await h(key);
+        if (body && body.__status) return { ok: false, status: body.__status, text: async () => JSON.stringify(body.__body || []) };
         return { ok: true, status: 200, text: async () => JSON.stringify(body) };
       }
     }
@@ -291,6 +299,179 @@ export async function run(test) {
     const none = await readCurrentUser(fakeApi([]));
     assert.equal(none.data, null);
     assert.ok(none.problem && none.raw);
+  });
+
+  await test("snapshot: failureCause sorts failures and orgProblem keeps its wording", () => {
+    assert.equal(failureCause(Object.assign(new Error("expired"), { status: 401 })), "session");
+    assert.equal(failureCause(Object.assign(new Error("x"), { status: 403 })), "denied");
+    assert.equal(failureCause(Object.assign(new Error("x"), { status: 400, errorCode: "INSUFFICIENT_ACCESS" })), "denied");
+    assert.equal(failureCause(new TypeError("Failed to fetch")), "unreachable");
+    for (const st of [0, 502, 503, 504]) assert.equal(failureCause(Object.assign(new Error("x"), { status: st })), "unreachable", String(st));
+    assert.equal(failureCause(new Error("The request timed out")), "unreachable");
+    assert.equal(failureCause(Object.assign(new Error("bad"), { status: 400, errorCode: "MALFORMED_QUERY" })), "other");
+    assert.equal(failureCause(null), "other");
+    const e401 = Object.assign(new Error("Your Salesforce session has expired."), { status: 401 });
+    assert.equal(orgProblem(e401), "Your Salesforce session has expired.");
+    assert.equal(orgProblem(new TypeError("Failed to fetch")), "Salesforce could not be reached to read the org details. Check your connection, reload the Salesforce tab and try again.");
+    assert.equal(orgProblem(new Error("x")), "The organization record could not be read.");
+  });
+
+  const NOT_ALLOWED = /not be allowed/, UNREACHED = /could not be reached.*Check your connection/;
+
+  await test("snapshot: record SELECT failure is worded by cause", async () => {
+    const run = async (h) => readPageDetails(fakeApi([ACCOUNT_DESCRIBE, ["FROM Account WHERE", h]]), ACCOUNT_URL);
+    const net = await run(dropped);
+    assert.match(net.problem, UNREACHED);
+    assert.doesNotMatch(net.problem, NOT_ALLOWED);
+    assert.match((await run(() => failure(503, "SERVER_UNAVAILABLE", "down"))).problem, UNREACHED);
+    assert.match((await run(denied)).problem, NOT_ALLOWED);
+    const other = await run(() => failure(400, "MALFORMED_QUERY", "unexpected token"));
+    assert.match(other.problem, /could not be read/);
+    assert.doesNotMatch(other.problem, NOT_ALLOWED);
+    assert.doesNotMatch(other.problem, /reached/);
+    assert.ok(net.data && net.raw); // the shape holds
+    const gone = await run(() => ({ done: true, records: [] }));
+    assert.match(gone.problem, /could not be found.*may not be allowed/);
+  });
+
+  await test("snapshot: record describe failure is worded by cause", async () => {
+    const run = async (h) => readPageDetails(fakeApi([["/sobjects/Account/describe", h]]), ACCOUNT_URL);
+    const net = await run(dropped);
+    assert.match(net.problem, UNREACHED);
+    assert.doesNotMatch(net.problem, NOT_ALLOWED);
+    assert.match((await run(denied)).problem, NOT_ALLOWED);
+    const other = await run(() => failure(400, "MALFORMED_QUERY", "weird"));
+    assert.match(other.problem, /could not be read/);
+    assert.doesNotMatch(other.problem, NOT_ALLOWED);
+  });
+
+  await test("snapshot: the object lookup for a classic /<Id> address is worded by cause", async () => {
+    const run = async (h) => readPageDetails(fakeApi([["/sobjects/", h]]), "/001000000000001AAA");
+    assert.match((await run(dropped)).problem, UNREACHED);
+    const other = await run(() => failure(400, "X_ERR", "weird"));
+    assert.match(other.problem, /could not be worked out/);
+    assert.doesNotMatch(other.problem, NOT_ALLOWED);
+  });
+
+  await test("snapshot: user query failure is worded by cause, with and without the Chatter fallback", async () => {
+    const chatter = ["/chatter/users/me", () => ({ id: "005000000000001AAA", name: "Alex", username: "a@example.com" })];
+    const partial = await readCurrentUser(fakeApi([chatter, ["FROM User WHERE", dropped]]));
+    assert.equal(partial.data.name, "Alex");
+    assert.match(partial.problem, /Only part of your user details/);
+    assert.match(partial.problem, UNREACHED);
+    assert.doesNotMatch(partial.problem, NOT_ALLOWED);
+    assert.match((await readCurrentUser(fakeApi([chatter, ["FROM User WHERE", denied]]))).problem, NOT_ALLOWED);
+    const oth = await readCurrentUser(fakeApi([chatter, ["FROM User WHERE", () => failure(400, "MALFORMED_QUERY", "bad")]]));
+    assert.match(oth.problem, /Only part of your user details/);
+    assert.doesNotMatch(oth.problem, NOT_ALLOWED);
+    // no Chatter fields (userinfo only): data is null
+    const info = ["/userinfo", () => ({ user_id: "005000000000001AAA" })];
+    const net = await readCurrentUser(fakeApi([info, ["FROM User WHERE", dropped]]));
+    assert.equal(net.data, null);
+    assert.match(net.problem, UNREACHED);
+    assert.doesNotMatch(net.problem, NOT_ALLOWED);
+    const den = await readCurrentUser(fakeApi([info, ["FROM User WHERE", denied]]));
+    assert.match(den.problem, NOT_ALLOWED);
+    const oth2 = await readCurrentUser(fakeApi([info, ["FROM User WHERE", () => failure(400, "MALFORMED_QUERY", "bad")]]));
+    assert.match(oth2.problem, /could not be read/);
+    assert.doesNotMatch(oth2.problem, NOT_ALLOWED);
+  });
+
+  await test("snapshot: the who-are-you step keeps the cause of both tries", async () => {
+    const net = await readCurrentUser(fakeApi([["/chatter/users/me", dropped], ["/userinfo", dropped]]));
+    assert.equal(net.data, null);
+    assert.match(net.problem, /could not be reached.*Check your connection/);
+    assert.doesNotMatch(net.problem, /would not say|not be allowed/);
+    assert.ok(/Failed to fetch/.test(net.raw));
+    // one try dropped, the other denied: say it could not be reached
+    const mixed = await readCurrentUser(fakeApi([["/chatter/users/me", denied], ["/userinfo", dropped]]));
+    assert.match(mixed.problem, /could not be reached/);
+    const den = await readCurrentUser(fakeApi([["/chatter/users/me", denied], ["/userinfo", denied]]));
+    assert.match(den.problem, /would not say who you are/);
+    const sess = await readCurrentUser(fakeApi([["/chatter/users/me", () => failure(401, "INVALID_SESSION_ID", "expired")], ["/userinfo", dropped]]));
+    assert.match(sess.problem, /session has expired/);
+    const oth = await readCurrentUser(fakeApi([["/chatter/users/me", () => failure(400, "X", "weird")], ["/userinfo", () => failure(400, "X", "weird")]]));
+    assert.match(oth.problem, /could not be read/);
+    assert.doesNotMatch(oth.problem, /not be allowed|would not say|reached/);
+  });
+
+  await test("snapshot: Setup page names from the built-in list, Object Manager and the address", () => {
+    const name = (u, t) => setupDisplayName(parsePageUrl(u), t);
+    assert.equal(name("/lightning/setup/CompanyProfileInfo/home"), "Company Information");
+    assert.equal(name("/lightning/setup/ManageUsers/home"), "Users");
+    assert.equal(name("/lightning/setup/PermSetGroups/home"), "Permission Set Groups");
+    assert.equal(name("/lightning/setup/ObjectManager/home"), "Object Manager");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view"), "Object Manager > Fields & Relationships");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/ButtonsLinksActions/view"), "Object Manager > Buttons, Links, and Actions");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/SomethingNew/view"), "Object Manager > Something New");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/view"), "Object Manager > Details");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/MySearchLayouts/view"), "Object Manager > Search Layouts");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/AlohaSearchLayouts/view"), "Object Manager > List View Button Layout");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/Limits/view"), "Object Manager > Object Limits");
+    assert.equal(name("/lightning/setup/ObjectManager/Account/SearchLayouts/view"), "Object Manager > Search Layouts"); // made from the address
+    assert.equal(parsePageUrl("/lightning/setup/ObjectManager/Account/PageLayouts/view").objectApi, "Account");
+    assert.equal(name("/lightning/setup/ConnectedApplication/home"), "Manage Connected Apps");
+    assert.equal(name("/lightning/setup/SecurityEvents/home"), "View Setup Audit Trail");
+    assert.equal(name("/lightning/setup/HealthCheck/home"), "Health Check");
+    assert.equal(name("/lightning/setup/AuditTrail/home"), "Audit Trail"); // removed segment: made from the address
+    assert.equal(name("/lightning/setup/SecurityHealthCheck/home"), "Security Health Check");
+    assert.equal(name("/lightning/setup/SomeNewThing/home"), "Some New Thing"); // unknown: made from the address
+    assert.equal(name("/lightning/setup/constructor/home"), "constructor");
+    assert.equal(name("/setup/own/orgdetail.apexp"), "own/orgdetail.apexp");
+    assert.equal(name("/lightning/o/Account/list"), null);
+  });
+
+  await test("snapshot: tab titles are cleaned and generic ones rejected", () => {
+    assert.equal(cleanTabTitle("Company Information | Salesforce"), "Company Information");
+    assert.equal(cleanTabTitle("Company Information ~ Salesforce - Developer Edition"), "Company Information");
+    assert.equal(cleanTabTitle("  Users ~ Salesforce  "), "Users");
+    assert.equal(cleanTabTitle("Debug Logs | Salesforce"), "Debug Logs");
+    for (const g of ["Salesforce", "Lightning Experience | Salesforce", "Setup", "Loading...", "Loading", "Loading…", "Page not found | Salesforce", "page NOT found", "Error", "Error ~ Salesforce - Developer Edition", "", "   ", " | Salesforce", null, undefined, 5]) {
+      assert.equal(cleanTabTitle(g), "", String(g));
+    }
+    for (const g of ["Insufficient Privileges | Salesforce", "Error: Insufficient privileges", "insufficient privileges", "Something went wrong", "Sorry to interrupt | Salesforce", "Login", "login | Salesforce", "Verify Your Identity | Salesforce", "Error: something", "Errors"]) {
+      assert.equal(cleanTabTitle(g), "", String(g));
+    }
+    assert.equal(cleanTabTitle("Login History | Salesforce"), "Login History");
+    assert.ok(cleanTabTitle("A".repeat(300) + " | Salesforce").length <= 120);
+  });
+
+  await test("snapshot: the tab for this page is chosen by host and address, newest first", () => {
+    const base = "https://acme.lightning.force.com/lightning/setup/CompanyProfileInfo/home";
+    const tabs = [
+      { url: base + "?sid=abc#frag", title: "Old title | Salesforce", lastAccessed: 100 },
+      { url: base, title: "Company Information | Salesforce", lastAccessed: 200 },
+      { url: "https://other.lightning.force.com/lightning/setup/CompanyProfileInfo/home", title: "Wrong Org | Salesforce", lastAccessed: 900 },
+      { url: "https://acme.lightning.force.com/lightning/setup/ManageUsers/home", title: "Users | Salesforce", lastAccessed: 950 },
+      { url: "not a url", title: "x" }, null,
+    ];
+    const clean = "/lightning/setup/CompanyProfileInfo/home";
+    assert.equal(setupTitleFromTabs(tabs, "acme.lightning.force.com", clean), "Company Information");
+    assert.equal(setupTitleFromTabs(tabs, "ACME.lightning.force.com", clean), "Company Information");
+    assert.equal(setupTitleFromTabs(tabs, "nobody.lightning.force.com", clean), "");
+    assert.equal(setupTitleFromTabs(tabs, "acme.lightning.force.com", "/lightning/setup/Roles/home"), "");
+    // the newest tab is still loading: the next one with a real name is used
+    assert.equal(setupTitleFromTabs([{ url: base, title: "Loading...", lastAccessed: 5 }, { url: base, title: "Company Information | Salesforce", lastAccessed: 1 }], "acme.lightning.force.com", clean), "Company Information");
+    assert.equal(setupTitleFromTabs([{ url: base, title: "Salesforce" }], "acme.lightning.force.com", clean), "");
+    assert.equal(setupTitleFromTabs(null, "h", clean), "");
+    assert.equal(setupTitleFromTabs(tabs, "", clean), "");
+  });
+
+  await test("snapshot: the Setup page line uses the tab title first, then the list, then the address", async () => {
+    const u = "/lightning/setup/CompanyProfileInfo/home";
+    const line = async (url, setupTitle) => {
+      const r = await readIssueSnapshot(fakeApi([]), { host: "h", url, setupTitle });
+      return snapshotText({ when: new Date(0), timeZone: "UTC", page: r.page.data }).split("\n").find((l) => l.startsWith("Setup page:"));
+    };
+    assert.equal(await line(u, "Company Settings"), "Setup page: Company Settings");
+    assert.equal(await line(u, ""), "Setup page: Company Information");
+    assert.equal(await line(u), "Setup page: Company Information");
+    assert.equal(await line("/lightning/setup/Mystery/home"), "Setup page: Mystery");
+    assert.equal(await line("/lightning/setup/ObjectManager/Account/FieldsAndRelationships/view", "Account | Object Manager"), "Setup page: Object Manager > Fields & Relationships");
+    // a title is org text: still scrubbed
+    assert.ok(!(await line(u, "Users sid=abc123")).includes("abc123"));
+    // the text does not say where the name came from
+    assert.ok(!/tab|title/i.test(await line(u, "Company Settings")));
   });
 
   await test("snapshot: the new files use no innerHTML, storage or writes", () => {
