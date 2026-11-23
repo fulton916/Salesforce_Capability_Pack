@@ -7,6 +7,7 @@
 // Salesforce's answer the result says so (`mismatch`) and lists likely causes, never a guess as fact.
 
 import { looksLikeId } from "../../shared/recordid.js";
+import { ruleSentences } from "./record-access-rules.js";
 
 export { looksLikeId };
 
@@ -727,9 +728,39 @@ function routesFor(u, name, ctx, sf) {
 
 // ---------- one user ----------
 
+/** The restriction and scoping rules for one user: what was read and, for each rule, what it means for this user and record.
+ *  state: "none" (read, no active rules), "found", "failed" (could not be read: `error`), "unread" (older facts without a rules read). */
+function ruleView(u, name, ctx, noAccess = false) {
+  const rules = ctx.facts.rules;
+  const plural = ctx.plural;
+  if (!rules) return { state: "unread", header: "Restriction and scoping rules were not read.", lines: [] };
+  if (!rules.read) return { state: "failed", error: rules.error || "", header: `Restriction and scoping rules on ${plural} could not be read${rules.error ? ` (${rules.error})` : ""}, so they were not checked.`, lines: [] };
+  if (!rules.items?.length) return { state: "none", header: `No restriction or scoping rules on ${plural}.`, lines: [] };
+  const lines = ruleSentences(rules, name, u.ruleValues ?? null, rules.recordValues ?? null, { noAccess });
+  const nR = lines.filter((l) => l.type === "restrict").length;
+  const nS = lines.length - nR;
+  const parts = [nR ? `${nR} restriction rule${nR === 1 ? "" : "s"}` : null, nS ? `${nS} scoping rule${nS === 1 ? "" : "s"}` : null].filter(Boolean).join(" and ");
+  const hiding = lines.some((l) => l.type === "restrict" && l.outcome === "hides");
+  const closing = !hiding ? null : noAccess
+    ? `By its criteria, a restriction rule would also hide this record from ${name}, but ${name} has no access to it anyway.`
+    : `By its criteria, a restriction rule should hide this record from ${name}. This was worked out from the rule's text, not checked by logging in as ${name}.`;
+  return { state: "found", header: `${parts} on ${plural}:`, lines, noAccess, closing };
+}
+
+const hidingLines = (rv) => rv.lines.filter((l) => l.type === "restrict" && l.outcome === "hides");
+const maybeLines = (rv) => rv.lines.filter((l) => l.type === "restrict" && l.outcome === "maybe");
+
+/** Cause sentences for a user Salesforce says cannot see the record. Empty when the rules were read and none can hide it. */
+function ruleCauses(rv) {
+  if (rv.state === "unread") return ["A restriction rule or scoping rule may hide the record from them (restriction and scoping rules were not read)"];
+  if (rv.state === "failed") return [`A restriction rule may hide the record from them (restriction and scoping rules could not be read${rv.error ? `: ${rv.error}` : ""})`];
+  // When there is no access anyway, a rule that would also hide the record is not the reason; only a rule we could not check may be.
+  return [...hidingLines(rv).filter((l) => !l.wouldAlso).map((l) => `${l.text} This is the likely reason.`), ...maybeLines(rv).map((l) => l.text)];
+}
+
 const MAIN_CAUSES = {
   routeButNone: (n) => [
-    "A restriction rule or scoping rule hides the record from them (this page does not read those)",
+    ...n.ruleCauses,
     "Sharing was changed recently and Salesforce has not finished recalculating it",
     n.inactive ? `${n.name} is inactive or frozen` : "The user is frozen or limited in a way this page does not read",
     "Their object access is limited by something we did not read (for example a muting permission set)",
@@ -747,6 +778,8 @@ function analyse(u, name, ctx, side) {
   const sfShare = sfShareLevel(u.sf);
   const inactive = u.isActive === false && u.sf == null;
   const { routes, gate, cap: capLevel, notes } = routesFor(u, name, ctx, sf);
+  const noAccess = sf === "none" || gate || (sf === null && !routes.length);
+  const rv = ruleView(u, name, ctx, noAccess);
   const known = routes.filter((r) => r.access !== null);
   const unknown = routes.some((r) => r.access === null);
   const best = routes.reduce((m, r) => higher(m, r.effective), "none");
@@ -757,7 +790,7 @@ function analyse(u, name, ctx, side) {
       mismatch = {
         kind: "routeButNone",
         text: `We found ${routes.length === 1 ? "a route" : `${routes.length} routes`} that should give ${name} access, but Salesforce says ${name} can't see this record. Salesforce's answer is the one that counts.`,
-        causes: MAIN_CAUSES.routeButNone({ name, inactive: u.isActive === false }),
+        causes: MAIN_CAUSES.routeButNone({ name, inactive: u.isActive === false, ruleCauses: ruleCauses(rv) }),
       };
     } else if (sf !== "none" && !routes.length) {
       mismatch = {
@@ -777,7 +810,7 @@ function analyse(u, name, ctx, side) {
       mismatch = {
         kind: "routesHigher",
         text: `The routes we found give more than Salesforce says: they point to ${GIVES[best]}, but Salesforce says ${name} ${LEVEL_PHRASE[sf]}.`,
-        causes: MAIN_CAUSES.routeButNone({ name, inactive: u.isActive === false }),
+        causes: MAIN_CAUSES.routeButNone({ name, inactive: u.isActive === false, ruleCauses: ruleCauses(rv) }),
       };
     }
   }
@@ -804,13 +837,19 @@ function analyse(u, name, ctx, side) {
       ? `Sharing gives ${name} full access to this record, but ${name}'s object permissions on ${ctx.plural} only allow ${can === "view" ? "viewing" : "editing, not deleting"}, so ${name} can only ${can} it.`
       : `Sharing gives ${name} full access to this record, but ${name} can only ${can} it. Something other than sharing holds ${name} back (we could not tell what).`;
   }
+  // In a test, Salesforce's UserRecordAccess still said "can view" for a user a restriction rule should hide.
+  const hides = hidingLines(rv).filter((l) => !l.wouldAlso);
+  const ruleSfNote = sf !== null && sf !== "none" && hides.length
+    ? `Salesforce's answer above may not include restriction rules (in a test it still said 'can view' for a user a rule should hide). By its criteria, restriction rule${hides.length === 1 ? "" : "s"} ${hides.map((l) => `'${l.name}'`).join(", ")} should hide this record from ${name}, so ${name} may not be able to see it in practice.`
+    : null;
+  const ruleHideNames = hides.map((l) => `'${l.name}'`);
   const inactiveText = inactive
     ? `${name} is inactive. Salesforce gives no answer for an inactive user, and an inactive user can't log in. The routes below only show what would apply if ${name} were active.`
     : null;
   return {
     key: side, id: u.id, name, username: u.username || "", isActive: u.isActive !== false,
     profile: u.profile || "", roleName: u.roleName || "",
-    sfLevel: sf, sfShare, inactive, inactiveText, limitText,
+    sfLevel: sf, sfShare, inactive, inactiveText, limitText, rules: rv, ruleSfNote, ruleHideNames,
     sfText: inactive ? "Salesforce gives no answer for an inactive user" : sf === null ? "Salesforce's answer could not be read" : LEVEL_PHRASE[sf],
     routes, gate, gateText, cap: capLevel, mismatch, parentLine, notes, raw: u,
   };
@@ -964,6 +1003,31 @@ function difference(x, y, ctx, via) {
 
 // ---------- explain ----------
 
+/** Rules one user is hidden from but the other is not (a restriction rule that hides, or may hide, it for one only). Short form:
+ *  the full rule sentence is already on the user's card. */
+function ruleDifferences(a, b) {
+  const out = [];
+  const hidden = (l) => l && l.type === "restrict" && (l.outcome === "hides" || l.outcome === "maybe");
+  a.rules.lines.forEach((la, i) => {
+    const lb = b.rules.lines[i];
+    if (!lb || la.type !== "restrict" || hidden(la) === hidden(lb)) return;
+    const [h, hn, o, on] = hidden(la) ? [la, a.name, lb, b.name] : [lb, b.name, la, a.name];
+    const verb = h.outcome === "maybe" ? "may hide it from" : h.wouldAlso ? "would also hide it from" : "hides it from";
+    const tail = h.outcome === "maybe" ? " (could not be checked)" : " by its criteria";
+    const why = o.outcome === "notApplies" ? `does not apply to ${on}` : `does not hide it from ${on} (the record matches its filter)`;
+    out.push(`${h.short} ${verb} ${hn}${tail}; ${why}.`);
+  });
+  return out;
+}
+
+/** Notes about the rules read (one line when they were read, one when they were not). */
+function ruleNotes(facts, ctx) {
+  const r = facts.rules;
+  if (!r) return [];
+  if (!r.read) return [`Restriction rules and scoping rules on ${ctx.plural.toLowerCase()} could not be read${r.error ? ` (${r.error})` : ""}, so they were not checked. Your user may not have permission to read them.`];
+  return ["Restriction rules and scoping rules are read from the org (active ones on this object only). Only simple criteria are checked against the user's and the record's own values (field, comparison, value; joined by AND or by OR); a rule with anything else is shown as 'may hide it'. This comes from the rule's text, not from logging in as the user. Salesforce's own answer at the top may not include restriction rules (in a test it still said 'can view' for a user a rule should hide)."];
+}
+
 /** Work out the routes for one or two users and, with two, why they differ.
  *  `userIds` picks (and orders) users from `facts.users`; without it the first two are used. */
 export function explain(facts, userIds) {
@@ -978,9 +1042,22 @@ export function explain(facts, userIds) {
   let verdict;
   const said = users.map((u) => (u.inactive
     ? `${u.name} is inactive. Salesforce gives no answer for inactive users, and they can't log in.`
-    : u.sfLevel === null ? `Salesforce did not say whether ${u.name} can see this record.` : `${u.name} ${LEVEL_PHRASE[u.sfLevel]}.`));
+    : u.sfLevel === null ? `Salesforce did not say whether ${u.name} can see this record.`
+      : u.ruleHideNames.length ? `Salesforce says ${u.name} ${LEVEL_PHRASE[u.sfLevel]}, but restriction rule${u.ruleHideNames.length === 1 ? "" : "s"} ${u.ruleHideNames.join(", ")} should hide it from ${users.length === 1 ? "them" : u.name}.`
+        : `${u.name} ${LEVEL_PHRASE[u.sfLevel]}.`));
   verdict = said.join(" ");
-  if (users.length === 2 && users.every((u) => u.sfLevel !== null) && users[0].sfLevel === users[1].sfLevel) verdict += " They have the same access.";
+  if (users.length === 2 && users.every((u) => u.sfLevel !== null) && users[0].sfLevel === users[1].sfLevel) {
+    const [ua, ub] = users;
+    const rulesDiffer = ruleDifferences(ua, ub).length > 0 || ua.ruleHideNames.join("|") !== ub.ruleHideNames.join("|");
+    if (!rulesDiffer) verdict += " They have the same access.";
+    else {
+      const only = ua.ruleHideNames.length && !ub.ruleHideNames.length ? ua : ub.ruleHideNames.length && !ua.ruleHideNames.length ? ub : null;
+      const same = `Salesforce gives ${ua.name} and ${ub.name} the same access (${LEVEL_SHORT[ua.sfLevel].replace(/ it$/, "")} this record)`;
+      verdict = only
+        ? `${same}, but restriction rule ${only.ruleHideNames.join(", ")} should hide it from ${only.name} only.`
+        : `${same}, but ${ruleDifferences(ua, ub).length ? "a restriction rule may hide it from one of them only" : "restriction rules treat them differently"}.`;
+    }
+  }
   for (const u of users) if (u.limitText) verdict += ` ${u.limitText}`;
 
   let diff = null;
@@ -1019,13 +1096,22 @@ export function explain(facts, userIds) {
     }
   }
 
+  if (diff) {
+    diff.rules = ruleDifferences(users[0], users[1]);
+    if (diff.rules.length && diff.same) {
+      diff.same = false;
+      diff.text = `${diff.text} But a restriction rule should treat them differently (see below), so ${users[0].name} and ${users[1].name} may not see this record alike in practice.`;
+    }
+  }
+
   const notes = [
     ...(facts.notes || []),
     ...users.flatMap((u) => u.notes),
     ...(ctx.hierarchy && facts.object?.custom ? ["We could not read whether people above in the role hierarchy get access on this custom object (the 'Grant Access Using Hierarchies' setting). We assumed they do."] : []),
     ...(!ctx.permsApply ? [`Salesforce keeps no object permissions for ${ctx.plural.toLowerCase()} (access follows the owner and the related record), so Read and Edit on the object were not used.`] : []),
     ...(users.some((u) => u.mismatch) ? ["Salesforce's answer is the one shown at the top. Routes are our explanation, and they did not match it for everyone (see the lists above)."] : []),
-    "Not checked: restriction rules and scoping rules, Experience Cloud sharing sets, field-level access, and which specific sharing rule gave access (Salesforce only says 'a sharing rule').",
+    ...ruleNotes(facts, ctx),
+    "Not checked: Experience Cloud sharing sets, field-level access, and which specific sharing rule gave access (Salesforce only says 'a sharing rule').",
     ...(acctScope(ctx) ? [
       `Access through the account is checked for ${ctx.plural.toLowerCase()}: the account's own sharing (sharing rules, manual shares, the account team, territories) and the account owner, including people above them in the role hierarchy. Salesforce's "View Sharing Hierarchy" page is the place to confirm a route we could not explain.`,
       ...(ctx.facts.account?.truncated ? ["The account has a very long list of sharing rows. Only the first part was read, so a route through the account may be missing."] : []),
@@ -1070,6 +1156,11 @@ export function toPlainText(res) {
       L.push(`    ${rt.steps.join(" -> ")}`);
     });
     if (u.parentLine) L.push(`  ${u.parentLine}`);
+    if (u.rules && u.rules.state !== "unread") {
+      L.push(`  ${u.rules.header}`);
+      for (const l of u.rules.lines) L.push(`    - ${l.text}`);
+    }
+    if (u.ruleSfNote) L.push(`  ${u.ruleSfNote}`);
     if (u.mismatch) {
       L.push(`  Does not match Salesforce: ${u.mismatch.text}`);
       L.push("  Possible reasons:");
@@ -1089,6 +1180,7 @@ export function toPlainText(res) {
       for (const c of it.change) L.push(`      What would change it: ${c}`);
     }
     for (const v of d.via || []) L.push(`  ${v}`);
+    for (const t of d.rules || []) L.push(`  ${t}`);
     if (d.unexplained) L.push(`  ${d.unexplained}`);
   }
   L.push("");

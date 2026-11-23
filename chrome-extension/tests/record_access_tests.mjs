@@ -8,6 +8,7 @@ import path from "node:path";
 import { SfApi, SalesforceError } from "../shared/sfconn.js";
 import { recordIdFromUrl } from "../shared/recordid.js";
 import { looksLikeId, to18, explain, toPlainText, sfLabelFor, causeInfo, owdText, sfLevel, shareLevel, exactFirst, givesText } from "../tools/record-access/record-access-logic.js";
+import { parseCriteria, checkRule, neededFields } from "../tools/record-access/record-access-rules.js";
 import { readRecordContext, readRecordAccess, readMemberRoles, readUserById, withRetry, withLimit, createReadCache, clearRecordFacts, MAX_IN_FLIGHT } from "../tools/record-access/record-access-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -967,6 +968,193 @@ export async function run(test) {
     assert.deepEqual(kinds(explain(same).users[0]), []);
   });
 
+
+  // ---------- restriction and scoping rules ----------
+
+  const RR = { id: "0eY000000000001AAA", devName: "East_Only", label: "East only", type: "Restrict", userCriteria: "$User.Department = 'Restricted'", recordFilter: "Region__c = 'East'", description: "" };
+  const SR = { id: "0eY000000000002AAA", devName: "Own_First", label: "Own first", type: "Scoping", userCriteria: "$User.Department = 'Scoped'", recordFilter: "OwnerId = $User.Id", description: "" };
+  const rrUser = (id, name, dept, sf = SF_VIEW) => user(id, name, { sf, ruleValues: { Department: dept } });
+  const withRules = (items, recordValues, users, extra = {}) => facts({ rules: { read: true, error: "", items, recordValues, ...extra }, users, shares: { available: true, truncated: false, rows: [{ who: ID.alice, level: "Read", cause: "Manual" }, { who: ID.bob, level: "Read", cause: "Manual" }] } });
+
+  await test("rules: criteria are parsed in the simple forms and refused when complex", () => {
+    const p = parseCriteria("$User.Department = 'A' AND $User.Title != 'B'", true);
+    assert.equal(p.ok, true); assert.equal(p.join, "and"); assert.deepEqual(p.terms.map((t) => [t.field, t.op]), [["Department", "="], ["Title", "!="]]);
+    assert.equal(parseCriteria("Region__c = 'East' OR Region__c = 'West'", false).join, "or");
+    assert.equal(parseCriteria("OwnerId = $User.Id", false).terms[0].value.kind, "userRef");
+    assert.equal(parseCriteria("Name = 'it\\'s AND that'", false).terms[0].value.v, "it's AND that");
+    for (const bad of ["(Region__c = 'East')", "Region__c IN ('A','B')", "A = 'x' AND B = 'y' OR C = 'z'", "Owner.Name = 'x'", "Region__c LIKE 'E%'", "", "Region__c = 'East"]) assert.equal(parseCriteria(bad, false).ok, false, bad);
+    assert.equal(parseCriteria("Department = 'A'", true).ok, false, "user criteria need $User.");
+    const need = neededFields([SR, RR]);
+    assert.deepEqual([need.user.slice().sort(), need.record.slice().sort()], [["Department", "Id"], ["OwnerId", "Region__c"]]);
+  });
+
+  await test("rules: when Salesforce already says no access, a rule that would exclude the record 'would also hide' it and is not the likely reason", () => {
+    const f = withRules([RR], { Region__c: "West" }, [rrUser(ID.alice, "Alice Smith", "Restricted", SF_NONE)]);
+    const u = explain(f).users[0];
+    assert.equal(u.rules.state, "found");
+    assert.equal(u.rules.lines[0].outcome, "hides");
+    assert.match(u.rules.lines[0].text, /^By its criteria, restriction rule 'East only' would also hide this record from Alice Smith\. It applies to users where \$User\.Department = 'Restricted'/);
+    assert.match(u.rules.lines[0].text, /only records where Region__c = 'East'; this record does not match \(Region__c is 'West'\)/);
+    assert.match(u.rules.closing, /would also hide this record from Alice Smith, but Alice Smith has no access to it anyway/);
+    assert.equal(u.mismatch.kind, "routeButNone");
+    assert.ok(!u.mismatch.causes.some((c) => /likely reason/.test(c) || /East only/.test(c)), "not offered as the reason");
+    assert.equal(u.ruleSfNote, null);
+    assert.match(toPlainText(explain(f)), /would also hide this record from Alice Smith/);
+    assert.ok(!/should hide/.test(explain(f).verdict));
+    // no route and no access at all: the same
+    const g = facts({ rules: { read: true, error: "", items: [RR], recordValues: { Region__c: "West" } }, users: [rrUser(ID.bob, "Bob Jones", "Restricted", SF_NONE)], shares: { available: true, truncated: false, rows: [] } });
+    assert.equal(explain(g).users[0].routes.length, 0);
+    assert.match(explain(g).users[0].rules.lines[0].text, /would also hide/);
+  });
+
+  await test("rules: Salesforce says can view while a rule should hide it: the headline says both, in the same sentence, and every text is equally careful", () => {
+    const f = withRules([RR], { Region__c: "West" }, [rrUser(ID.alice, "Alice Smith", "Restricted", SF_VIEW)]);
+    const res = explain(f);
+    const u = res.users[0];
+    assert.equal(res.verdict, "Salesforce says Alice Smith can view this record, but restriction rule 'East only' should hide it from them.");
+    assert.match(u.rules.lines[0].text, /^By its criteria, restriction rule 'East only' should hide this record from Alice Smith\./);
+    assert.match(u.rules.closing, /^By its criteria, a restriction rule should hide this record from Alice Smith\./);
+    assert.match(u.ruleSfNote, /^Salesforce's answer above may not include restriction rules \(in a test it still said 'can view' for a user a rule should hide\)\./);
+    assert.ok(!/does not count/.test(u.ruleSfNote));
+    const text = toPlainText(res);
+    assert.match(text, /^Salesforce says Alice Smith can view this record, but restriction rule/m);
+    assert.match(text, /may not include restriction rules/);
+    assert.ok(!/does not count restriction rules|\bhides this record from\b/.test(text), "no flat claim in the copied text");
+    assert.ok(res.notes.every((n) => !/did not count/.test(n)));
+    const g = withRules([RR], { Region__c: "East" }, [rrUser(ID.alice, "Alice Smith", "Restricted", SF_VIEW)]);
+    assert.equal(explain(g).users[0].ruleSfNote, null);
+    assert.equal(explain(g).verdict, "Alice Smith can view this record.");
+  });
+
+  await test("rules: a rule that applies but the record passes its filter does not hide it; a rule that does not apply is said so", () => {
+    const f = withRules([RR], { Region__c: "east" }, [rrUser(ID.alice, "Alice Smith", "Restricted"), rrUser(ID.bob, "Bob Jones", "Sales")]);
+    const [a, b] = explain(f).users;
+    assert.equal(a.rules.lines[0].outcome, "passes");
+    assert.match(a.rules.lines[0].text, /applies to Alice Smith but does not hide this record/);
+    assert.equal(b.rules.lines[0].outcome, "notApplies");
+    assert.match(b.rules.lines[0].text, /does not apply to Bob Jones/);
+    assert.equal(a.mismatch, null);
+  });
+
+  await test("rules: a scoping rule is never shown as taking access away", () => {
+    const f = withRules([SR], { OwnerId: ID.maria }, [rrUser(ID.alice, "Alice Smith", "Scoped", SF_NONE)]);
+    const u = explain(f).users[0];
+    assert.equal(u.rules.lines[0].outcome, "scopes");
+    assert.match(u.rules.lines[0].text, /by default Alice Smith sees only records where OwnerId = \$User\.Id in list views and searches\. It does not take access away/);
+    assert.ok(!/hides/.test(u.rules.lines[0].text));
+    assert.ok(!u.mismatch.causes.some((c) => /Scoping rule/.test(c)), "scoping rule is not offered as a reason");
+    assert.equal(u.ruleSfNote, null);
+  });
+
+  await test("rules: criteria that are too complex are shown as may hide it", () => {
+    const hard = { ...RR, id: "0eY000000000009AAA", label: "Complex", userCriteria: "$User.Department IN ('A','B')" };
+    const f = withRules([hard], { Region__c: "West" }, [rrUser(ID.alice, "Alice Smith", "A", SF_NONE)]);
+    const u = explain(f).users[0];
+    assert.equal(u.rules.lines[0].outcome, "maybe");
+    assert.match(u.rules.lines[0].text, /^Restriction rule 'Complex' may hide this record from Alice Smith: the user criteria could not be checked/);
+    assert.ok(u.mismatch.causes.some((c) => /may hide this record/.test(c)));
+    const g = withRules([RR], { Region__c: "West" }, [user(ID.alice, "Alice Smith", { sf: SF_NONE })]);
+    assert.equal(explain(g).users[0].rules.lines[0].outcome, "maybe");
+  });
+
+  await test("rules: none on the object says so, a failed read says it could not be read (not none)", () => {
+    const none = explain(withRules([], null, [rrUser(ID.alice, "Alice Smith", "X")]));
+    assert.equal(none.users[0].rules.state, "none");
+    assert.equal(none.users[0].rules.header, "No restriction or scoping rules on Accounts.");
+    const failed = explain(withRules([], null, [rrUser(ID.alice, "Alice Smith", "X", SF_NONE)], { read: false, error: "INSUFFICIENT_ACCESS: no permission" }));
+    const u = failed.users[0];
+    assert.equal(u.rules.state, "failed");
+    assert.match(u.rules.header, /could not be read \(INSUFFICIENT_ACCESS: no permission\)/);
+    assert.ok(!/No restriction or scoping rules/.test(u.rules.header));
+    assert.ok(u.mismatch.causes.some((c) => /could not be read/.test(c)));
+    assert.ok(failed.notes.some((n) => /could not be read/.test(n) && /Restriction rules/.test(n)));
+    const ok = explain(withRules([], null, [rrUser(ID.alice, "Alice Smith", "X", SF_NONE)]));
+    assert.ok(!ok.users[0].mismatch.causes.some((c) => /restriction rule/i.test(c)));
+    assert.ok(!ok.notes.some((n) => /^Not checked: restriction/.test(n)));
+    assert.ok(ok.notes.some((n) => /^Not checked: Experience Cloud sharing sets/.test(n)));
+  });
+
+  await test("rules: one user hidden by a rule and the other not: Salesforce's same answer is not called 'the same access', and the rule is not repeated in full", () => {
+    const f = withRules([RR], { Region__c: "West" }, [rrUser(ID.alice, "Alice Smith", "Restricted"), rrUser(ID.bob, "Bob Jones", "Sales")]);
+    const res = explain(f);
+    assert.equal(res.verdict, "Salesforce gives Alice Smith and Bob Jones the same access (can view this record), but restriction rule 'East only' should hide it from Alice Smith only.");
+    assert.ok(!/They have the same access/.test(res.verdict));
+    assert.equal(res.difference.same, false);
+    assert.equal(res.difference.rules.length, 1);
+    assert.equal(res.difference.rules[0], "Restriction rule 'East only' hides it from Alice Smith by its criteria; does not apply to Bob Jones.");
+    assert.ok(!/It applies to users where/.test(res.difference.rules[0]), "short form");
+    assert.match(toPlainText(res), /does not apply to Bob Jones/);
+    const g = withRules([RR], { Region__c: "West" }, [rrUser(ID.alice, "Alice Smith", "Restricted"), rrUser(ID.bob, "Bob Jones", "Restricted")]);
+    assert.deepEqual(explain(g).difference.rules, []);
+    assert.match(explain(g).verdict, /should hide it from Alice Smith\. Salesforce says Bob Jones can view this record, but restriction rule 'East only' should hide it from Bob Jones\. They have the same access\./);
+    const h = withRules([RR], { Region__c: "East" }, [rrUser(ID.alice, "Alice Smith", "Restricted"), rrUser(ID.bob, "Bob Jones", "Sales")]);
+    assert.match(explain(h).verdict, /They have the same access\./, "still said when no rule treats them differently");
+  });
+
+  await test("rules: a text compared with a number could not be checked (may hide), not false", () => {
+    const run = (rf, rv) => checkRule({ type: "Restrict", userCriteria: "$User.Department = 'A'", recordFilter: rf }, { Department: "A" }, rv);
+    assert.equal(run("Qty__c < 5", { Qty__c: "abc" }).outcome, "maybe");
+    assert.equal(run("Qty__c >= 5", { Qty__c: "abc" }).outcome, "maybe");
+    assert.equal(run("Qty__c < 5", { Qty__c: 3 }).outcome, "passes");
+    assert.equal(run("Qty__c < 5", { Qty__c: 9 }).outcome, "hides");
+  });
+
+  await test("rules: AND and OR criteria, other operators, and checks by value", () => {
+    const run = (uc, rf, uv, rv) => checkRule({ type: "Restrict", userCriteria: uc, recordFilter: rf }, uv, rv).outcome;
+    assert.equal(run("$User.Department = 'A' AND $User.Title = 'B'", "Region__c = 'E'", { Department: "A", Title: "C" }, { Region__c: "W" }), "notApplies");
+    assert.equal(run("$User.Department = 'A' OR $User.Title = 'B'", "Region__c = 'E'", { Department: "x", Title: "B" }, { Region__c: "W" }), "hides");
+    assert.equal(run("$User.Department = 'A'", "Region__c = 'E' OR Region__c = 'W'", { Department: "A" }, { Region__c: "W" }), "passes");
+    assert.equal(run("$User.Department != 'A'", "Amount__c > 10", { Department: "B" }, { Amount__c: 5 }), "hides");
+    assert.equal(run("$User.IsActive = true", "OwnerId = $User.Id", { IsActive: true, Id: "005000000000001AAA" }, { OwnerId: "005000000000001" }), "passes", "15 and 18 character Ids are the same Id");
+    assert.equal(run("$User.Department = 'A'", "Region__c = null", { Department: "A" }, { Region__c: null }), "passes");
+    assert.equal(run("$User.Department = 'A'", "Region__c = 'E'", { department: "a" }, { region__c: "w" }), "hides", "field names and text compare without case");
+  });
+
+  await test("rules: the reader asks the Tooling API for active rules of the object by API name, reads only fields the rule uses, and reports a failed read", async () => {
+    const { api, log } = fakeOrg();
+    const orig = api.fetch;
+    const rules = [{ Id: RR.id, DeveloperName: "East_Only", MasterLabel: "East only", IsActive: true, TargetEntity: "Account", EnforcementType: "Restrict", UserCriteria: "$User.Department = 'Restricted'", RecordFilter: "Name = 'East Co'", Description: "" }];
+    let fail = false;
+    const okJson = (body) => ({ ok: true, status: 200, text: async () => JSON.stringify(body) });
+    api.fetch = async (url, o) => {
+      const u = new URL(url);
+      const q = u.searchParams.get("q") || "";
+      log.push({ method: o?.method || "GET", path: u.pathname, q });
+      if (/tooling\/query/.test(u.pathname)) {
+        if (fail) return { ok: false, status: 403, text: async () => JSON.stringify([{ message: "no permission", errorCode: "INSUFFICIENT_ACCESS" }]) };
+        return okJson({ done: true, totalSize: 1, records: rules });
+      }
+      if (/sobjects\/User\/describe/.test(u.pathname)) return okJson({ fields: [{ name: "Department", type: "string" }, { name: "Id", type: "id" }] });
+      if (/^SELECT Department FROM User WHERE Id = '005000000000001AAA'/.test(q)) return okJson({ done: true, totalSize: 1, records: [{ Department: "Restricted" }] });
+      if (/^SELECT Name FROM Account WHERE Id = '001000000000001AAA'/.test(q)) return okJson({ done: true, totalSize: 1, records: [{ Name: "West Co" }] });
+      return orig(url, o);
+    };
+    const ctx = await readRecordContext(api, ID.rec);
+    const f = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(f.rules.read, true);
+    assert.equal(f.rules.items[0].type, "Restrict");
+    assert.deepEqual(f.rules.recordValues, { Name: "West Co" });
+    assert.deepEqual(f.users[0].ruleValues, { Department: "Restricted" });
+    assert.ok(log.some((l) => /tooling\/query/.test(l.path) && /FROM RestrictionRule WHERE TargetEntity = 'Account' AND IsActive = true/.test(l.q)), "tooling query by API name");
+    assert.ok(log.every((l) => l.method === "GET"));
+    assert.equal(explain(f).users[0].rules.lines[0].outcome, "hides");
+    fail = true;
+    const f2 = await readRecordAccess(api, ctx, [{ id: ID.alice, name: "Alice Smith" }]);
+    assert.equal(f2.rules.read, false);
+    assert.match(f2.rules.error, /no permission/);
+    assert.equal(explain(f2).users[0].rules.state, "failed");
+    assert.ok(f2.warnings.some((w) => /Restriction and scoping rules: no permission/.test(w)));
+  });
+
+  await test("rules: the demo facts show a rule that hides the record for one user and not the other", () => {
+    const demo = JSON.parse(readFileSync(ext("samples", "record_access_demo.json"), "utf-8"));
+    const res = explain(demo);
+    assert.equal(res.users[1].rules.lines[0].outcome, "hides");
+    assert.equal(res.users[0].rules.lines[0].outcome, "notApplies");
+    assert.equal(res.difference.rules.length, 1);
+    assert.ok(/sample|made-up/i.test(JSON.stringify(demo.rules)));
+  });
+
   await test("record access: an exact name match is listed first", () => {
     const users = [{ name: "Ann Smithson", username: "a@example.invalid" }, { name: "Ann Smith", username: "b@example.invalid" }, { name: "Joann Smith", username: "c@example.invalid" }];
     assert.deepEqual(exactFirst(users, "ann smith").map((u) => u.name), ["Ann Smith", "Ann Smithson", "Joann Smith"]);
@@ -1021,6 +1209,7 @@ export async function run(test) {
     };
     const route = (q) => {
       if (failOn.some((re) => re.test(q))) return { fail: "INSUFFICIENT_ACCESS", code: "INSUFFICIENT_ACCESS" };
+      if (/FROM RestrictionRule/.test(q)) return [];
       if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
       if (/FROM Account WHERE Id/.test(q)) return [{ Id: ID.rec, Name: "Contoso (sample)", OwnerId: ID.maria }];
       if (/FROM User WHERE Id = '005000000000003AAA'/.test(q)) return [{ Name: "Maria Keller", UserRoleId: ID.low }];
@@ -1315,6 +1504,7 @@ export async function run(test) {
     const log = [];
     const inList = (q) => [...(q.match(/IN \(([^)]*)\)/)?.[1] || "").matchAll(/'([^']*)'/g)].map((m) => m[1]);
     const route = (q) => {
+      if (/FROM RestrictionRule/.test(q)) return [];
       if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
       if (/FROM Case WHERE Id/.test(q)) return [{ Id: "500000000000001AAA", CaseNumber: "0001", OwnerId: ID.carl, AccountId: ID.rec }];
       if (/SELECT Name FROM Account/.test(q)) return [{ Name: "Contoso (sample)" }];
@@ -1463,6 +1653,7 @@ export async function run(test) {
     const queries = [];
     const route = (q) => {
       queries.push(q);
+      if (/FROM RestrictionRule/.test(q)) return [];
       if (/FROM EntityDefinition/.test(q)) return [{ InternalSharingModel: "Private", ExternalSharingModel: "Private" }];
       if (/FROM Contact WHERE Id/.test(q)) return [{ Id: "003000000000001AAA", Name: "Pat Sample", OwnerId: ID.carl, AccountId: ID.rec }];
       if (/SELECT Name FROM Account/.test(q)) return [{ Name: "Contoso (sample)" }];
@@ -1522,7 +1713,7 @@ export async function run(test) {
   });
 
   await test("record access: the new files never use innerHTML, storage or remote code, and only read", () => {
-    const files = [["tools/record-access/record-access.js"], ["tools/record-access/record-access.html"], ["tools/record-access/record-access.css"], ["tools/record-access/record-access-logic.js"], ["tools/record-access/record-access-read.js"], ["menu.js"]];
+    const files = [["tools/record-access/record-access.js"], ["tools/record-access/record-access.html"], ["tools/record-access/record-access.css"], ["tools/record-access/record-access-logic.js"], ["tools/record-access/record-access-read.js"], ["tools/record-access/record-access-rules.js"], ["menu.js"]];
     for (const f of files) {
       const text = readFileSync(ext(...f), "utf-8");
       for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "localStorage", "sessionStorage", "chrome.storage", "document.write", "eval("]) {
@@ -1531,7 +1722,7 @@ export async function run(test) {
       assert.ok(!/https?:\/\/(?!127\.0\.0\.1)/.test(text.replace(/https:\/\/\$\{/g, "")), `${f.join("/")} mentions a remote URL`);
     }
     // the one import allowed is the shared (also pure) record Id helper
-    const pure = readFileSync(ext("tools/record-access/record-access-logic.js"), "utf-8").replace('import { looksLikeId } from "../../shared/recordid.js";', "");
+    const pure = readFileSync(ext("tools/record-access/record-access-logic.js"), "utf-8").replace('import { looksLikeId } from "../../shared/recordid.js";', "").replace('import { ruleSentences } from "./record-access-rules.js";', "");
     for (const bad of ["document.", "window.", "fetch(", "chrome.", "location.", "import "]) assert.ok(!pure.includes(bad), `record-access-logic.js contains ${bad}`);
     const read = readFileSync(ext("tools/record-access/record-access-read.js"), "utf-8");
     assert.ok(!/\b(INSERT|UPDATE|DELETE|UPSERT|POST|PATCH|PUT)\b/.test(read.replace(/Delete|Update/g, "")), "record-access-read.js has a write verb");
@@ -2109,8 +2300,8 @@ export async function run(test) {
     const ctx2 = await readRecordContext(ok.api, ID.rec);
     const good = [];
     await readRecordAccess(ok.api, ctx2, BOTH, { progress: (t) => good.push(t) });
-    assert.equal(good[0], "Reading… (0 of 9)");
-    assert.equal(good[good.length - 1], "Reading… (9 of 9)");
+    assert.equal(good[0], "Reading… (0 of 10)");
+    assert.equal(good[good.length - 1], "Reading… (10 of 10)");
   });
 
   await test("record access: two users are read together and each gets their own facts", async () => {
@@ -2228,9 +2419,9 @@ export async function run(test) {
     const seen = [];
     await readRecordAccess(api, ctx, BOTH, { progress: (t) => seen.push(t) });
     const nums = seen.map((t) => t.match(/^Reading… \((\d+) of (\d+)\)$/)).map((m) => (assert.ok(m, "plain wording"), [Number(m[1]), Number(m[2])]));
-    assert.deepEqual(nums[0], [0, 9]);
-    assert.deepEqual(nums.at(-1), [9, 9]);
-    for (let i = 1; i < nums.length; i++) assert.ok(nums[i][0] === nums[i - 1][0] + 1 && nums[i][1] === 9);
+    assert.deepEqual(nums[0], [0, 10]);
+    assert.deepEqual(nums.at(-1), [10, 10]);
+    for (let i = 1; i < nums.length; i++) assert.ok(nums[i][0] === nums[i - 1][0] + 1 && nums[i][1] === 10);
   });
 
   await test("record access: the page keeps what it read in memory only and empties the record's facts for a new record", () => {

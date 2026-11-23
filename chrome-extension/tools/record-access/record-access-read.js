@@ -7,6 +7,7 @@
 import { chunk, soqlString } from "../../shared/sfconn.js";
 import { readRoles } from "../../shared/roles-read.js";
 import { ACCESS_SCHEMA, to18, looksLikeId, exactFirst } from "./record-access-logic.js";
+import { neededFields } from "./record-access-rules.js";
 
 const ID_CHUNK = 200;
 const MAX_DEPTH = 10; // levels of groups inside groups
@@ -35,6 +36,25 @@ async function soft(out, what, fn, fallback, { quietIfOff = false } = {}) {
     if (!(quietIfOff && isOff(e))) out.notes.push(`${w} could not be read, so it was not checked. Your user may not have permission to see it.`);
     return fallback;
   }
+}
+
+// Field types whose value can be compared with a text, number, true/false or null written in a rule.
+const RULE_FIELD_TYPES = new Set(["string", "picklist", "id", "reference", "boolean", "int", "double", "currency", "percent", "email", "phone", "url", "textarea"]);
+
+/** Of the wanted field names, the ones this object has (by describe, any case) with a type that can be compared. API names only. */
+async function usableFields(api, objectApi, wanted) {
+  if (!wanted.length) return [];
+  const d = await api.describe(objectApi);
+  const byLower = new Map((d.fields || []).map((f) => [f.name.toLowerCase(), f]));
+  return wanted.map((w) => byLower.get(w.toLowerCase())).filter((f) => f && IDENT.test(f.name) && RULE_FIELD_TYPES.has(f.type)).map((f) => f.name);
+}
+
+/** One SELECT of the given fields from one record; {fieldName: value} (Salesforce returns ids as 18 characters). */
+async function readFieldValues(api, objectApi, id, fields) {
+  if (!fields.length) return {};
+  const { records } = await api.query(`SELECT ${fields.join(", ")} FROM ${objectApi} WHERE Id = ${soqlString(id)}`);
+  const r = records[0] || {};
+  return Object.fromEntries(fields.map((f) => [f, r[f] ?? null]));
 }
 
 const blank = () => ({ notes: [], warnings: [] });
@@ -607,7 +627,7 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
   const orgWide = (key, load) => remembered(cache, "org", key, load);
   const ofRecord = (key, load) => { if (cache.rec.has(key)) keptUsed = true; return remembered(cache, "rec", key, load); };
 
-  const total = 7 + users.length;
+  const total = 8 + users.length;
   let done = 0;
   // Once the run has ended (answered or failed) no more progress is told: reads still under way after an early failure
   // must not write "Reading… (7 of 8)" next to the error.
@@ -640,6 +660,42 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
       }
     }, null, { quietIfOff: true });
     return { o, territories, terrParent: new Map(territories.items.map((t) => [t.id, t.parentId])), activeTerr: new Set(territories.items.map((t) => t.id)) };
+  })());
+
+  // Restriction rules and scoping rules on the record's object (Tooling API RestrictionRule), read once per Explain, and the record's own
+  // values for the fields the rule filters use. `read: false` (with the cause) is told apart from "no rules".
+  const rulesU = tick((async () => {
+    const o = blank();
+    const rules = { read: false, error: "", items: [], recordValues: null };
+    try {
+      rules.items = await orgWide(`rules:${objectApi}`, async () => {
+        const { records } = await api.query(
+          `SELECT Id, DeveloperName, MasterLabel, IsActive, TargetEntity, EnforcementType, UserCriteria, RecordFilter, Description FROM RestrictionRule WHERE TargetEntity = ${soqlString(objectApi)} AND IsActive = true`,
+          { tooling: true }
+        );
+        return records.map((r) => ({
+          id: r.Id, devName: r.DeveloperName, label: r.MasterLabel || "", type: r.EnforcementType || "", userCriteria: r.UserCriteria || "",
+          recordFilter: r.RecordFilter || "", description: r.Description || "",
+        }));
+      });
+      rules.read = true;
+    } catch (e) {
+      rules.error = e?.message || String(e);
+      o.warnings.push(`Restriction and scoping rules: ${rules.error}`);
+    }
+    if (rules.read && rules.items.length) {
+      const need = neededFields(rules.items);
+      rules.userFields = [];
+      try {
+        rules.userFields = await usableFields(api, "User", need.user);
+        const recFields = await usableFields(api, objectApi, need.record);
+        rules.recordValues = await ofRecord(`ruleRecord:${recFields.join(",")}`, () => readFieldValues(api, objectApi, rec.id, recFields));
+      } catch (e) {
+        o.warnings.push(`The record's values for restriction and scoping rules: ${e?.message || e}`);
+        o.notes.push("The record's own values could not be read, so restriction and scoping rule filters were not checked against it.");
+      }
+    }
+    return { o, rules };
   })());
 
   // The record's own sharing rows.
@@ -763,6 +819,11 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
       const { records: a } = await assignedQ;
       return a.map((x) => x.Territory2Id).filter((id) => activeTerr.has(id));
     }, [], { quietIfOff: true });
+    const ruleValuesP = soft2("Values for restriction and scoping rules", async () => {
+      const { rules } = await rulesU;
+      if (!rules.userFields?.length) return null;
+      return readFieldValues(api, "User", pick.id, rules.userFields);
+    }, null);
     const hasAccount = !!(ACCOUNT_CHILD_LEVEL[objectApi] && rec.accountId);
     const parts = [
       soft2("Salesforce's own access answer", async () => { user.sf = await readSf(api, pick.id, rec.id); }, null),
@@ -788,6 +849,7 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
     ].filter(Boolean);
     const [u, terrIds] = await Promise.all([userP, terrAssignP]);
     await Promise.all(parts);
+    user.ruleValues = await ruleValuesP;
     if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
     if (u.Name !== pick.name) { // notes were worded with the picked name; use the name Salesforce holds
       const fix = (t) => (t.startsWith(`${pick.name}: `) ? `${u.Name}: ${t.slice(pick.name.length + 2)}` : t);
@@ -805,15 +867,15 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
   // Everything is under way. Gather it, always in the same order, so the notes read the same way every time.
   let gathered;
   try {
-    gathered = await Promise.all([rolesU, terrU, sharesU, accountU, namesU, membersU, permU, ...userUs]);
+    gathered = await Promise.all([rolesU, terrU, sharesU, accountU, namesU, membersU, permU, rulesU, ...userUs]);
   } finally {
     open = false;
   }
-  const [R, T, S, A, N, M, P, ...U] = gathered;
+  const [R, T, S, A, N, M, P, RU, ...U] = gathered;
   const out = blank();
   out.notes.push(...ctx.notes);
   out.warnings.push(...ctx.warnings);
-  for (const x of [R, T, S, A, N, M, P]) { out.notes.push(...x.o.notes); out.warnings.push(...x.o.warnings); }
+  for (const x of [R, T, S, A, N, M, P, RU]) { out.notes.push(...x.o.notes); out.warnings.push(...x.o.warnings); }
   const groups = N.groups;
   for (const x of U) {
     for (const [id, g] of x.upGroups) if (!groups.has(id)) groups.set(id, g);
@@ -825,6 +887,7 @@ export async function readRecordAccess(rawApi, ctx, users, { progress = () => {}
     schema: ACCESS_SCHEMA,
     record: rec, owd: ctx.owd, object,
     roles: R.roles, territories: T.territories, shares: S.shares, account: A.account, groups: [...groups.values()], shareUsers: N.shareUsers, memberRoles: M.memberRoles,
+    rules: { read: RU.rules.read, error: RU.rules.error, items: RU.rules.items, recordValues: RU.rules.recordValues },
     users: U.map((x) => x.user), notes: out.notes, warnings: out.warnings,
     ...(keptUsed && cache.recAt !== null ? { kept: { at: cache.recAt } } : {}), // record facts served from an earlier Explain, and when they were first read
   };

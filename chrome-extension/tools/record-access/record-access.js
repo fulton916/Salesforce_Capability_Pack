@@ -379,6 +379,13 @@ function personNode(u) {
   else if (!u.routes.length) nodes.push(el("div", { class: "noroute", text: "We found no route that gives this user access." }));
   else nodes.push(el("ol", { class: "routes" }, u.routes.map((r) => routeNode(r, u.inactive))));
   if (u.parentLine) nodes.push(el("p", { class: "hint", text: u.parentLine }));
+  if (u.rules && u.rules.state !== "unread") {
+    nodes.push(el("h3", { text: "Restriction and scoping rules" }));
+    nodes.push(el("p", { class: u.rules.state === "failed" ? "noroute" : "hint", text: u.rules.header }));
+    if (u.rules.lines.length) nodes.push(el("ul", { class: "rules" }, u.rules.lines.map((l) => el("li", { class: l.outcome === "hides" ? "rule-hides" : "", text: l.text }))));
+    if (u.rules.closing) nodes.push(el("p", { class: "noroute", text: u.rules.closing }));
+  }
+  if (u.ruleSfNote) nodes.push(el("p", { class: "gate", text: u.ruleSfNote }));
   return el("div", { class: `panel person ${u.key}` }, nodes);
 }
 
@@ -427,6 +434,7 @@ function renderResult() {
         ...it.change.map((m) => el("p", { class: "change", text: `What would change it: ${m}` }))));
     }
     for (const v of d.via || []) parts.push(el("p", { class: "hint", text: v }));
+    for (const t of d.rules || []) parts.push(el("p", { class: "miss", text: t }));
     if (d.unexplained) parts.push(el("p", { class: "hint", text: d.unexplained }));
     $("#diff").replaceChildren(...parts);
   }
