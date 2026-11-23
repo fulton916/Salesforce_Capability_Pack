@@ -121,6 +121,34 @@
    "roleId": "00E000000000004AAA"
   }
  ],
+ "rules": {
+  "read": true,
+  "error": "",
+  "items": [
+   {
+    "id": "0eY000000000001AAA",
+    "devName": "Sample_Field_Sales_Region",
+    "label": "Sample: Field Sales see their region",
+    "type": "Restrict",
+    "userCriteria": "$User.Department = 'Field Sales'",
+    "recordFilter": "Region__c = 'EMEA'",
+    "description": "Made-up sample rule"
+   },
+   {
+    "id": "0eY000000000002AAA",
+    "devName": "Sample_Managers_Own",
+    "label": "Sample: Managers start with their own accounts",
+    "type": "Scoping",
+    "userCriteria": "$User.Department = 'Sales Management'",
+    "recordFilter": "OwnerId = $User.Id",
+    "description": "Made-up sample rule"
+   }
+  ],
+  "recordValues": {
+   "Region__c": "Americas",
+   "OwnerId": "005000000000003AAA"
+  }
+ },
  "users": [
   {
    "id": "005000000000001AAA",
@@ -176,6 +204,10 @@
     "Opportunity": 0,
     "Case": 0,
     "Contact": 0
+   },
+   "ruleValues": {
+    "Department": "Sales Management",
+    "Id": "005000000000001AAA"
    }
   },
   {
@@ -224,6 +256,10 @@
     "Opportunity": 0,
     "Case": 0,
     "Contact": 0
+   },
+   "ruleValues": {
+    "Department": "Field Sales",
+    "Id": "005000000000002AAA"
    }
   }
  ],
