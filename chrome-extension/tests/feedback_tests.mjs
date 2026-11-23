@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { TOOLS } from "../shared/tool-list.js";
 import { issueUrl, REPO_URL, FEEDBACK_TOOLS, browserName, versionText } from "../shared/feedback.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -14,17 +15,17 @@ const read = (f) => readFileSync(f, "utf-8");
 
 export async function run(test) {
   await test("feedback: bug link uses bug.yml with tool and version", () => {
-    const u = new URL(issueUrl({ kind: "bug", tool: FEEDBACK_TOOLS.psg, version: "Extension 0.2.0, Chrome 131" }));
+    const u = new URL(issueUrl({ kind: "bug", tool: FEEDBACK_TOOLS.psg, version: "Extension 0.8.0, Chrome 131" }));
     assert.equal(`${u.origin}${u.pathname}`, `${REPO_URL}/issues/new`);
     assert.equal(u.searchParams.get("template"), "bug.yml");
-    assert.equal(u.searchParams.get("tool"), "PSG Compare (extension)");
-    assert.equal(u.searchParams.get("version"), "Extension 0.2.0, Chrome 131");
+    assert.equal(u.searchParams.get("tool"), "Compare permission set groups (extension)");
+    assert.equal(u.searchParams.get("version"), "Extension 0.8.0, Chrome 131");
   });
 
   await test("feedback: enhancement link uses enhancement.yml", () => {
     const u = new URL(issueUrl({ kind: "enhancement", tool: FEEDBACK_TOOLS.access, version: "v" }));
     assert.equal(u.searchParams.get("template"), "enhancement.yml");
-    assert.equal(u.searchParams.get("tool"), "User access (extension)");
+    assert.equal(u.searchParams.get("tool"), "User access summary and comparison (extension)");
   });
 
   await test("feedback: output is encoded and unknown kinds are refused", () => {
@@ -52,7 +53,7 @@ export async function run(test) {
     assert.equal(browserName({ userAgent: "Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36 Edg/130.0.0.0" }), "Edge 130");
     assert.equal(browserName({ userAgent: "Mozilla/5.0 Chrome/130.0.0.0 Safari/537.36" }), "Chrome 130");
     assert.equal(browserName({}), "unknown browser");
-    assert.equal(versionText("0.2.0", { userAgent: "Chrome/131.0" }), "Extension 0.2.0, Chrome 131");
+    assert.equal(versionText("0.8.0", { userAgent: "Chrome/131.0" }), "Extension 0.8.0, Chrome 131");
     assert.equal(versionText("", { userAgent: "Chrome/131.0" }), "Extension dev server, Chrome 131");
   });
 
@@ -80,6 +81,17 @@ export async function run(test) {
   await test("feedback: manifest has no github host permission", () => {
     const m = JSON.parse(read(ext("manifest.json")));
     assert.ok(!JSON.stringify(m.host_permissions).includes("github"));
+  });
+
+  await test("feedback: labels match the tool names in the toolbar menu", () => {
+    const keyToId = { psg: "compare-groups", access: "user-access", hierarchy: "hierarchy", record: "record-access", flows: "flow-usage", snapshot: "page-details" };
+    for (const [key, id] of Object.entries(keyToId)) {
+      const tool = TOOLS.find((t) => t.id === id);
+      assert.ok(tool, `no tool ${id}`);
+      assert.equal(FEEDBACK_TOOLS[key], `${tool.title} (extension)`, key);
+    }
+    const labels = Object.values(FEEDBACK_TOOLS);
+    for (const t of TOOLS) assert.ok(labels.includes(`${t.title} (extension)`), `no feedback label for tool ${t.id}`);
   });
 
   await test("feedback: issue forms carry the field ids and dropdown labels the link sends", () => {

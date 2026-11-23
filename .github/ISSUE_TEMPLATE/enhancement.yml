@@ -12,11 +12,11 @@ body:
     attributes:
       label: Which tool?
       options:
-        - PSG Compare (extension)
-        - User access (extension)
+        - Compare permission set groups (extension)
+        - User access summary and comparison (extension)
         - Territory & role hierarchy (extension)
         - Why can a user see this record? (extension)
-        - Where is it used in flows (extension)
+        - Where is it used in flows? (extension)
         - Page details for a ticket (extension)
         - Extension menu / other
         - sf-country-state-codes
@@ -35,7 +35,7 @@ body:
     id: version
     attributes:
       label: Version (optional)
-      placeholder: "Extension 0.2.0, Chrome 131"
+      placeholder: "Extension 0.8.0, Chrome 131"
   - type: textarea
     id: idea
     attributes:
