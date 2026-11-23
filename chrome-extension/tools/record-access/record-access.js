@@ -321,7 +321,9 @@ async function run() {
   updateExplain();
   showError("");
   try {
-    const facts = DEMO ? state.demo : await readRecordAccess(state.api, state.ctx, picks, { progress: setProgress, cache: state.cache });
+    // Progress counts only from this run while it is still busy (a late call after the run ended is ignored).
+    const progress = (t) => { if (token === state.run && state.busy) setProgress(t); };
+    const facts = DEMO ? state.demo : await readRecordAccess(state.api, state.ctx, picks, { progress, cache: state.cache });
     if (token !== state.run) return;
     state.result = explain(facts, picks.map((p) => p.id));
     state.keptAt = facts.kept?.at ?? null;
