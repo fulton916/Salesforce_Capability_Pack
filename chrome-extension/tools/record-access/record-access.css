@@ -42,3 +42,8 @@
 details.notes details.tech { margin-top: 10px; font-size: 12px; }
 details.notes details.tech div { font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 4px; }
 @media (max-width: 720px) { .inputrow { flex-direction: column; } }
+.person h3 { font-size: 14px; margin: 14px 0 4px; }
+.person ul.rules { margin: 6px 0 0; padding-left: 20px; font-size: 14px; }
+.person ul.rules li { padding: 2px 0; }
+.person ul.rules li.rule-hides { font-weight: 600; color: var(--risk); }
+.person .gate { margin-top: 8px; }
