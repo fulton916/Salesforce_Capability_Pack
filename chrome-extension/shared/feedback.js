@@ -9,11 +9,11 @@ export const REPO_URL = "https://github.com/fulton916/Salesforce_Capability_Pack
 
 /** Exact option labels of the "tool" dropdown in .github/ISSUE_TEMPLATE/*.yml. */
 export const FEEDBACK_TOOLS = {
-  psg: "PSG Compare (extension)",
-  access: "User access (extension)",
+  psg: "Compare permission set groups (extension)",
+  access: "User access summary and comparison (extension)",
   hierarchy: "Territory & role hierarchy (extension)",
   record: "Why can a user see this record? (extension)",
-  flows: "Where is it used in flows (extension)",
+  flows: "Where is it used in flows? (extension)",
   snapshot: "Page details for a ticket (extension)",
   menu: "Extension menu / other",
 };
@@ -48,7 +48,7 @@ export function browserName(nav) {
   return "unknown browser";
 }
 
-/** "Extension 0.2.0, Chrome 131" (or "Extension dev server, ..." when there is no manifest). */
+/** "Extension 0.8.0, Chrome 131" (or "Extension dev server, ..." when there is no manifest). */
 export function versionText(manifestVersion, nav) {
   return `Extension ${manifestVersion || "dev server"}, ${browserName(nav)}`;
 }
