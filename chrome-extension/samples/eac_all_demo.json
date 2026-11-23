@@ -555,5 +555,142 @@
     "005DEMO00000022AAA",
     "005DEMO00000025AAA"
   ],
-  "accessNote": ""
+  "accessNote": "",
+  "permissionAssignments": [
+    {
+      "Id": "0BaDEMO00000001AAA",
+      "AssigneeId": "005DEMO00000002AAA",
+      "PermissionSetId": "0PSDEMO00000001AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Sales_Email_Calendar",
+        "Label": "Sales Email and Calendar",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000002AAA",
+      "AssigneeId": "005DEMO00000002AAA",
+      "PermissionSetId": "0PSDEMO00000090AAA",
+      "PermissionSetGroupId": "0PGDEMO00000001AAA",
+      "PermissionSet": {
+        "Name": "Sales_Productivity_Combined",
+        "Label": "Sales Productivity",
+        "IsOwnedByProfile": false,
+        "Type": "Group",
+        "Profile": null
+      },
+      "PermissionSetGroup": {
+        "DeveloperName": "Sales_Productivity",
+        "MasterLabel": "Sales Productivity"
+      }
+    },
+    {
+      "Id": "0BaDEMO00000003AAA",
+      "AssigneeId": "005DEMO00000003AAA",
+      "PermissionSetId": "0PSDEMO00000090AAA",
+      "PermissionSetGroupId": "0PGDEMO00000001AAA",
+      "PermissionSet": {
+        "Name": "Sales_Productivity_Combined",
+        "Label": "Sales Productivity",
+        "IsOwnedByProfile": false,
+        "Type": "Group",
+        "Profile": null
+      },
+      "PermissionSetGroup": {
+        "DeveloperName": "Sales_Productivity",
+        "MasterLabel": "Sales Productivity"
+      }
+    },
+    {
+      "Id": "0BaDEMO00000004AAA",
+      "AssigneeId": "005DEMO00000004AAA",
+      "PermissionSetId": "0PSDEMO00000001AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Sales_Email_Calendar",
+        "Label": "Sales Email and Calendar",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000005AAA",
+      "AssigneeId": "005DEMO00000005AAA",
+      "PermissionSetId": "0PSDEMO00000091AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "X00eDEMO00000001",
+        "Label": "Sales Standard Profile",
+        "IsOwnedByProfile": true,
+        "Type": "Profile",
+        "Profile": {
+          "Name": "Sales Standard Profile"
+        }
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000006AAA",
+      "AssigneeId": "005DEMO00000006AAA",
+      "PermissionSetId": "0PSDEMO00000002AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Executive_Assistant_Access",
+        "Label": "Executive Assistant Access",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000007AAA",
+      "AssigneeId": "005DEMO00000018AAA",
+      "PermissionSetId": "0PSDEMO00000002AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Executive_Assistant_Access",
+        "Label": "Executive Assistant Access",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000008AAA",
+      "AssigneeId": "005DEMO00000010AAA",
+      "PermissionSetId": "0PSDEMO00000003AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Service_Email_Calendar",
+        "Label": "Service Email and Calendar",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    },
+    {
+      "Id": "0BaDEMO00000009AAA",
+      "AssigneeId": "005DEMO00000001AAA",
+      "PermissionSetId": "0PSDEMO00000001AAA",
+      "PermissionSetGroupId": null,
+      "PermissionSet": {
+        "Name": "Sales_Email_Calendar",
+        "Label": "Sales Email and Calendar",
+        "IsOwnedByProfile": false,
+        "Type": "Regular",
+        "Profile": null
+      },
+      "PermissionSetGroup": null
+    }
+  ],
+  "permissionAssignmentsNote": "Made-up permission assignments that give Einstein Activity Capture, in the shape the reader returns (PermissionSetAssignment records). Gray Madeup has none; Emery Test gets access from the profile."
 }

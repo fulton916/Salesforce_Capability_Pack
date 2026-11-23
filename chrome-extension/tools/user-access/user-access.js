@@ -3,12 +3,13 @@ import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
 import { readUserAccess } from "./user-access-read.js";
-import { readEacRaw, readPastedUsers } from "./user-access-eac-read.js";
+import { readEacRaw, readPastedUsers, readEacPermissionAssignments } from "./user-access-eac-read.js";
 import {
-  ACTION_LIST, ACTIONS, CONFIG_ID_HELP, CONFIG_ID_BAD, CHANGE_WARNING, NO_UNDO_ADD, AFTER_STEP, INSPECTOR_UNVERIFIED, READ_ONLY_NOTE, UNDO_HEADERS,
+  ACTION_LIST, ACTIONS, CONFIG_ID_HELP, CONFIG_ID_BAD, CHANGE_WARNING, NO_UNDO_ADD, AFTER_STEP, INSPECTOR_UNVERIFIED, READ_ONLY_NOTE,
+  NOT_VERIFIED_NOTE, MOVE_ORDER_NOTE, MOVE_UNDO_NOTE, PROFILE_ASSIGNMENT_NOTE, GIVE_BACK_NOTE,
   validConfigId, inspectorSteps, parsePasted, matchPasted, knownConfigs, entryFromRow, entryFromUser, entryFromRecord, entryKey,
-  planChange, planUserCount, skipGroups, skipHelp, previewSummary, outputFor, changeFileName, copyWithFallback,
-  usableId, profileKey, allNoRealId, duplicatesText, NO_REAL_ID_TEXT,
+  planChange, planUserCount, planRemovalCount, involvedPermissions, permissionWarning, permissionRowFrom, skipGroups, skipHelp, previewSummary,
+  outputFor, changeFileName, copyWithFallback, duplicatesText,
 } from "./user-access-eac-changes.js";
 import {
   buildEacRows, eacCounts, filterEacRows, filterNoConfig, groupByConfig, eacCsvRows, noConfigCsvRows, eacSummaryLine, profileNote,
@@ -56,7 +57,7 @@ const state = {
   diffOnly: true,
   showApi: false,
   search: "",
-  eac: { rows: [], profileAssignments: [], profileRows: [], noConfig: null, sel: new Map(), profileSel: new Set(), plan: null, notFound: [], demoUsers: [], accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
+  eac: { rows: [], profileAssignments: [], profileRows: [], noConfig: null, sel: new Map(), plan: null, notFound: [], demoUsers: [], demoPermissions: [], accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
 };
 
 const compareMode = () => !!(state.sides.a.access && state.sides.b.access);
@@ -579,6 +580,7 @@ async function loadEacRaw() {
   if (DEMO) {
     const raw = await (await fetch("../../samples/eac_all_demo.json")).json();
     eac.demoUsers = raw.users || [];
+    eac.demoPermissions = raw.permissionAssignments || [];
     return raw;
   }
   return readEacRaw(state.api, { progress: (t) => { $("#eacProgress").textContent = t; } });
@@ -596,7 +598,7 @@ async function showEveryone() {
       accessNote: raw.accessNote || "", loaded: true, note: raw.partial || "", limits: new Map(),
     });
     // A fresh read: the old picks may no longer be true, so start the change again.
-    eac.sel = new Map(); eac.profileSel = new Set(); eac.notFound = []; eac.plan = null;
+    eac.sel = new Map(); eac.notFound = []; eac.plan = null;
     $("#eacPreviewBox").hidden = true; $("#eacPasteResult").replaceChildren(); $("#eacPasteStatus").textContent = "";
     renderEac();
   } catch (e) {
@@ -769,22 +771,18 @@ function renderTargetHelp() {
   }
 }
 
+/** Profile assignments cannot be removed here: for Remove and Move, list them with the way to change them in Setup. */
 function renderProfileList() {
   const box = $("#eacProfileList");
-  const show = chosenAction() === "remove" && eac.profileRows.length > 0;
+  const show = chosenAction() !== "add" && eac.profileRows.length > 0;
   box.hidden = !show;
   box.replaceChildren();
   if (!show) return;
-  box.append(el("h4", { text: "Profile assignments you can remove whole" }),
-    el("p", { class: "help", text: "A profile assignment puts everyone on the profile into a configuration. Removing it takes all of them out at once." }),
-    ...eac.profileRows.map((p) => el("label", { class: "check", style: "display:block" },
-      el("input", {
-        type: "checkbox", checked: usableId(p.id) ? eac.profileSel.has(profileKey(p)) : false, disabled: !usableId(p.id),
-        onchange: (ev) => { if (ev.target.checked) eac.profileSel.add(profileKey(p)); else eac.profileSel.delete(profileKey(p)); selectionChanged(); },
-      }),
-      ` Remove the whole profile assignment (every user on profile ${p.profileName}) from ${p.configuration}`,
-      p.members !== null ? ` (${num(p.members)} ${p.members === 1 ? "user" : "users"})` : "",
-      usableId(p.id) ? null : el("div", { class: "help", text: NO_REAL_ID_TEXT }))));
+  box.append(el("h4", { text: "Profile assignments" }),
+    el("p", { class: "help", text: `${PROFILE_ASSIGNMENT_NOTE} These profiles are assigned to a configuration:` }),
+    el("ul", { class: "eac-names" }, eac.profileRows.map((p) => el("li", {
+      text: `Profile ${p.profileName} in ${p.configuration}${p.members !== null ? ` (${num(p.members)} ${p.members === 1 ? "user" : "users"})` : ""}`,
+    }))));
 }
 
 /** Rebuild the action and configuration lists after a read. Keeps what was chosen when it is still there. */
@@ -864,24 +862,58 @@ function nameList(items) {
   return el("ul", { class: "eac-names" }, items.map((i) => el("li", { text: i })));
 }
 
+/** One table to load: copy, download, and its own steps in Salesforce Inspector. */
+function renderLoad(plan, load, part) {
+  const status = el("span", { role: "status" });
+  const holder = el("div", {});
+  const n = load.rows.length;
+  return el("div", { class: "eac-load" },
+    el("h5", { text: `${load.label} (${num(n)} ${n === 1 ? "row" : "rows"})` }),
+    el("div", { class: "eac-out" },
+      el("button", { class: "primary", text: `Copy for Salesforce Inspector: ${load.label}`, onclick: () => copyOut(load.text, "text", holder, status) }),
+      el("button", { text: `Download CSV (Data Loader): ${load.label}`, onclick: () => download(changeFileName(plan.action, stamp(), part), load.csv, "text/csv") }),
+      status),
+    holder,
+    el("ol", { class: "eac-steps" }, inspectorSteps(load).map((t) => el("li", { text: t }))));
+}
+
+function renderSteps(plan, steps, prefix) {
+  const out = [];
+  for (const s of steps) {
+    out.push(el("h4", { text: s.title }));
+    if (s.note) out.push(el("p", { class: "help", text: s.note }));
+    if (!s.loads.length) { out.push(el("p", { class: "help", text: "Nothing to load in this step." })); continue; }
+    for (const l of s.loads) out.push(renderLoad(plan, l, `${prefix}${l.key}`));
+  }
+  return out;
+}
+
 function renderPreview(plan) {
   const box = $("#eacPreviewBox");
   box.hidden = false;
   box.replaceChildren();
   box.className = "eac-preview";
   if (plan.error) { box.append(el("p", { class: "eac-bad-text", text: plan.error })); return; }
-  const a = ACTIONS[plan.action];
   const parts = [el("h4", { text: "Preview" }), el("p", { class: "eac-summary", text: previewSummary(plan) })];
-  if (plan.action !== "add") parts.push(el("div", { class: "eac-warn", text: CHANGE_WARNING }));
+  if (plan.action !== "add") parts.push(el("div", { class: "eac-warn", text: CHANGE_WARNING }), el("p", { class: "help", text: NOT_VERIFIED_NOTE }));
   const users = [...plan.items].sort((x, y) => x.name.localeCompare(y.name));
   if (users.length) {
-    parts.push(el("h4", { text: `${num(planUserCount(plan))} ${planUserCount(plan) === 1 ? "user" : "users"} will be changed` }),
-      nameList(users.map((i) => `${i.name}${i.fromName ? ` (now in ${i.fromName})` : ""}${i.note ? ` ${i.note}` : ""}`)));
+    parts.push(el("h4", { text: `${num(planUserCount(plan))} ${planUserCount(plan) === 1 ? "user" : "users"} will be changed${plan.action === "add" ? "" : `, ${num(planRemovalCount(plan))} permission ${planRemovalCount(plan) === 1 ? "assignment" : "assignments"} deleted`}` }),
+      nameList(users.map((i) => {
+        const n = i.removals?.length || 0;
+        const how = n > 1 ? ` (${n} assignments, and they lose Einstein Activity Capture only when all are deleted)` : "";
+        return `${i.name}${i.fromName ? ` (now in ${i.fromName})` : ""}${how}${i.note ? ` ${i.note}` : ""}`;
+      })));
   }
-  if (plan.profileItems.length) {
-    parts.push(el("h4", { text: "Whole profile assignments to remove" }),
-      nameList(plan.profileItems.map((p) => `Remove the whole profile assignment (every user on profile ${p.profileName}) from ${p.configuration}`)));
+  const involved = involvedPermissions(plan);
+  if (involved.length) {
+    parts.push(el("h4", { text: "Permission sets and groups involved" }),
+      el("ul", { class: "eac-names" }, involved.map((p) => el("li", {},
+        el("strong", { text: p.label }),
+        ` (${p.kind === "group" ? "permission set group" : "permission set"}${p.apiName ? `, ${p.apiName}` : ""}): ${num(p.users)} ${p.users === 1 ? "user" : "users"}. `,
+        el("span", { class: "eac-warn-text", text: permissionWarning(p.kind) })))));
   }
+  if (plan.action === "move" && users.length) parts.push(el("p", { class: "help", text: MOVE_ORDER_NOTE }));
   for (const g of skipGroups(plan)) {
     parts.push(el("div", { class: "eac-skip" }, el("h4", { text: `${g.title} (${num(g.entries.length)})` }), el("p", { class: "help", text: skipHelp(plan.action, g.code) }),
       nameList(g.entries.map((e) => (e.detail ? `${e.name} (${e.detail})` : e.name)))));
@@ -893,40 +925,55 @@ function renderPreview(plan) {
   plan.previewed = true; // only now may any text be built
   let out = null;
   try { out = outputFor(plan); } catch (e) { box.append(el("p", { class: "eac-bad-text", text: e.message })); return; }
-  if (!out) { if (!allNoRealId(plan)) box.append(el("p", { text: "Nothing to load: every pick was skipped." })); return; }
-  const status = el("span", { role: "status" });
-  const holder = el("div", {});
-  const n = out.change.rows.length;
-  box.append(
-    el("h4", { text: `Load it: ${a.word} (${num(n)} ${n === 1 ? "row" : "rows"})` }),
-    el("div", { class: "eac-out" },
-      el("button", { class: "primary", text: `Copy for Salesforce Inspector: ${a.word}`, onclick: () => copyOut(out.text, `${a.word} text`, holder, status) }),
-      el("button", { text: `Download CSV (Data Loader): ${a.word}`, onclick: () => download(changeFileName(plan.action, stamp()), out.csv, "text/csv") }),
-      status),
-    holder,
+  if (!out) { box.append(el("p", { text: "Nothing to load: every pick was skipped." })); return; }
+  box.append(el("h4", { text: "Load it" }),
     el("p", { class: "help", text: `Steps in Salesforce Inspector. ${INSPECTOR_UNVERIFIED}` }),
-    el("ol", { class: "eac-steps" }, inspectorSteps(plan.action).map((t) => el("li", { text: t }))),
+    ...renderSteps(plan, out.steps, ""),
     el("p", { class: "help", text: AFTER_STEP }));
-  if (out.undo) {
-    const ustatus = el("span", { role: "status" });
-    const uholder = el("div", {});
-    box.append(
-      el("h4", { text: `Undo the ${a.word}` }),
-      el("p", { class: "help", text: `The undo text keeps the old Ids so the ${a.word.toLowerCase()} can be reversed. Load it the same way, with Action: ${UNDO_HEADERS[plan.action].op}. Keep it until you have checked the result.` }),
-      el("div", { class: "eac-out" }, el("button", { text: `Copy undo text for the ${a.word}`, onclick: () => copyOut(out.undoText, "undo text", uholder, ustatus) }), ustatus),
-      uholder);
+  if (out.undoSteps.length) {
+    box.append(el("h4", { text: "Undo the Remove" }),
+      el("p", { class: "help", text: `Two steps, in this order. ${GIVE_BACK_NOTE} Keep these texts until you have checked the result.` }),
+      ...renderSteps(plan, out.undoSteps, "undo_"));
+  } else if (plan.action === "move") {
+    box.append(el("p", { class: "help", text: MOVE_UNDO_NOTE }));
   } else {
     box.append(el("p", { class: "help", text: NO_UNDO_ADD }));
   }
 }
 
-function runPreview() {
-  const plan = planChange({
-    action: chosenAction(), targetId: chosenTarget(), entries: [...eac.sel.values()],
-    profileItems: chosenAction() === "remove" ? eac.profileRows.filter((p) => eac.profileSel.has(profileKey(p))) : [],
-    rows: eac.rows, notFound: eac.notFound,
-  });
-  if (!plan.error && !eac.sel.size && !plan.profileItems.length) plan.error = "Pick at least one user first.";
+/** The permission assignments that give the picked users Einstein Activity Capture (read only; the demo reads its sample). */
+async function readPermissions(userIds) {
+  if (DEMO) {
+    const ids = new Set(userIds.map((i) => String(i).slice(0, 15)));
+    return eac.demoPermissions.filter((r) => ids.has(String(r.AssigneeId).slice(0, 15))).map(permissionRowFrom);
+  }
+  return readEacPermissionAssignments(state.api, userIds);
+}
+
+async function runPreview() {
+  const action = chosenAction();
+  const entries = [...eac.sel.values()];
+  let permissions = null;
+  if (ACTIONS[action]?.needsPermissions && entries.length) {
+    const status = $("#eacPreviewStatus");
+    $("#eacPreview").disabled = true;
+    status.textContent = "Reading their permission assignments…";
+    try {
+      permissions = await readPermissions(entries.map((e) => e.userId));
+    } catch (e) {
+      const box = $("#eacPreviewBox");
+      box.hidden = false;
+      box.className = "eac-preview";
+      box.replaceChildren(el("p", { class: "eac-bad-text", text: plainError(e, e?.raw !== undefined ? e.message : "The permission assignments could not be read.") }));
+      if (rawOf(e)) box.append(el("details", { class: "tech" }, el("summary", { text: "Technical details" }), el("div", { text: e.raw || rawOf(e) })));
+      return;
+    } finally {
+      status.textContent = "";
+      $("#eacPreview").disabled = false;
+    }
+  }
+  const plan = planChange({ action, targetId: chosenTarget(), entries, rows: eac.rows, notFound: eac.notFound, permissions: permissions || (ACTIONS[action]?.needsPermissions ? [] : null) });
+  if (!plan.error && !eac.sel.size) plan.error = "Pick at least one user first.";
   eac.plan = plan;
   renderPreview(plan);
 }
@@ -946,7 +993,7 @@ $("#eacAction").addEventListener("change", onActionChange);
 $("#eacTarget").addEventListener("change", () => { renderTargetHelp(); selectionChanged(); });
 $("#eacTargetId").addEventListener("input", () => { renderTargetHelp(); selectionChanged(); });
 $("#eacSelShown").addEventListener("click", selectEverythingShown);
-$("#eacSelClear").addEventListener("click", () => { eac.sel = new Map(); eac.profileSel = new Set(); selectionChanged(); renderProfileList(); renderEacGroups(); });
+$("#eacSelClear").addEventListener("click", () => { eac.sel = new Map(); selectionChanged(); renderEacGroups(); });
 $("#eacPasteGo").addEventListener("click", findPasted);
 $("#eacPreview").addEventListener("click", runPreview);
 selectionChanged();
