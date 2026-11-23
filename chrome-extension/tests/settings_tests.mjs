@@ -12,7 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);
 const read = (f) => readFileSync(ext(f), "utf-8");
 
-const IDS = ["compare-groups", "user-access", "hierarchy", "record-access", "flow-usage", "page-details"];
+const IDS = ["compare-groups", "user-access", "hierarchy", "record-access", "flow-usage", "page-details", "error-tracer"];
 
 // A fake chrome.storage.local that records what it was asked.
 function fakeStorage(initial = {}, { failGet = false, failSet = false } = {}) {
@@ -37,7 +37,7 @@ function walkJs(dir, rel = "") {
 }
 
 export async function run(test) {
-  await test("settings: the tool list has the six ids, in menu order, each with a page, title and description", () => {
+  await test("settings: the tool list has the seven ids, in menu order, each with a page, title and description", () => {
     assert.deepEqual(TOOLS.map((t) => t.id), IDS);
     for (const t of TOOLS) {
       assert.ok(t.page === `tools/${t.id}/${t.id}.html`, t.id);
@@ -47,13 +47,13 @@ export async function run(test) {
 
   await test("settings: visibleTools with none hidden, some hidden, all hidden", () => {
     assert.deepEqual(visibleTools(TOOLS, []).map((t) => t.id), IDS);
-    assert.deepEqual(visibleTools(TOOLS, ["hierarchy", "page-details"]).map((t) => t.id), ["compare-groups", "user-access", "record-access", "flow-usage"]);
+    assert.deepEqual(visibleTools(TOOLS, ["hierarchy", "page-details"]).map((t) => t.id), ["compare-groups", "user-access", "record-access", "flow-usage", "error-tracer"]);
     assert.deepEqual(visibleTools(TOOLS, IDS), []);
   });
 
   await test("settings: visibleTools ignores unknown ids and bad input, and keeps the order", () => {
-    assert.deepEqual(visibleTools(TOOLS, ["nope", 7, null, "user-access"]).map((t) => t.id), ["compare-groups", "hierarchy", "record-access", "flow-usage", "page-details"]);
-    for (const bad of [undefined, null, "user-access", { a: 1 }, 5]) assert.equal(visibleTools(TOOLS, bad).length, 6);
+    assert.deepEqual(visibleTools(TOOLS, ["nope", 7, null, "user-access"]).map((t) => t.id), ["compare-groups", "hierarchy", "record-access", "flow-usage", "page-details", "error-tracer"]);
+    for (const bad of [undefined, null, "user-access", { a: 1 }, 5]) assert.equal(visibleTools(TOOLS, bad).length, 7);
     assert.deepEqual(cleanHidden(["page-details", "page-details", "x", "compare-groups"], TOOLS), ["compare-groups", "page-details"]);
     const copy = visibleTools(TOOLS, ["hierarchy"]);
     assert.equal(copy[2], TOOLS[3], "entries are the same objects, in the same order");
@@ -97,7 +97,7 @@ export async function run(test) {
   await test("settings store: a failed read shows every tool; a failed save throws and changes nothing", async () => {
     const bad = createSettingsStore(TOOLS, fakeStorage({ [HIDDEN_KEY]: ["hierarchy"] }, { failGet: true }));
     assert.deepEqual(await bad.getHidden(), []);
-    assert.equal(visibleTools(TOOLS, await bad.getHidden()).length, 6);
+    assert.equal(visibleTools(TOOLS, await bad.getHidden()).length, 7);
     const st = fakeStorage({ [HIDDEN_KEY]: ["hierarchy"] }, { failSet: true });
     const store = createSettingsStore(TOOLS, st);
     await assert.rejects(() => store.setToolOn("user-access", false));

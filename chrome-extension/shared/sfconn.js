@@ -54,6 +54,16 @@ export class SalesforceError extends Error {
   }
 }
 
+/** The error for a failed response (shared by `get` and `getText`). */
+function failure(res, text, body, url) {
+  const err = Array.isArray(body) ? body[0] : body;
+  const msg = err?.message || text || `HTTP ${res.status}`;
+  if (res.status === 401) {
+    return new SalesforceError("Your Salesforce session has expired. Reload the Salesforce tab, then try again.", { status: 401, errorCode: err?.errorCode, url, detail: msg });
+  }
+  return new SalesforceError(msg, { status: res.status, errorCode: err?.errorCode, url });
+}
+
 /** Minimal REST client. `fetchImpl` is injectable for tests. */
 export class SfApi {
   constructor({ apiHost, sessionId, apiVersion = API_VERSION, fetchImpl, base }) {
@@ -74,15 +84,25 @@ export class SfApi {
     const text = await res.text();
     let body = null;
     try { body = text ? JSON.parse(text) : null; } catch { /* not JSON */ }
-    if (!res.ok) {
-      const err = Array.isArray(body) ? body[0] : body;
-      const msg = err?.message || text || `HTTP ${res.status}`;
-      if (res.status === 401) {
-        throw new SalesforceError("Your Salesforce session has expired. Reload the Salesforce tab, then try again.", { status: 401, errorCode: err?.errorCode, url, detail: msg });
-      }
-      throw new SalesforceError(msg, { status: res.status, errorCode: err?.errorCode, url });
-    }
+    if (!res.ok) throw failure(res, text, body, url);
     return body;
+  }
+
+  /** GET a plain-text answer (for example one debug log's body). Same login, same errors as `get`;
+   * the answer is returned as text and never parsed. Only GET: no method is ever set. */
+  async getText(path) {
+    const url = path.startsWith("http") ? path : this.base + path;
+    this.calls++;
+    const res = await this.fetch(url, {
+      headers: { Authorization: `Bearer ${this.sessionId}`, Accept: "text/plain, */*" },
+    });
+    const text = await res.text();
+    if (!res.ok) {
+      let body = null;
+      try { body = text ? JSON.parse(text) : null; } catch { /* the error is plain text */ }
+      throw failure(res, text, body, url);
+    }
+    return text;
   }
 
   /** Run SOQL and follow nextRecordsUrl until every record is read. */
