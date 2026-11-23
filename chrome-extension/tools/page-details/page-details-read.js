@@ -2,9 +2,9 @@
 // Every area fails softly: it returns {data: null, problem: "plain words", raw: "..."} instead of throwing.
 
 import { soqlString } from "../../shared/sfconn.js";
-import { parsePageUrl, looksLikeId, sandboxNameFromHost, localeLabel, setupPageName } from "./page-details-logic.js";
+import { parsePageUrl, looksLikeId, sandboxNameFromHost, localeLabel, setupDisplayName } from "./page-details-logic.js";
 
-const plainReason = (e, fallback) => (e?.status === 401 ? e.message : fallback);
+const RECONNECT = "Check your connection, reload the Salesforce tab and try again.";
 const rawOf = (e) => (e?.status === 401 ? "" : e?.message || String(e || ""));
 
 /** Org name, Id, production or sandbox, instance. `host` is the My Domain host the person was on. */
@@ -24,35 +24,59 @@ export async function readOrgDetails(api, host) {
   }
 }
 
-/** Plain words for why the Organization read failed, by cause. */
-export function orgProblem(e) {
-  if (e?.status === 401) return e.message;
+/** Why a read failed: "session" (401), "denied" (permission), "unreachable" (connection, timeout, 502/503/504) or "other". */
+export function failureCause(e) {
+  if (e?.status === 401) return "session";
   const text = `${e?.errorCode || ""} ${e?.message || ""}`;
   const status = e?.status;
-  if (status === 403 || /INSUFFICIENT_ACCESS|INVALID_TYPE|FORBIDDEN|not supported|insufficient access|permission|not allowed/i.test(text)) {
-    return "Your user may not be allowed to read the organization record.";
-  }
+  if (status === 403 || /INSUFFICIENT_ACCESS|INVALID_TYPE|FORBIDDEN|not supported|insufficient access|permission|not allowed/i.test(text)) return "denied";
   if (status === 0 || status === 502 || status === 503 || status === 504 || e?.name === "TypeError" ||
-      /INVALID_SESSION_ID|failed to fetch|network|timed? ?out|ECONN|ENOTFOUND|session|connection/i.test(text)) {
-    return "Salesforce could not be reached to read the org details. Check your connection, reload the Salesforce tab and try again.";
+      /INVALID_SESSION_ID|failed to fetch|network|timed? ?out|ECONN|ENOTFOUND|session|connection/i.test(text)) return "unreachable";
+  return "other";
+}
+
+/** Plain words for a failure by cause. `what` is what could not be reached ("the org details"). */
+function causeProblem(e, { denied, other, what }) {
+  switch (failureCause(e)) {
+    case "session": return e.message;
+    case "unreachable": return `Salesforce could not be reached to read ${what}. ${RECONNECT}`;
+    case "denied": return denied;
+    default: return other;
   }
-  return "The organization record could not be read.";
+}
+
+/** Plain words for why the Organization read failed, by cause. */
+export function orgProblem(e) {
+  return causeProblem(e, {
+    denied: "Your user may not be allowed to read the organization record.",
+    other: "The organization record could not be read.", what: "the org details",
+  });
 }
 
 /** Id of the current user. Tries the Chatter "me" resource, then the OAuth userinfo address; both are GET only. */
 async function currentUserId(api) {
-  const tries = [];
+  const tries = [], errors = [];
   try {
     const me = await api.get(`/services/data/v${api.apiVersion}/chatter/users/me`);
     if (me?.id) return { id: me.id, chatter: me };
     tries.push("chatter/users/me returned no id");
-  } catch (e) { tries.push(`chatter/users/me: ${rawOf(e)}`); }
+  } catch (e) { errors.push(e); tries.push(`chatter/users/me: ${rawOf(e)}`); }
   try {
     const info = await api.get("/services/oauth2/userinfo");
     if (info?.user_id) return { id: info.user_id, chatter: null };
     tries.push("userinfo returned no user_id");
-  } catch (e) { tries.push(`userinfo: ${rawOf(e)}`); }
-  throw Object.assign(new Error(tries.join("; ")), { tries });
+  } catch (e) { errors.push(e); tries.push(`userinfo: ${rawOf(e)}`); }
+  throw Object.assign(new Error(tries.join("; ")), { tries, errors });
+}
+
+/** Words for the who-are-you step, from the causes of both tries: a session problem wins, then a dropped connection. */
+function whoProblem(errors) {
+  const causes = errors.map(failureCause);
+  const session = errors[causes.indexOf("session")];
+  if (session) return session.message;
+  if (causes.includes("unreachable")) return `Salesforce could not be reached to find out who you are. ${RECONNECT}`;
+  if (causes.includes("denied")) return "Salesforce would not say who you are from this page.";
+  return "Who you are could not be read from this page.";
 }
 
 /** The person's own user details. Falls back to what the Chatter resource said when the User query is refused. */
@@ -61,7 +85,7 @@ export async function readCurrentUser(api) {
   try {
     who = await currentUserId(api);
   } catch (e) {
-    return { data: null, problem: "Salesforce would not say who you are from this page.", raw: rawOf(e) };
+    return { data: null, problem: whoProblem(e.errors || []), raw: rawOf(e) };
   }
   try {
     const { records } = await api.query(
@@ -77,10 +101,16 @@ export async function readCurrentUser(api) {
     };
   } catch (e) {
     const c = who.chatter;
-    if (!c) return { data: null, problem: "Your user details could not be read.", raw: rawOf(e) };
+    if (!c) {
+      return { data: null, problem: causeProblem(e, { denied: "Your user may not be allowed to read your own user record.", other: "The user record could not be read.", what: "your user details" }), raw: rawOf(e) };
+    }
+    const part = "Only part of your user details could be read (profile and role are missing).";
+    const cause = failureCause(e);
     return {
       data: { id: who.id, name: c.name, username: c.username, profile: null, role: null, language: c.language || null, locale: c.locale || null, timeZone: c.timeZone || null, userType: c.userType || null },
-      problem: "Only part of your user details could be read (profile and role are missing).",
+      problem: cause === "session" ? e.message
+        : cause === "unreachable" ? `${part} Salesforce could not be reached for the rest. ${RECONNECT}`
+        : cause === "denied" ? `${part} Your user may not be allowed to read the user record.` : part,
       raw: rawOf(e),
     };
   }
@@ -92,23 +122,29 @@ const formatDate = (iso) => {
 };
 
 /** What the address says, plus (for records) one SELECT. Always returns the address facts; `problem` explains what is missing. */
-export async function readPageDetails(api, url) {
+export async function readPageDetails(api, url, setupTitle = "") {
   const p = parsePageUrl(url);
   const page = {
     kind: p.kind, url: p.path || null, objectApi: p.objectApi, objectLabel: null, recordId: p.recordId, recordName: null, recordType: null,
-    owner: null, modifiedBy: null, modifiedAt: null, setupPage: setupPageName(p.setupPage), filterName: p.filterName, listView: null,
+    owner: null, modifiedBy: null, modifiedAt: null, setupPage: setupDisplayName(p, setupTitle), filterName: p.filterName, listView: null,
     hashAddress: p.hashAddress === true,
   };
   const raws = [];
   let problem = null;
+  const recordWords = (e, denied, other) => causeProblem(e, { denied, other, what: "the record" });
 
   // A classic /<Id> address has no object: find it by the first three characters of the Id.
   if (page.kind === "record" && !page.objectApi && page.recordId) {
+    let lookupError = null;
     try {
       const g = await api.describeGlobal();
       page.objectApi = (g.sobjects || []).find((s) => s.keyPrefix === page.recordId.slice(0, 3))?.name || null;
-    } catch (e) { raws.push(`Object lookup: ${rawOf(e)}`); }
-    if (!page.objectApi) problem = "The kind of record could not be worked out from the address.";
+    } catch (e) { lookupError = e; raws.push(`Object lookup: ${rawOf(e)}`); }
+    if (!page.objectApi) {
+      const base = "The kind of record could not be worked out from the address.";
+      problem = lookupError && failureCause(lookupError) !== "other"
+        ? recordWords(lookupError, `${base} Your user may not be allowed to look up object types.`, base) : base;
+    }
   }
 
   let describe = null;
@@ -119,7 +155,7 @@ export async function readPageDetails(api, url) {
       page.objectApi = describe.name || page.objectApi;
     } catch (e) {
       raws.push(`Object ${page.objectApi}: ${rawOf(e)}`);
-      if (page.kind === "record") problem = plainReason(e, "This kind of record could not be read. Your user may not be allowed to see it.");
+      if (page.kind === "record") problem = recordWords(e, "This kind of record could not be read. Your user may not be allowed to see it.", "This kind of record could not be read.");
     }
   }
 
@@ -158,7 +194,7 @@ export async function readPageDetails(api, url) {
         }
       } catch (e) {
         raws.push(`Record: ${rawOf(e)}`);
-        problem = plainReason(e, "The record could not be read. Your user may not be allowed to see it, or it may have been deleted.");
+        problem = recordWords(e, "The record could not be read. Your user may not be allowed to see it, or it may have been deleted.", "The record could not be read.");
       }
     }
   }
@@ -166,7 +202,7 @@ export async function readPageDetails(api, url) {
 }
 
 /** Everything the page shows, each area read on its own. Never throws. */
-export async function readIssueSnapshot(api, { host, url }) {
-  const [org, user, page] = await Promise.all([readOrgDetails(api, host), readCurrentUser(api), readPageDetails(api, url)]);
+export async function readIssueSnapshot(api, { host, url, setupTitle }) {
+  const [org, user, page] = await Promise.all([readOrgDetails(api, host), readCurrentUser(api), readPageDetails(api, url, setupTitle)]);
   return { org, user, page };
 }
