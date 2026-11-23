@@ -18,7 +18,7 @@ const OBJECT_RE = /^[A-Za-z][A-Za-z0-9_]{0,79}$/;
  * and an old `/one/one.app#/...` address (hash already dropped) is flagged so the page can say so. */
 function finish(out, path) {
   if (out.objectApi && !OBJECT_RE.test(out.objectApi)) {
-    out.kind = "other"; out.objectApi = null; out.recordId = null; out.filterName = null; out.setupPage = null;
+    out.kind = "other"; out.objectApi = null; out.recordId = null; out.filterName = null; out.setupPage = null; out.setupSub = null;
   }
   if (out.kind === "other" && path === "/one/one.app") out.hashAddress = true;
   return out;
@@ -27,14 +27,14 @@ function finish(out, path) {
 /** What kind of page an address is. Never throws.
  * Returns {kind: "record" | "list" | "setup" | "home" | "other", objectApi, recordId, filterName, setupPage, path}. */
 export function parsePageUrl(input) {
-  const out = { kind: "other", objectApi: null, recordId: null, filterName: null, setupPage: null, path: "", hashAddress: false };
+  const out = { kind: "other", objectApi: null, recordId: null, filterName: null, setupPage: null, setupSub: null, path: "", hashAddress: false };
   const cleaned = cleanUrl(input);
   if (!cleaned) return out;
   const [path, query] = cleaned.split("?");
   out.path = cleaned;
   const filter = query ? new URLSearchParams(query).get("filterName") : null;
   const seg = path.split("/").filter(Boolean).map((s) => { try { return decodeURIComponent(s); } catch { return s; } });
-  const [a, b, c, d] = seg;
+  const [a, b, c, d, e] = seg;
 
   if (seg.length === 0 || (seg.length === 1 && /^home/i.test(a))) { out.kind = "home"; return out; }
   if (a === "lightning") {
@@ -49,7 +49,10 @@ export function parsePageUrl(input) {
     } else if (b === "setup") {
       out.kind = "setup";
       out.setupPage = c || null;
-      if (c === "ObjectManager" && d && d !== "home") out.objectApi = d;
+      if (c === "ObjectManager" && d && d !== "home") {
+        out.objectApi = d;
+        if (e && e !== "view" && e !== "home") out.setupSub = e; // the Object Manager sub-page, e.g. FieldsAndRelationships
+      }
     } else if (b === "page" && c === "home") {
       out.kind = "home";
     }
@@ -73,6 +76,72 @@ export const KIND_TEXT = {
 export function setupPageName(raw) {
   if (!raw) return null;
   return String(raw).replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/_/g, " ");
+}
+
+// Salesforce's own names for common Lightning Setup address segments (used when the tab's title cannot be read).
+export const SETUP_TITLES = {
+  CompanyProfileInfo: "Company Information", ManageUsers: "Users", EnhancedProfiles: "Profiles",
+  PermSets: "Permission Sets", PermSetGroups: "Permission Set Groups", Roles: "Roles", PublicGroups: "Public Groups",
+  Queues: "Queues", SecuritySharing: "Sharing Settings", ObjectManager: "Object Manager", Flows: "Flows",
+  ApexClasses: "Apex Classes", ApexTriggers: "Apex Triggers", DeployStatus: "Deployment Status",
+  CustomMetadata: "Custom Metadata Types", CustomSettings: "Custom Settings", OrgLoginHistory: "Login History",
+  AsyncApexJobs: "Apex Jobs", ScheduledJobs: "Scheduled Jobs", ApexDebugLogs: "Debug Logs",
+  HealthCheck: "Health Check", NamedCredential: "Named Credentials", ConnectedApplication: "Manage Connected Apps",
+  ImportedPackage: "Installed Packages", ExternalStrings: "Custom Labels", StaticResources: "Static Resources",
+  CustomTabs: "Tabs", SetupOneHome: "Setup Home",
+  Territory2Models: "Territory Models", OrgEmailSettings: "Deliverability", SecurityEvents: "View Setup Audit Trail",
+  // Not checked live (developer orgs have no Sandboxes page):
+  DataManagementCreateTestInstance: "Sandboxes",
+};
+
+/** Salesforce's names for the Object Manager sub-pages (the Object line already names the object). */
+export const OBJECT_MANAGER_SUBPAGES = {
+  FieldsAndRelationships: "Fields & Relationships", PageLayouts: "Page Layouts", LightningPages: "Lightning Record Pages",
+  ButtonsLinksActions: "Buttons, Links, and Actions", CompactLayouts: "Compact Layouts", FieldSets: "Field Sets",
+  ValidationRules: "Validation Rules", RecordTypes: "Record Types", ApexTriggers: "Triggers", MySearchLayouts: "Search Layouts",
+  AlohaSearchLayouts: "List View Button Layout", Limits: "Object Limits",
+};
+
+const GENERIC_TITLES = new Set(["salesforce", "lightning experience", "setup", "loading", "loading...", "loading…", "home",
+  "page not found", "error", "login"]); // the last three name no page
+// Error and sign-in titles that name no Setup page (matched anywhere in the title, case-insensitively).
+const NO_PAGE_TITLES = ["insufficient privileges", "something went wrong", "sorry to interrupt", "verify your identity"];
+const MAX_TITLE = 120;
+
+/** A browser tab title as the Setup page name: the " | Salesforce" (Lightning) and " ~ Salesforce - <edition>" (Classic)
+ * endings are removed. "" when what is left does not name a page ("Salesforce", "Loading...", empty). */
+export function cleanTabTitle(title) {
+  if (typeof title !== "string") return "";
+  let t = title.replace(/\s+/g, " ").trim();
+  t = t.replace(/\s*[|~]\s*Salesforce(?:\s+-\s+[^|~]*)?$/i, "").trim();
+  const low = t.toLowerCase();
+  if (!t || GENERIC_TITLES.has(low) || low.startsWith("error") || NO_PAGE_TITLES.some((x) => low.includes(x))) return "";
+  return t.length > MAX_TITLE ? t.slice(0, MAX_TITLE).trim() : t;
+}
+
+/** The cleaned title of the open tab for this page. `tabs` = chrome.tabs.query results ({url, title, lastAccessed}),
+ * `host` the page's host name, `cleanedUrl` the page's cleaned address. Most recently used tab wins. "" when none fits. */
+export function setupTitleFromTabs(tabs, host, cleanedUrl) {
+  if (!Array.isArray(tabs) || !host || !cleanedUrl) return "";
+  const want = String(host).toLowerCase();
+  const match = tabs.filter((t) => {
+    try { return t && new URL(t.url).hostname.toLowerCase() === want && cleanUrl(t.url) === cleanedUrl; } catch { return false; }
+  }).sort((x, y) => (y.lastAccessed || 0) - (x.lastAccessed || 0));
+  for (const t of match) { const c = cleanTabTitle(t.title); if (c) return c; }
+  return "";
+}
+
+/** The "Setup page" line: the tab's title when given (and the page is not an Object Manager sub-page), else the built-in
+ * name, else the name made from the address. `p` = parsePageUrl result. */
+export function setupDisplayName(p, tabTitle) {
+  if (!p || p.kind !== "setup") return null;
+  if (tabTitle && !p.objectApi) return tabTitle;
+  const seg = p.setupPage;
+  if (seg === "ObjectManager") {
+    if (!p.setupSub) return p.objectApi ? `${SETUP_TITLES.ObjectManager} > Details` : SETUP_TITLES.ObjectManager;
+    return `${SETUP_TITLES.ObjectManager} > ${OBJECT_MANAGER_SUBPAGES[p.setupSub] || setupPageName(p.setupSub)}`;
+  }
+  return (seg && Object.hasOwn(SETUP_TITLES, seg) ? SETUP_TITLES[seg] : null) || setupPageName(seg);
 }
 
 /** Sandbox name from a host such as "acme--uat.sandbox.my.salesforce.com" -> "uat"; null when the host does not show one. */

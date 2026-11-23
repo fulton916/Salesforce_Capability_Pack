@@ -2093,6 +2093,26 @@ export async function run(test) {
     }
   });
 
+  await test("record access: a failed run tells no progress after it ended; a good run still does", async () => {
+    // The user read fails at once while the other reads are still under way.
+    const { api } = slowOrg({ failOn: [/FROM User WHERE Id = /] });
+    const ctx = await readRecordContext(api, ID.rec);
+    const seen = [];
+    let ended = false;
+    const late = [];
+    await assert.rejects(readRecordAccess(api, ctx, BOTH, { progress: (t) => { seen.push(t); if (ended) late.push(t); } }));
+    ended = true;
+    await new Promise((r) => setTimeout(r, 120)); // let the reads that were still going finish
+    assert.deepEqual(late, [], `no progress after the failure: ${late.join(" | ")}`);
+    // a later good run shows progress up to the end
+    const ok = slowOrg();
+    const ctx2 = await readRecordContext(ok.api, ID.rec);
+    const good = [];
+    await readRecordAccess(ok.api, ctx2, BOTH, { progress: (t) => good.push(t) });
+    assert.equal(good[0], "Reading… (0 of 9)");
+    assert.equal(good[good.length - 1], "Reading… (9 of 9)");
+  });
+
   await test("record access: two users are read together and each gets their own facts", async () => {
     const { api, flight } = slowOrg();
     const ctx = await readRecordContext(api, ID.rec);
