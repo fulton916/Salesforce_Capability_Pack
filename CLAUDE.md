@@ -18,7 +18,7 @@ Org administration:
 - `sf-country-state-codes`: CLI. Export State and Country/Territory picklists to Excel.
 - `sf-territory-export`: CLI. Read-only Territory Management export to Excel.
 - `sf-user-access-teardown`: CLI. Query, and only with `--execute` plus confirmation, remove user access.
-- `chrome-extension`: the pack's main toolkit (formerly `sf-psg-compare`). Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with six read-only tools: "Compare permission set groups" (PSG Compare; compares two groups), "User access summary and comparison" (looks up or compares users' access), "Territory & role hierarchy" (shows the whole territory or role tree, narrows it to one branch, exports it for Excel), "Why can a user see this record?" (explains how one user, or why one of two users, can see the record open in the tab), "Where is it used in flows?" (finds the flows that use an object, a field or a record Id) and "Page details for a ticket" (copies who you are, which org and which page, as plain text for a support ticket).
+- `chrome-extension`: the pack's main toolkit (formerly `sf-psg-compare`). Chrome extension (plain ES modules, no build step). "Salesforce Capability Pack" toolbar menu with seven read-only tools: "Compare permission set groups" (PSG Compare; compares two groups), "User access summary and comparison" (looks up or compares users' access), "Territory & role hierarchy" (shows the whole territory or role tree, narrows it to one branch, exports it for Excel), "Why can a user see this record?" (explains how one user, or why one of two users, can see the record open in the tab), "Where is it used in flows?" (finds the flows that use an object, a field or a record Id) and "Page details for a ticket" (copies who you are, which org and which page, as plain text for a support ticket) and "Error Tracer: read a debug log" (reads an existing debug log and says what failed, where and for which user; never sets a trace flag).
 
 CLI tools are Python 3.10+ scripts using the Salesforce CLI (`sf` v2); most need `openpyxl`
 (`pip install -r requirements.txt` in the package). Node is needed only for the extension's tests.
@@ -57,7 +57,7 @@ rounds, then the user decides.
 - Org-touching tools are read-only by default. Writes need a dry run, an explicit flag and a confirmation.
 - No real org data, credentials, tokens, user lists or snapshots in the repo. Fixtures are synthetic.
 - No imports across package folders.
-- `chrome-extension` (all six tools): read-only, never inserts org data as HTML, no remote code, never stores the
+- `chrome-extension` (all seven tools): read-only, never inserts org data as HTML, no remote code, never stores the
   session id, matches across orgs by API name, not Id.
 - `sf-user-password-reset/` is a local one-off tool, not part of the pack. It is git-ignored and never committed.
 

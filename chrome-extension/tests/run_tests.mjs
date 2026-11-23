@@ -33,6 +33,7 @@ await (await import("./hierarchy_tests.mjs")).run(test);
 await (await import("./record_access_tests.mjs")).run(test);
 await (await import("./flow_usage_tests.mjs")).run(test);
 await (await import("./page_details_tests.mjs")).run(test);
+await (await import("./error_tracer_tests.mjs")).run(test);
 await (await import("./settings_tests.mjs")).run(test);
 
 // ---------- fakes ----------
@@ -1034,7 +1035,7 @@ await test("layout: nothing in the extension folder starts with an underscore (C
 });
 
 await test("layout: every tool folder has its page, and the manifest and menu point at real files", () => {
-  const tools = ["compare-groups", "user-access", "hierarchy", "record-access", "flow-usage", "page-details"];
+  const tools = ["compare-groups", "user-access", "hierarchy", "record-access", "flow-usage", "page-details", "error-tracer"];
   const files = walk(extRoot).filter((e) => !e.dir).map((e) => e.path);
   for (const t of tools) {
     for (const f of [`${t}.html`, `${t}.js`, `${t}-read.js`]) assert.ok(files.includes(`tools/${t}/${f}`), `tools/${t}/${f}`);

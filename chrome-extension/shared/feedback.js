@@ -15,6 +15,7 @@ export const FEEDBACK_TOOLS = {
   record: "Why can a user see this record? (extension)",
   flows: "Where is it used in flows (extension)",
   snapshot: "Page details for a ticket (extension)",
+  errors: "Error Tracer: read a debug log (extension)",
   menu: "Extension menu / other",
 };
 

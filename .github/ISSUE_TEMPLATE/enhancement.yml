@@ -18,6 +18,7 @@ body:
         - Why can a user see this record? (extension)
         - Where is it used in flows (extension)
         - Page details for a ticket (extension)
+        - Error Tracer: read a debug log (extension)
         - Extension menu / other
         - sf-country-state-codes
         - sf-safe-translation-push
