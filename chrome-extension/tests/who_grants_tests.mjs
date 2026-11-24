@@ -9,7 +9,7 @@ import { TOOLS } from "../shared/tool-list.js";
 import { FEEDBACK_TOOLS } from "../shared/feedback.js";
 import {
   analyze, sectionsOf, copyText, copyWithFallback, matchItems, systemItems, objectItems, fieldItems, factsFromModel, whenStamp, dateWords, expiryWords,
-  permissionWords, setupUrl, systemApiShort, fieldApiShort, NOT_CHECKED_NOTE, UNLISTED_FIELD_HINT, OBJECT_LEVELS, FIELD_LEVELS, KIND_CHOICES,
+  permissionWords, setupUrl, systemApiShort, fieldApiShort, NOT_CHECKED_NOTE, UNLISTED_FIELD_HINT, OBJECT_LEVELS, FIELD_LEVELS, KIND_CHOICES, PlainError, errorWords, notPassedText, connectErrorWords, SessionLookupError, andList,
 } from "../tools/who-grants/who-grants-logic.js";
 import { readGrants, readSystemList, readObjectList, readFieldDescribe, useNewestVersion } from "../tools/who-grants/who-grants-read.js";
 
@@ -207,7 +207,7 @@ export async function run(test) {
     assert.deepEqual(r.gives.map((x) => [x.kindWord, x.label]), [["Profile", "Standard Sales"], ["Permission set", "Cleanup"], ["Permission set group", "Sales Ops"]]);
     assert.deepEqual(r.gives[2].via.map((v) => v.label), ["Inner A", "Inner B"], "only the permission sets inside that give it are named");
     const lines = sectionsOf(r)[0].items.map((i) => i.lines.join(" "));
-    assert.match(lines[2], /these permission sets inside the group: "Inner A", "Inner B"/);
+    assert.match(lines[2], /these permission sets inside the group: "Inner A" and "Inner B"/);
   });
 
   await test("grants: one place says '1 place' and the headline names the permission, an object level and a field", () => {
@@ -324,7 +324,7 @@ export async function run(test) {
     assert.equal(r.answer, "no");
     assert.equal(r.muted.length, 0);
     assert.equal(r.notPassed.length, 1);
-    assert.match(r.notPassed[0].text, /inside the group have it, but the group does not pass it on\. A likely reason is that muting removes something it depends on\./);
+    assert.match(r.notPassed[0].text, /inside the group has it, but the group does not pass it on\. A likely reason is that muting removes something it depends on\./);
     assert.match(r.headline, /has it inside but does not pass it on/);
   });
 
@@ -1596,6 +1596,113 @@ export async function run(test) {
     assert.deepEqual(bare.body.map((b) => (typeof b === "string" ? b : [b.label, b.items.map((i) => [i.text, i.link])])), [["Given inside the group by:", [['"Inner B"', null]]], ["Taken away by:", [['"Mute It"', null]]]]);
     // no sentence on the page names a set that a list names
     for (const sec of sectionsOf(analyze(build(true), SYS))) for (const it of sec.items) for (const b of it.body) if (typeof b === "string") assert.ok(!/"Inner B"|"Mute It"/.test(b), b);
+  });
+
+  await test("grants words: one permission set inside a group that does not pass it on is singular, two are plural", () => {
+    assert.equal(notPassedText(["Inner A"]), 'The permission set "Inner A" inside the group has it, but the group does not pass it on. A likely reason is that muting removes something it depends on.');
+    assert.match(notPassedText(["Inner A", "Inner B"]), /^The permission sets "Inner A" and "Inner B" inside the group have it, but the group/);
+    assert.match(notPassedText(["A", "B", "C"]), /^The permission sets "A", "B" and "C" inside the group have it/);
+    assert.equal(andList([]), "");
+    assert.equal(andList(['"A"']), '"A"');
+    assert.equal(andList(['"A"', '"B"']), '"A" and "B"');
+    assert.equal(andList(['"A"', '"B"', '"C"']), '"A", "B" and "C"');
+    const one = facts({
+      units: [unit("group", "G", { group: "g1" })],
+      sets: [S("agg", "G", { kind: "group" }), S("c1", "Inner A", { target: true })],
+      groups: [group("g1", "G", { agg: "agg", comps: ["c1"] })],
+    });
+    const r = analyze(one, SYS);
+    assert.equal(r.notPassed.length, 1);
+    assert.match(copyText(r, {}), /The permission set "Inner A" inside the group has it, but the group does not pass it on\./);
+    assert.ok(!/permission sets "Inner A"/.test(copyText(r, {})));
+  });
+
+  await test("grants words: sentences that join names agree with how many names there are", () => {
+    // session-based and ended sources on the object a field needs: one and several
+    const mk = (n, status) => facts({
+      units: [unit("set", "Cols", { set: "d1" }), ...Array.from({ length: n }, (_, i) => unit("set", `Edit ${i}`, { set: `s${i}`, status }))],
+      sets: [S("d1", "Cols", { fld: { read: true, edit: true } }), ...Array.from({ length: n }, (_, i) => S(`s${i}`, `Edit ${i}`, { obj: { read: true, edit: true } }))],
+    });
+    const sessOne = analyze(mk(1, "needsActivation"), FLD("edit")).objectAccess.text;
+    const sessMany = analyze(mk(2, "needsActivation"), FLD("edit")).objectAccess.text;
+    assert.match(sessOne, /gives it only after session activation/);
+    assert.match(sessMany, /and permission set "Edit 0".* give it only after session activation|"Edit 0" and permission set "Edit 1" give it only after/);
+    assert.ok(!/ gives it/.test(sessMany), sessMany);
+    const endOne = analyze(mk(1, "expired"), FLD("edit")).objectAccess.text;
+    const endMany = analyze(mk(2, "expired"), FLD("edit")).objectAccess.text;
+    assert.match(endOne, /would give it, but the assignment has ended or is not active\./);
+    assert.match(endMany, /would give it, but the assignments have ended or are not active\./);
+    // two muting sets that list it while the group still has it
+    const g = facts({
+      units: [unit("group", "G", { group: "g1" })],
+      sets: [S("agg", "G", { kind: "group", target: true }), S("c1", "C", { target: true }), S("m1", "M1", { kind: "muting", target: true }), S("m2", "M2", { kind: "muting", target: true })],
+      groups: [group("g1", "G", { agg: "agg", comps: ["c1"], mute: ["m1", "m2"] })],
+    });
+    assert.ok(analyze(g, SYS).notes.some((n) => /^Muting permission sets in this group \("M1" and "M2"\) list it, but/.test(n)));
+    const g1 = facts({
+      units: [unit("group", "G", { group: "g1" })],
+      sets: [S("agg", "G", { kind: "group", target: true }), S("c1", "C", { target: true }), S("m1", "M1", { kind: "muting", target: true })],
+      groups: [group("g1", "G", { agg: "agg", comps: ["c1"], mute: ["m1"] })],
+    });
+    assert.ok(analyze(g1, SYS).notes.some((n) => /^A muting permission set in this group \("M1"\) lists it, but/.test(n)));
+  });
+
+  await test("grants errors: the three connect messages say what to do once", () => {
+    const noSession = connectErrorWords(new SessionLookupError("No Salesforce session found for acme.lightning.force.com. Log in to the org in this browser, then try again."), "acme.lightning.force.com").message;
+    const expired = connectErrorWords(Object.assign(new Error("Your Salesforce session has expired. Reload the Salesforce tab, then try again."), { status: 401 }), "h").message;
+    const other = connectErrorWords(new TypeError("fetch failed"), "h");
+    const notHost = connectErrorWords(new SessionLookupError("Not a Salesforce host: evil.com"), "evil.com").message;
+    console.log(`    connect: ${noSession}
+    connect: ${expired}
+    connect: ${other.message}
+    connect: ${notHost}`);
+    assert.equal(noSession, "No Salesforce session found for acme.lightning.force.com. Log in to the org in this browser, then reload this page.");
+    assert.equal(expired, "Your Salesforce session has expired. Reload the Salesforce tab (log in if it asks), then reload this page.");
+    assert.equal(other.message, "Could not connect to the org. Check your connection, log in to the org in this browser, then reload this page.");
+    assert.equal(other.raw, "fetch failed");
+    assert.equal(notHost, "Not a Salesforce host: evil.com Log in to the org in this browser, then reload this page.");
+    for (const m of [noSession, expired, other.message, notHost]) assert.equal(m.split("reload this page").length - 1, 1, m);
+  });
+
+  await test("grants errors: a TypeError and other raw errors show the fallback with the raw text folded; plain errors and the 401 keep their words", () => {
+    const fb = "Could not connect to the org.";
+    const te = errorWords(new TypeError("Cannot read properties of null (reading 'query')"), fb);
+    assert.equal(te.message, fb);
+    assert.match(te.raw, /Cannot read properties of null/);
+    assert.deepEqual(errorWords(new PlainError("This user could not be found."), fb), { message: "This user could not be found.", raw: "" });
+    const e401 = Object.assign(new Error("Your Salesforce session has expired."), { status: 401 });
+    assert.deepEqual(errorWords(e401, fb), { message: "Your Salesforce session has expired.", raw: "" });
+    const e400 = Object.assign(new Error("MALFORMED_QUERY: x"), { status: 400 });
+    assert.deepEqual(errorWords(e400, fb), { message: fb, raw: "MALFORMED_QUERY: x" });
+    assert.deepEqual(errorWords(new Error("some other"), fb), { message: fb, raw: "some other" });
+    assert.deepEqual(errorWords(undefined, fb), { message: fb, raw: "" });
+  });
+
+  await test("grants errors: the reader's deliberate messages are PlainError, so they stay plain on the page", async () => {
+    const org = makeOrg({});
+    await assert.rejects(readGrants(org.api(), { id: "bad" }, { kind: "system", api: "PermissionsViewSetup" }), (e) => e instanceof PlainError && errorWords(e, "x").message === "That user does not look right. Pick the user again.");
+    await assert.rejects(readGrants(org.api(), { id: USER }, { kind: "system", api: "nope" }), (e) => e instanceof PlainError);
+  });
+
+  await test("grants page: a failed connect hides the org-only parts, keeps the error visible and focuses nothing hidden", () => {
+    const js = read(ext("tools/who-grants/who-grants.js"));
+    const html = read(ext("tools/who-grants/who-grants.html"));
+    const catchPart = js.slice(js.indexOf("state.api = null;"), js.indexOf("connect().then("));
+    assert.match(catchPart, /state\.api = null/);
+    assert.match(catchPart, /hideOrgParts\(\)/);
+    assert.match(catchPart, /connectErrorWords\(e, HOST\)/);
+    assert.match(catchPart, /#panelUser"\)\.hidden = true/);
+    assert.match(catchPart, /#panelPermission"\)\.hidden = true/);
+    assert.match(catchPart, /prepend\(\$\("#error"\)\)/);
+    assert.match(catchPart, /return false/);
+    assert.match(js, /connect\(\)\.then\(\(ok\) => \{ if \(ok\) combos\.user\.input\.focus\(\)/);
+    assert.match(html, /id="panelUser"/);
+    assert.match(html, /id="panelPermission"/);
+    // the error box and its panel are not org-only; every box, the kinds and Find are
+    assert.ok(!/id="error"[^>]*org-only|org-only[^>]*id="error"/.test(html));
+    for (const id of ["userInput", "systemInput", "find"]) assert.ok(html.indexOf(`id="${id}"`) > 0);
+    assert.match(html, /<div class="actions org-only">/);
+    assert.match(html, /<p class="hint org-only">/);
   });
 
 }

@@ -181,7 +181,9 @@ export function expiryWords(iso, timeZone) {
 
 const places = (n) => `${n} place${n === 1 ? "" : "s"}`;
 const kindWord = (k) => (k === "profile" ? "Profile" : k === "group" ? "Permission set group" : "Permission set");
-const namesList = (names) => names.map((n) => `"${n}"`).join(", ");
+/** "A", "A and B", "A, B and C" (the items are already worded, quotes included). Pure. */
+export const andList = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
+const namesList = (names) => andList(names.map((n) => `"${n}"`));
 
 /** The date and time with its time zone, for the copied text. `timeZone` is an IANA name (or undefined for the browser's). */
 export function whenStamp(date, timeZone) {
@@ -289,7 +291,7 @@ function evalUnitCore(u, facts, spec) {
 
   if (aggExplicit) {
     const mutingListsIt = mutings.filter((m) => mutes(m, spec));
-    if (mutingListsIt.length) notes.push(`A muting permission set in this group ("${mutingListsIt.map((m) => m.label).join('", "')}") lists it, but the group still has it, so muting does not remove it here.`);
+    if (mutingListsIt.length) notes.push(`${pick(mutingListsIt.length, "A muting permission set", "Muting permission sets")} in this group (${andList(mutingListsIt.map((m) => `"${m.label}"`))}) ${pick(mutingListsIt.length, "lists", "list")} it, but the group still has it, so muting does not remove it here.`);
     return { explicit: true, implied, impliedVia, via: compHas.map((s) => setRef(s)), viaUnknown: !comps || !compHas.length, viaUnreadable: !comps, notes };
   }
 
@@ -315,7 +317,7 @@ function evalUnitCore(u, facts, spec) {
       explicit: false, implied, impliedVia, via: [], viaUnknown: false, notes,
       notPassed: {
         sets: compHas.map((s) => setRef(s)),
-        text: `The permission sets ${namesList(compHas.map((s) => s.label))} inside the group have it, but the group does not pass it on. A likely reason is that muting removes something it depends on.`,
+        text: notPassedText(compHas.map((s) => s.label)),
         // On the page the sets are named once, in a list with their links, so this sentence does not repeat them.
         pageText: `The group's combined permissions do not have it, although ${compHas.length === 1 ? "a permission set inside the group has" : "permission sets inside the group have"} it. A likely reason is that muting removes something it depends on.`,
       },
@@ -358,7 +360,7 @@ function collect(facts, spec) {
     const recalc = u.kind === "group" && g && g.status && g.status !== "Updated" ? g.status : null;
     if (u.status === "active" && !covers && e.unknownImplied?.length) {
       // A covering permission was not read: it could give this, so "not given anywhere" cannot be said.
-      const what = e.unknownImplied.map((t) => `"${t}"`).join(" and ");
+      const what = andList(e.unknownImplied.map((t) => `"${t}"`));
       c.notSure.push({ ...base, text: `We could not check whether ${what} gives it for ${u.unnamed ? u.label.charAt(0).toLowerCase() + u.label.slice(1) : `${kindWord(u.kind).toLowerCase()} "${u.label}"`}.`, short: `${what} could not be checked` });
     }
     if (u.status === "active" && covers && u.activationUnknown && !u.sessionBased) c.unknownActivation.push(base);
@@ -387,11 +389,52 @@ function collect(facts, spec) {
 
 // ---------- the answer ----------
 
+// ---------- errors ----------
+
+/** An error whose message is already plain words for the person (thrown on purpose by the reader). Anything else is shown as the fallback sentence, with its text folded under Technical details. */
+export class PlainError extends Error {
+  constructor(message) { super(message); this.name = "PlainError"; }
+}
+
+/** What to show for a failure: `message` (plain) and `raw` (for the folded Technical details; "" when none). A 401 and a PlainError keep their own wording; a TypeError and the like never reach the main view. Pure. */
+export function errorWords(e, fallback) {
+  if (e?.status === 401) return { message: e.message, raw: "" };
+  if (e instanceof PlainError) return { message: e.message, raw: "" };
+  return { message: fallback, raw: e?.message || String(e || "") };
+}
+
+/** Raised by the page when finding the session fails, so the connect message can tell it from other failures. */
+export class SessionLookupError extends Error {
+  constructor(message) { super(message); this.name = "SessionLookupError"; }
+}
+
+const LOG_IN_RELOAD = "Log in to the org in this browser, then reload this page.";
+
+/** What to show when the connection fails: `message` (one sentence of what happened, then what to do once) and `raw` (for Technical details). `host` is the host this page was opened for. Pure. */
+export function connectErrorWords(e, host) {
+  if (e?.status === 401) return { message: "Your Salesforce session has expired. Reload the Salesforce tab (log in if it asks), then reload this page.", raw: "" };
+  if (e instanceof SessionLookupError) {
+    const m = String(e.message || "").trim();
+    if (!m || /^No Salesforce session found/.test(m)) return { message: `No Salesforce session found for ${host || "this org"}. ${LOG_IN_RELOAD}`, raw: "" };
+    return { message: `${m} ${LOG_IN_RELOAD}`, raw: "" };
+  }
+  return { message: `Could not connect to the org. Check your connection, log in to the org in this browser, then reload this page.`, raw: e?.message || String(e || "") };
+}
+
+/** `one` for a single thing, `many` for several: "gives" / "give", so a sentence is right whatever the count. */
+const pick = (n, one, many) => (n === 1 ? one : many);
+
+/** The "inside the group" sentence for a group whose parts have it but which does not pass it on. `names` are the labels. Pure. */
+export function notPassedText(names) {
+  const one = names.length === 1;
+  return `${one ? "The permission set" : "The permission sets"} ${namesList(names)} inside the group ${one ? "has" : "have"} it, but the group does not pass it on. A likely reason is that muting removes something it depends on.`;
+}
+
 function joinNames(items) {
   const names = items.map((i) => (i.unnamed ? i.label.charAt(0).toLowerCase() + i.label.slice(1) : `${i.kindWord.toLowerCase()} "${i.label}"`));
   if (names.length > 3) return `${names.slice(0, 3).join(", ")} and ${names.length - 3} more`;
   if (names.length < 2) return names.join("");
-  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return andList(names);
 }
 
 /** The object access a field needs (Read, or Edit for Edit on the field), or null for other kinds. */
@@ -416,9 +459,9 @@ function objectAccessFor(facts, spec) {
     // Say why, when the object access exists but does not count right now.
     const cap = (t) => t.charAt(0).toUpperCase() + t.slice(1);
     const parts = [];
-    if (c.activation.length) parts.push(`${joinNames(c.activation)} gives it only after session activation.`);
+    if (c.activation.length) parts.push(`${joinNames(c.activation)} ${pick(c.activation.length, "gives", "give")} it only after session activation.`);
     if (c.muted.length) parts.push(`${joinNames(c.muted)} would give it, but muting removes it.`);
-    if (c.notActive.length) parts.push(`${joinNames(c.notActive)} would give it, but the assignment has ended or is not active.`);
+    if (c.notActive.length) parts.push(`${joinNames(c.notActive)} would give it, but ${pick(c.notActive.length, "the assignment has", "the assignments have")} ended or ${pick(c.notActive.length, "is", "are")} not active.`);
     if (c.activation.length) text = `${word} on ${obj}: not right now; ${parts.join(" ")}`;
     else if (parts.length) text = `${word} on ${obj}: no. ${parts.map(cap).join(" ")}`;
     else text = `${word} on ${obj}: no. ${level === "edit" ? "Edit on a field also needs Edit on its object" : "Field access only works with Read on its object"}, so this field access does not work for this user.`;
@@ -448,7 +491,9 @@ export function analyze(facts, spec) {
   const sources = [...c.gives, ...c.implied];
   const hedges = [];
   if (sources.length === 1 && sources[0].recalc) hedges.push(`The group "${sources[0].label}" is still being recalculated, so this may change.`);
-  if (c.unknownActivation.length) hedges.push(`We could not check whether ${joinNames(c.unknownActivation)} is session-based; if it is, it only counts after the person activates it.`);
+  if (c.unknownActivation.length) hedges.push((c.unknownActivation.length === 1
+    ? `We could not check whether ${joinNames(c.unknownActivation)} is session-based; if it is, it only counts after the person activates it.`
+    : `We could not check whether ${joinNames(c.unknownActivation)} are session-based; if they are, they only count after the person activates them.`));
   const more = unsure ? " Some access could not be checked, so there may be more." : "";
 
   const lvlWord = objectAccess ? (objectAccess.level === "edit" ? "Edit" : "Read") : "";
@@ -534,7 +579,7 @@ function linksOf(things) {
   return out;
 }
 
-const viaText = (via) => via.map((v) => `"${v.label}"`).join(", ");
+const viaText = (via) => andList(via.map((v) => `"${v.label}"`));
 
 /**
  * The sections in the order they are shown. Each item has a title, a small API name and `lines` (plain sentences: what the copied text uses).
@@ -569,7 +614,7 @@ export function sectionsOf(r, opts = {}) {
         else if (x.kind === "set") c.add("Assigned directly.");
         else if (x.via.length) c.add(`Through ${x.via.length === 1 ? "this permission set" : "these permission sets"} inside the group: ${viaText(x.via)}.`, list("Given inside the group by:", x.via));
         else c.add(x.viaUnreadable ? "The group gives it. We could not read the permission sets inside, so we cannot tell which one." : "The group gives it, but we could not tell which permission set inside.");
-        if (x.alsoImplied?.length) c.add(`It is also covered by ${x.alsoImplied.map((t) => `"${t}"`).join(" and ")}, which it includes.`);
+        if (x.alsoImplied?.length) c.add(`It is also covered by ${andList(x.alsoImplied.map((t) => `"${t}"`))}, which it includes.`);
         c.add(expiryLine(x, tz));
         return c.build();
       }),

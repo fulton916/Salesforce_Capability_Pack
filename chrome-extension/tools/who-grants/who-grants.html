@@ -21,9 +21,9 @@
     <ul class="demo-hints" id="demoHintList"></ul>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="panelUser">
     <h2 class="step">1. Choose the user</h2>
-    <p class="hint">Type part of a name or username.</p>
+    <p class="hint org-only">Type part of a name or username.</p>
     <div class="field org-only">
       <label class="pick-label" for="userInput">User</label>
       <div class="combo">
@@ -33,7 +33,7 @@
     </div>
   </section>
 
-  <section class="panel">
+  <section class="panel" id="panelPermission">
     <h2 class="step">2. Choose the permission</h2>
     <fieldset class="kinds org-only" id="kinds">
       <legend class="pick-label">What kind of permission?</legend>
@@ -71,7 +71,7 @@
       <select id="level"></select>
     </div>
 
-    <div class="actions">
+    <div class="actions org-only">
       <button id="find" class="primary" disabled>Find where it comes from</button>
       <span id="progress" role="status"></span>
     </div>
