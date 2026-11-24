@@ -4,7 +4,7 @@ import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
 import {
   analyze, sectionsOf, copyText, copyWithFallback, matchItems, objectItems, fieldItems, factsFromModel, whenStamp,
-  OBJECT_LEVELS, FIELD_LEVELS, UNLISTED_FIELD_HINT, setupUrl, systemApiShort, fieldApiShort,
+  OBJECT_LEVELS, FIELD_LEVELS, UNLISTED_FIELD_HINT, setupUrl, systemApiShort, fieldApiShort, PlainError, errorWords, SessionLookupError, connectErrorWords,
 } from "./who-grants-logic.js";
 import { readGrants, readSystemList, readObjectList, readFieldDescribe, useNewestVersion } from "./who-grants-read.js";
 import { startLiveReload } from "../../shared/livereload.js";
@@ -64,8 +64,8 @@ function showError(msg, raw) {
   box.append(msg);
   if (raw) box.append(el("details", { class: "tech" }, el("summary", { text: "Technical details" }), el("div", { text: raw })));
 }
-const plainError = (e, fallback) => (e?.status === 401 ? e.message : e?.status || e?.errorCode ? fallback : e?.message || fallback);
-const rawOf = (e) => (e?.status === 401 ? "" : e?.status || e?.errorCode ? e?.message || String(e || "") : "");
+const plainError = (e, fallback) => errorWords(e, fallback).message;
+const rawOf = (e) => errorWords(e, "").raw;
 const setProgress = (t) => { $("#progress").textContent = t || ""; };
 
 // ---------- one combo box for every search box on the page ----------
@@ -456,6 +456,12 @@ function showOrg(o, host, via) {
   document.title = `Where does a user get this permission? – ${o.name || host}`;
 }
 
+/** Hide everything that needs an org (the search boxes, Find). The plain error stays in view. */
+function hideOrgParts() {
+  document.querySelectorAll(".org-only").forEach((n) => (n.hidden = true));
+}
+
+/** Connect to the org. Returns true when the boxes can be used. */
 async function connect() {
   if (DEMO) {
     state.model = await (await fetch("../../samples/who_grants_demo.json")).json();
@@ -463,7 +469,7 @@ async function connect() {
     $("#org").replaceChildren(el("span", { class: "badge demo", text: "DEMO" }), " Made-up org and users, no org connected");
     $("#demoHints").hidden = false;
     $("#demoHintList").replaceChildren(...state.model.hints.map((h) => el("li", { text: h })));
-    return;
+    return true;
   }
   try {
     let session;
@@ -471,24 +477,33 @@ async function connect() {
       session = { apiHost: location.host, sessionId: "dev", base: `${location.origin}/sf` };
     } else if (HOST && typeof chrome !== "undefined" && chrome.cookies) {
       $("#org").textContent = `Connecting to ${HOST}…`;
-      session = await findSession(HOST, chrome.cookies);
+      try { session = await findSession(HOST, chrome.cookies); } catch (e) { throw new SessionLookupError(e?.message || ""); } // its messages are plain words
     } else {
       $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
-      document.querySelectorAll(".org-only").forEach((n) => (n.hidden = true));
-      return;
+      hideOrgParts();
+      return false;
     }
     state.api = new SfApi(session);
     await useNewestVersion(state.api); // this page asks for the org's newest API version (the shared default is unchanged)
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
     showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
+    return true;
   } catch (e) {
+    state.api = null; // nothing may use a connection that did not come up
     $("#org").textContent = `Could not connect${HOST ? " to " + HOST : ""}.`;
-    showError(plainError(e, "Could not connect to the org. If you have been away a while, reload the Salesforce tab and try again."), rawOf(e));
+    hideOrgParts();
+    const w = connectErrorWords(e, HOST);
+    // Only the error shows, not the two empty steps: the box moves up out of step 2.
+    $("#panelUser").hidden = true;
+    $("#panelPermission").hidden = true;
+    $("main").prepend($("#error"));
+    showError(w.message, w.raw);
+    return false;
   }
 }
 
 showKind();
-connect().then(() => combos.user.input.focus()).catch((e) => showError("Something went wrong while starting.", e?.message || String(e)));
+connect().then((ok) => { if (ok) combos.user.input.focus(); }).catch((e) => showError("Something went wrong while starting.", e?.message || String(e)));
 startLiveReload();
 
 // Header links to GitHub's new-issue form. Only tool, extension version and browser go in the link.

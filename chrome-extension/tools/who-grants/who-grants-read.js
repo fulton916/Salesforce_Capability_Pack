@@ -7,7 +7,7 @@
 // The PermissionSet columns the org does not have (older API versions) are left out, judged from describe.
 
 import { soqlString, chunk } from "../../shared/sfconn.js";
-import { FACTS_SCHEMA, systemItems, objectItems } from "./who-grants-logic.js";
+import { FACTS_SCHEMA, systemItems, objectItems, PlainError } from "./who-grants-logic.js";
 
 const ID_CHUNK = 200;
 const ID_RE = /^[A-Za-z0-9]{15,18}$/;
@@ -135,7 +135,7 @@ function validate(spec) {
   if (spec.kind === "system" && SYSTEM_RE.test(spec.api || "")) return;
   if (spec.kind === "object" && OBJECT_RE.test(spec.object || "")) return;
   if (spec.kind === "field" && FIELD_RE.test(spec.field || "") && OBJECT_RE.test(spec.object || "") && spec.field.startsWith(`${spec.object}.`)) return;
-  throw new Error("That permission name does not look right. Pick it again from the list.");
+  throw new PlainError("That permission name does not look right. Pick it again from the list.");
 }
 
 // IsActive on an assignment does not say whether a session-based set was activated (seen live: true for a session set
@@ -155,7 +155,7 @@ function assignmentStatus(row, activation, now) {
  */
 export async function readGrants(api, user, spec, opts = {}) {
   validate(spec);
-  if (!ID_RE.test(user?.id || "")) throw new Error("That user does not look right. Pick the user again.");
+  if (!ID_RE.test(user?.id || "")) throw new PlainError("That user does not look right. Pick the user again.");
   const progress = opts.progress || (() => {});
   const now = opts.now || new Date();
   const problems = [];
@@ -168,7 +168,7 @@ export async function readGrants(api, user, spec, opts = {}) {
   progress("Reading the user and what is assigned to them…");
   const uq = await api.query(`SELECT Id, Name, Username, IsActive, ProfileId, Profile.Name FROM User WHERE Id = ${soqlString(user.id)}`);
   const u = uq.records[0];
-  if (!u) throw new Error("This user could not be found. They may have been deleted. Search again.");
+  if (!u) throw new PlainError("This user could not be found. They may have been deleted. Search again.");
 
   const [aNames, setNames, groupNames, mutingNames] = await Promise.all([
     fieldNames(api, "PermissionSetAssignment"), fieldNames(api, "PermissionSet"), fieldNames(api, "PermissionSetGroup"), fieldNames(api, "MutingPermissionSet"),
