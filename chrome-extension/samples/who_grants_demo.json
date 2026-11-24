@@ -1,0 +1,109 @@
+{
+  "_note": "Made-up org for the demo of 'Where does a user get this permission?'. Names are invented, addresses use example.com, Ids are not real. Anything not listed is off.",
+  "org": { "name": "Demo Org (made up)" },
+  "hints": [
+    "Casey Sample, Access to an object, Account, Delete: two places give it (one set assigned directly, one group that contains the same set). A third group would give it but its muting removes it. A session-based set and an expired assignment are listed but do not count.",
+    "Casey Sample, Access to an object, Opportunity, Read: nothing lists it, but View All Data covers it (\"Also covers it\").",
+    "Casey Sample, Access to a field, Account, Annual Revenue, Read: covered only by View All Fields (Global). Try Account, Industry, Edit to see which permission sets inside a group give it.",
+    "Riley Sample, Access to an object, Account, Delete: No, because the group's muting permission set removes it.",
+    "Riley Sample, A system permission, View Setup and Configuration: not given anywhere.",
+    "Riley Sample, Access to a field, Opportunity, Amount, Read: the field is given, but Riley has no access to Opportunity, so it does not work.",
+    "Jordan Sample (inactive user), Access to an object, Account, Delete: covered by Modify All Data, and the page says the user is inactive.",
+    "Jordan Sample, A system permission, View Setup and Configuration: the group is still being recalculated, so the page says it is not sure.",
+    "After an answer, change the Level (for example Read to Edit): the answer is redrawn at once with no new read."
+  ],
+  "systemPermissions": [
+    { "api": "PermissionsApiEnabled", "label": "API Enabled" },
+    { "api": "PermissionsExportReport", "label": "Export Reports" },
+    { "api": "PermissionsManageUsers", "label": "Manage Users" },
+    { "api": "PermissionsModifyAllData", "label": "Modify All Data" },
+    { "api": "PermissionsViewAllData", "label": "View All Data" },
+    { "api": "PermissionsViewAllFieldsGlobal", "label": "View All Fields (Global)" },
+    { "api": "PermissionsViewSetup", "label": "View Setup and Configuration" }
+  ],
+  "objects": [
+    { "api": "Account", "label": "Account" },
+    { "api": "Case", "label": "Case" },
+    { "api": "Contact", "label": "Contact" },
+    { "api": "Opportunity", "label": "Opportunity" }
+  ],
+  "fields": {
+    "Account": [
+      { "api": "Account.AnnualRevenue", "label": "Annual Revenue" },
+      { "api": "Account.Industry", "label": "Industry" },
+      { "api": "Account.Parent", "label": "Parent Account" },
+      { "api": "Account.ParentId", "label": "Parent Account" },
+      { "api": "Account.Rating", "label": "Account Rating" }
+    ],
+    "Case": [
+      { "api": "Case.Priority", "label": "Priority" }
+    ],
+    "Contact": [
+      { "api": "Contact.Birthdate", "label": "Birthdate" }
+    ],
+    "Opportunity": [
+      { "api": "Opportunity.Amount", "label": "Amount" },
+      { "api": "Opportunity.StageName", "label": "Stage" }
+    ]
+  },
+  "users": [
+    {
+      "id": "005000000000001", "name": "Casey Sample", "username": "casey.sample@example.com", "isActive": true, "profile": "Standard Sales",
+      "units": [
+        { "kind": "profile", "ref": "ps01" },
+        { "kind": "set", "ref": "ps03" },
+        { "kind": "set", "ref": "ps10" },
+        { "kind": "set", "ref": "ps11" },
+        { "kind": "set", "ref": "ps08", "status": "needsActivation" },
+        { "kind": "set", "ref": "ps09", "status": "expired", "expires": "2026-09-30T23:59:00Z" },
+        { "kind": "group", "ref": "g1" },
+        { "kind": "group", "ref": "g2" }
+      ]
+    },
+    {
+      "id": "005000000000002", "name": "Riley Sample", "username": "riley.sample@example.com", "isActive": true, "profile": "Minimal Access",
+      "units": [
+        { "kind": "profile", "ref": "ps02" },
+        { "kind": "set", "ref": "ps12" },
+        { "kind": "group", "ref": "g1" }
+      ]
+    },
+    {
+      "id": "005000000000003", "name": "Jordan Sample", "username": "jordan.sample@example.com", "isActive": false, "profile": "Standard Sales",
+      "units": [
+        { "kind": "profile", "ref": "ps01" },
+        { "kind": "set", "ref": "ps13" },
+        { "kind": "group", "ref": "g3" }
+      ]
+    }
+  ],
+  "sets": {
+    "ps01": { "label": "Standard Sales", "kind": "profile", "sys": { "PermissionsApiEnabled": true },
+      "obj": { "Account": { "read": true, "create": true, "edit": true }, "Contact": { "read": true } },
+      "fld": { "Account.Industry": { "read": true } } },
+    "ps02": { "label": "Minimal Access", "kind": "profile", "sys": { "PermissionsApiEnabled": true } },
+    "ps03": { "label": "Account Cleanup", "apiName": "Account_Cleanup", "obj": { "Account": { "read": true, "edit": true, "delete": true } } },
+    "ps04": { "label": "Sales Data Editors", "apiName": "Sales_Data_Editors",
+      "obj": { "Account": { "read": true, "create": true, "edit": true } },
+      "fld": { "Account.Industry": { "read": true, "edit": true }, "Account.Rating": { "read": true, "edit": true } } },
+    "ps05": { "label": "Sales Deleters", "apiName": "Sales_Deleters", "obj": { "Account": { "read": true, "delete": true } } },
+    "mu01": { "label": "Sales Muting", "kind": "muting", "apiName": "Sales_Muting", "obj": { "Account": { "delete": true } } },
+    "ps06": { "label": "Report Builders", "apiName": "Report_Builders", "sys": { "PermissionsViewSetup": true, "PermissionsExportReport": true } },
+    "ps08": { "label": "Support Escalation", "apiName": "Support_Escalation", "sys": { "PermissionsViewSetup": true }, "obj": { "Account": { "read": true, "edit": true, "delete": true } } },
+    "ps09": { "label": "Quarter End Access", "apiName": "Quarter_End_Access", "obj": { "Account": { "read": true, "delete": true } } },
+    "ps10": { "label": "Read-Only Auditor", "apiName": "Read_Only_Auditor", "sys": { "PermissionsViewAllData": true } },
+    "ps11": { "label": "Field Auditor", "apiName": "Field_Auditor", "sys": { "PermissionsViewAllFieldsGlobal": true } },
+    "ps12": { "label": "Amount Editors", "apiName": "Amount_Editors", "fld": { "Opportunity.Amount": { "read": true, "edit": true } } },
+    "ps13": { "label": "System Admin Powers", "apiName": "System_Admin_Powers", "sys": { "PermissionsModifyAllData": true } },
+    "agg1": { "label": "Sales Operations", "kind": "group", "sys": { "PermissionsExportReport": true },
+      "obj": { "Account": { "read": true, "create": true, "edit": true } },
+      "fld": { "Account.Industry": { "read": true, "edit": true }, "Account.Rating": { "read": true, "edit": true } } },
+    "agg2": { "label": "Cleanup Crew", "kind": "group", "obj": { "Account": { "read": true, "edit": true, "delete": true } } },
+    "agg3": { "label": "Regional Reports", "kind": "group" }
+  },
+  "groups": {
+    "g1": { "label": "Sales Operations", "apiName": "Sales_Operations", "status": "Updated", "aggregate": "agg1", "components": ["ps04", "ps05"], "muting": ["mu01"] },
+    "g2": { "label": "Cleanup Crew", "apiName": "Cleanup_Crew", "status": "Updated", "aggregate": "agg2", "components": ["ps03"], "muting": [] },
+    "g3": { "label": "Regional Reports", "apiName": "Regional_Reports", "status": "Outdated", "aggregate": "agg3", "components": ["ps06"], "muting": [] }
+  }
+}

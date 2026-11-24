@@ -2,9 +2,9 @@
 
 (Formerly the `sf-psg-compare` folder. Saved group files still use the schema ids `sf-psg-snapshot/1` and `/2`.)
 
-A Chrome extension with seven read-only tools: **Compare permission set groups**, **User access summary and
+A Chrome extension with eight read-only tools: **Compare permission set groups**, **User access summary and
 comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**,
-**Page details for a ticket** and **Error Tracer: read a debug log**.
+**Page details for a ticket**, **Error Tracer: read a debug log** and **Where does a user get this permission?**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -42,6 +42,10 @@ Page details for a ticket:
 Error Tracer: read a debug log:
 - What failed, where, and for which user, in a debug log a user's failing action left behind?
 - Which validation rule, flow step or line of Apex was it?
+
+Where does a user get this permission?:
+- Does this user get Delete on Account (or View Setup, or Edit on a field), and from which profile, permission set or group?
+- Which permission set inside a group gives it, and did a muting permission set take it away?
 
 ## Known limits
 
@@ -267,6 +271,39 @@ Try it: `python dev/dev_server.py --no-org`, then open
 <http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up logs: a trigger error, a
 validation rule, a failed flow, a clean log and a cut-off one). Not checked against a real org's logs.
 
+## Where does a user get this permission?
+
+Use it when you need to know **where one user gets one permission**: which profile, permission set or permission
+set group gives it, which permission set inside a group, and what muting took away. It is the question behind
+Setup's "User Access Summary" and its "Access Granted By" action, answered on one page and copyable for a ticket.
+
+1. Open **Where does a user get this permission?** from the toolbar menu and pick the user (type part of a name or username; inactive users are tagged).
+2. Choose the kind: **A system permission** (search by name, for example Modify All Data or View Setup), **Access to an object** (search the object, then a level: Read, Create, Edit, Delete, View All or Modify All) or **Access to a field** (the object, then the field, then Read or Edit). Lists show up to 100 matches; keep typing to narrow them. Every list works with the keyboard (arrow keys, Enter, Escape).
+3. Press **Find where it comes from**.
+
+The answer starts with one sentence ("Yes. Casey Sample gets Delete on Account from 2 places.", "No. ... does not get ...: not given anywhere.", "No. ... the group "X" would give it, but its muting permission set removes it."). It never says "not given anywhere" when something could not be read: it says "Not sure" and what could not be checked. Then, as cards (a label first, the API name small):
+
+- **Gives it**: the profile, a permission set assigned directly, or a permission set group (naming each permission set inside it that gives it). A permission set that is both direct and in a group shows both. An assignment that ends on a date shows the date and time in your own time zone (with its abbreviation, also in the copied text). A source that is listed outright and also covered by View All Data (or another permission that includes it) says so: 'It is also covered by "View All Data", which it includes.' A source that gives it outright and by implication is one card with the reason.
+- **Also covers it**: counted as giving it, because another permission covers this one: View All Data covers object Read and View All, Modify All Data covers Create, Edit, Delete and Modify All too, and View All Fields (on the object, or Global) covers field Read. Modify All Data and View All Data do not override field permissions, and nothing covers field Edit.
+- **Removed by muting**: the group, the permission sets inside it that give it, and the muting permission set that takes it away. Not counted.
+- **In a group but not passed on**: a permission set inside a group has it, nothing muted it, but the group's combined permissions do not have it (the page says a likely reason is that muting removes something it depends on). If the group is still being recalculated (status not Updated) the page says it is not sure instead.
+- **Needs session activation**: session-based permission sets or groups that contain it. Not counted as giving it.
+- **Not active**: assignments that have expired, were revoked or are not active and contain it. Not counted. Salesforce deletes an expired assignment soon after it expires, so this is rare. If a person has the same set or group assigned twice, the better one counts (an active one beats one that has ended).
+- **Could not be checked**: what could not be read (a group's parts, a group still being recalculated, a directly assigned permission set you are not allowed to see).
+- For a field, **Access to the object**: Read (or Edit, for Edit on the field) on the object is needed for field access to work, and the page says whether the user has it and from where. A field the user is "given" without that object access says it does not work. Some objects (for example Task and Event) have fields that field permissions control but are not set by object permissions at all: for those the page says access to the object is not checked here, and does not say the field does not work.
+- An inactive user is said to be inactive: they cannot log in, so nothing applies now.
+
+After an answer, changing the **Level** redraws it from what was already read, with no new read. Changing the user or the permission clears the answer. **Copy the answer** puts the org name, the user's name and username, the permission (label and API name), the answer, every section, the notes and the date and time with its time zone on the clipboard as plain text (if the browser blocks copying, a box with the text appears to select and copy).
+
+If you type a field that is not in the list, the list says that fields not listed (required fields, Name, system fields) are not controlled by field permissions and everyone with access to the object sees them. A field listed twice by Salesforce under the same label (Account.Parent and Account.ParentId) is one field and appears once.
+
+What it reads (GET and `SELECT` only; nothing is written and nothing is kept after you close the page): the org's API versions (it asks for the newest one for this page only), `describe` of `PermissionSet`, `ObjectPermissions` and `FieldPermissions` (for the lists; the first read of the field list is about 1 MB in a large org), then `User`, `PermissionSetAssignment`, `PermissionSet`, `PermissionSetGroup`, `PermissionSetGroupComponent`, `MutingPermissionSet`, `ObjectPermissions` and `FieldPermissions` for the one user and permission. A group's combined permission set (which has muting applied) is the truth for what the group gives. Only the user and the assignments are required: if something else cannot be read the page says so in plain words and the raw Salesforce text is under "Technical details".
+
+Not checked in this version: permission set licenses, sharing, and access to Apex classes and Visualforce pages. The user's license can also limit what a permission does. On an API version without expiry or revoked details for assignments, an assignment that has ended may still be counted (a note says so). A session-based set or group is always listed under "Needs session activation": Salesforce does not tell this page whether it was activated.
+
+Try it: `python dev/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/tools/who-grants/who-grants.html?demo=1>. The demo has a made-up org with three users (one inactive) and a list of things to try at the top of the page. Checked read-only in a developer org through the dev server: the lists (system permissions, objects, fields), a profile, a directly assigned set, a group with a muting permission set, a session-based set, an expiry date and access from View All Fields. Checked again after a fix for asking about Modify All Data, View All Data or View All Fields (Global), for a test user and an administrator in a developer org: system permissions, object levels and fields all matched a separate query. Not checked in a real org: a group that is not Updated, an expired or revoked assignment, an inactive user, and View All Data or Modify All Data covering an object. Not checked: opening it from the toolbar button in Chrome and the real clipboard.
+
 ## Install (unpacked, for your own browser)
 
 New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
@@ -287,6 +324,7 @@ push it by policy.
 - View Setup and Configuration (to read permission sets, groups and their permissions).
 - For User access summary and comparison, also access to see users.
 - For Error Tracer, permission to see debug logs (seeing other people's logs may need more; ask your administrator).
+- For Where does a user get this permission?, access to see users, permission sets, groups and their object and field permissions (View Setup and Configuration is normal).
 - To name Apex classes and pages: read access to them is normal with View Setup. Items it cannot
   name are kept by Id with a note at the top.
 
@@ -294,14 +332,15 @@ push it by policy.
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
-   and seven buttons: **Compare permission set groups** ("Find out how two permission set groups
+   and eight buttons: **Compare permission set groups** ("Find out how two permission set groups
    differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
    **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
    **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id") and
    **Page details for a ticket** ("Copy who you are, which org and which page, to paste into a
-   ticket") and **Error Tracer: read a debug log** ("See what failed, where and for which user, from a
-   debug log"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
+   ticket"), **Error Tracer: read a debug log** ("See what failed, where and for which user, from a
+   debug log") and **Where does a user get this permission?** ("Find every profile, permission set and group that
+   gives a user one permission"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
    The record button reads the record Id from the address of the tab. On a Salesforce tab with no
    record open it stays enabled, says "Open a record first", and the page opens with an empty record
    box.
@@ -651,7 +690,7 @@ one again, or press **Show all tools**, to bring it back. Each change saves at o
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.9.0", and all seven pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.10.0", and all eight pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -681,7 +720,8 @@ python dev/dev_server.py --no-org
 Open <http://127.0.0.1:8765/tools/compare-groups/compare-groups.html?demo=1> (two made-up groups from `samples/`)
 or <http://127.0.0.1:8765/tools/user-access/user-access.html?demo=1> (two made-up users) or
 <http://127.0.0.1:8765/tools/record-access/record-access.html?demo=1> (a made-up account and two made-up users) or
-<http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up debug logs).
+<http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up debug logs) or
+<http://127.0.0.1:8765/tools/who-grants/who-grants.html?demo=1> (a made-up org and three users).
 
 ## Developing without reloading Chrome
 
@@ -738,6 +778,9 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/error-tracer/error-tracer.*` | The Error Tracer: read a debug log page (html, js, extra css on top of `shared/pack.css`) |
 | `tools/error-tracer/error-tracer-logic.js` | Reads one debug log text in a single pass into plain findings (what failed, where, which rule or flow step, notes); Copy text. Pure, no browser APIs |
 | `tools/error-tracer/error-tracer-read.js` | Reads the log list (one `SELECT` on `ApexLog`) and one log's body (`GET`). GET only; never touches a trace flag or debug level |
+| `tools/who-grants/who-grants.*` | The "Where does a user get this permission?" page (html, js, extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
+| `tools/who-grants/who-grants-logic.js` | Turns what was read into the answer: places, muting, implied access, session and expired assignments, the copy text, the pick lists. Pure, no browser APIs |
+| `tools/who-grants/who-grants-read.js` | Reads the user's assignments, groups, parts, muting sets and the object or field permissions for one permission (GET and `SELECT` only; the newest API version for this page only) |
 | `shared/urlcontext.js` | Turns a Salesforce page address into an object and field. Pure |
 | `shared/sfread.js` | `readOrg`: the org name and edition shown in each page's header |
 | `shared/csv.js` | `toCsv`: CSV with a BOM, formula-guarded. Pure |
@@ -747,13 +790,13 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/compare-groups/compare-groups-logic.js` | Compares two snapshots; plain-language labels; CSV export. Pure, no browser APIs |
 | `shared/feedback.js` | Builds the GitHub new-issue link (tool, version, browser only). Pure, no browser APIs |
 | `shared/roles-read.js` | `readRoles`: the role list (portal roles left out), used by the hierarchy and record-access pages |
-| `shared/users-read.js` | `searchUsers`: the user search used by the user-access and record-access pages |
+| `shared/users-read.js` | `searchUsers`: the user search used by the user-access, record-access and who-grants pages |
 | `shared/users-logic.js` | `matchUsers`: the user search for the demos. Pure |
 | `shared/recordid.js` | `recordIdFromUrl`, `looksLikeId`: find a record Id in an address or pasted text. Pure |
 | `shared/pageurl.js` | `cleanUrl`: keeps only the path and list view name of a page address. Pure |
-| `shared/user-picker.css` | The user list, inactive tag and error details styles used by the user-access and record-access pages |
+| `shared/user-picker.css` | The user list, inactive tag and error details styles used by the user-access, record-access and who-grants pages |
 | `shared/pick.js` | Matching for the group search box |
 | `shared/livereload.js` | Reloads the page on file changes while the dev server runs (unpacked copies only) |
 | `dev/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
-| `samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`) and five made-up debug logs (`error_tracer_demo.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
+| `samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`), five made-up debug logs (`error_tracer_demo.json`) and a made-up org for the permission lookup (`who_grants_demo.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |

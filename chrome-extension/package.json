@@ -2,7 +2,7 @@
   "name": "chrome-extension",
   "version": "0.1.0",
   "private": true,
-  "description": "Salesforce Capability Pack Chrome extension (seven read-only tools: compare permission set groups, user access, territory and role hierarchy, record visibility, flow usage, page details for a ticket, and Error Tracer to read a debug log). This file only tells Node the code is ES modules, for the offline tests.",
+  "description": "Salesforce Capability Pack Chrome extension (eight read-only tools: compare permission set groups, user access, territory and role hierarchy, record visibility, flow usage, page details for a ticket, Error Tracer to read a debug log, and where a user gets a permission). This file only tells Node the code is ES modules, for the offline tests.",
   "type": "module",
   "scripts": {
     "test": "node tests/run_tests.mjs"
