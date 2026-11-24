@@ -1,10 +1,10 @@
-import { SfApi, findSession } from "../../shared/sfconn.js";
+import { SfApi, findSession, isSalesforceHost } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
 import {
   analyze, sectionsOf, copyText, copyWithFallback, matchItems, objectItems, fieldItems, factsFromModel, whenStamp,
-  OBJECT_LEVELS, FIELD_LEVELS, UNLISTED_FIELD_HINT,
+  OBJECT_LEVELS, FIELD_LEVELS, UNLISTED_FIELD_HINT, setupUrl, systemApiShort, fieldApiShort,
 } from "./who-grants-logic.js";
 import { readGrants, readSystemList, readObjectList, readFieldDescribe, useNewestVersion } from "./who-grants-read.js";
 import { startLiveReload } from "../../shared/livereload.js";
@@ -14,6 +14,8 @@ const params = new URLSearchParams(location.search);
 const DEMO = params.has("demo");
 const DEV = params.has("dev"); // served by dev/dev_server.py, which forwards API calls to the org
 const HOST = params.get("host");
+// The host the "Open in Setup" links go to: only a Salesforce host from ?host= (setupUrl checks it again). No links in demo mode.
+const LINK_HOST = !DEMO && HOST && isSalesforceHost(HOST) ? HOST : null;
 const DEBOUNCE_MS = 300;
 const MIN_CHARS = 2;
 const LIST_CAP = 100;
@@ -73,7 +75,7 @@ const setProgress = (t) => { $("#progress").textContent = t || ""; };
  * `search(text)` returns {rows, total?, empty?} (or a promise of it); `render(row)` returns {main, small, tag, mono};
  * `text(row)` is what the box shows once a row is chosen. Only the newest search may draw (a late answer is dropped).
  */
-function makeCombo({ input, list, search, render, text = (r) => r.label, onPick, onEnter, minChars = 0, debounce = 0, onError }) {
+function makeCombo({ input, list, search, render, text = (r) => r.label, onPick, onEnter, onClear, onDirty, minChars = 0, debounce = 0, onError }) {
   const c = { input, list, items: [], active: -1, seq: 0, timer: null, chosen: null };
   const optId = (i) => `${list.id}-opt-${i}`;
 
@@ -116,11 +118,28 @@ function makeCombo({ input, list, search, render, text = (r) => r.label, onPick,
     if (li) { li.scrollIntoView({ block: "nearest" }); input.setAttribute("aria-activedescendant", li.id); }
   }
 
+  /** True while the box says something other than the chosen row (typed over it, or emptied) and nothing new is chosen yet. */
+  c.isDirty = () => !!c.chosen && input.value !== text(c.chosen);
+
   function choose(row) {
     c.chosen = row;
     input.value = text(row);
     c.close();
     onPick(row);
+    onDirty?.();
+  }
+
+  /** Leaving the box without choosing: the chosen text comes back (and with it the same answer); an emptied box clears the choice. */
+  function leave() {
+    c.close();
+    if (c.chosen && input.value.trim() === "") {
+      c.chosen = null;
+      input.value = "";
+      onClear?.();
+    } else {
+      input.value = c.chosen ? text(c.chosen) : "";
+    }
+    onDirty?.();
   }
 
   c.open = () => {
@@ -148,20 +167,20 @@ function makeCombo({ input, list, search, render, text = (r) => r.label, onPick,
   };
 
   /** Set or clear the chosen row from code (no onPick). */
-  c.set = (row) => { c.chosen = row || null; input.value = row ? text(row) : ""; };
+  c.set = (row) => { c.chosen = row || null; input.value = row ? text(row) : ""; onDirty?.(); };
   c.disable = (off, placeholder) => { input.disabled = off; if (placeholder) input.placeholder = placeholder; if (off) c.close(); };
 
   input.addEventListener("focus", () => { input.select(); c.open(); });
   input.addEventListener("click", () => { if (list.hidden) c.open(); });
-  input.addEventListener("input", c.open);
-  input.addEventListener("blur", () => { c.close(); input.value = c.chosen ? text(c.chosen) : ""; });
+  input.addEventListener("input", () => { c.open(); onDirty?.(); });
+  input.addEventListener("blur", leave);
   input.addEventListener("keydown", (e) => {
     if (list.hidden && (e.key === "ArrowDown" || e.key === "ArrowUp")) { c.open(); e.preventDefault(); return; }
     if (e.key === "ArrowDown") { highlight(Math.min(c.active + 1, c.items.length - 1)); e.preventDefault(); }
     else if (e.key === "ArrowUp") { highlight(Math.max(c.active - 1, 0)); e.preventDefault(); }
     else if (e.key === "Enter" && !list.hidden && c.active >= 0) { choose(c.items[c.active]); e.preventDefault(); }
     else if (e.key === "Enter" && list.hidden && onEnter) { onEnter(); e.preventDefault(); }
-    else if (e.key === "Escape") c.close();
+    else if (e.key === "Escape") leave();
   });
   return c;
 }
@@ -187,6 +206,7 @@ const lists = {
 
 const asRows = (items, text) => { const r = matchItems(items, text, LIST_CAP); return { rows: r.items, total: r.total }; };
 const itemRender = (i) => ({ main: i.label, small: i.api, mono: true });
+const systemRender = (i) => ({ main: i.label, small: systemApiShort(i.api), mono: true }); // "ExportReport", not "PermissionsExportReport"
 
 // ---------- the combos ----------
 
@@ -201,6 +221,8 @@ combos.user = makeCombo({
   },
   render: (u) => ({ main: u.name, tag: u.isActive ? "" : "Inactive", small: [u.username, u.profile].filter(Boolean).join(" · ") }),
   onPick: (u) => { state.user = u; clearResult(); showError(""); updateFind(); },
+  onClear: () => { state.user = null; clearResult(); updateFind(); },
+  onDirty: () => syncView(),
   onEnter: () => run(),
   onError: (e) => showError(plainError(e, "The search did not work. If you have been away a while, reload the Salesforce tab and try again."), rawOf(e)),
 });
@@ -208,8 +230,10 @@ combos.user = makeCombo({
 combos.system = makeCombo({
   input: $("#systemInput"), list: $("#systemList"),
   search: async (typed) => asRows(await lists.system(), typed),
-  render: itemRender,
+  render: systemRender,
   onPick: (i) => { state.system = i; clearResult(); updateFind(); },
+  onClear: () => { state.system = null; clearResult(); updateFind(); },
+  onDirty: () => syncView(),
   onEnter: () => run(),
   onError: (e) => showError(plainError(e, "The list of system permissions could not be read."), rawOf(e)),
 });
@@ -218,6 +242,15 @@ combos.object = makeCombo({
   input: $("#objectInput"), list: $("#objectList"),
   search: async (typed) => asRows(await (state.kind === "field" ? lists.fieldObjects() : lists.objects()), typed),
   render: itemRender,
+  onClear: () => {
+    state.object = null;
+    state.field = null;
+    combos.field.set(null);
+    combos.field.disable(true, "Pick the object first, then search for the field");
+    clearResult();
+    updateFind();
+  },
+  onDirty: () => syncView(),
   onPick: (i) => {
     state.object = i;
     state.field = null;
@@ -240,8 +273,10 @@ combos.field = makeCombo({
     r.empty = typed ? UNLISTED_FIELD_HINT : "No field of this object is controlled by field permissions. Everyone with access to the object sees all of its fields.";
     return r;
   },
-  render: (f) => ({ main: f.label, small: f.api, mono: true }),
+  render: (f) => ({ main: f.label, small: fieldApiShort(f.api, state.object?.api), mono: true }),
   onPick: (f) => { state.field = f; clearResult(); updateFind(); },
+  onClear: () => { state.field = null; clearResult(); updateFind(); },
+  onDirty: () => syncView(),
   onEnter: () => run(),
   onError: (e) => showError(plainError(e, "The list of fields could not be read."), rawOf(e)),
 });
@@ -286,8 +321,17 @@ function specNow() {
   return state.field ? { ...base, field: state.field.api, fieldLabel: state.field.label } : null;
 }
 
+/** True while any search box says something other than what was chosen: the answer shown would not match the boxes. */
+const anyDirty = () => Object.values(combos).some((c) => c.isDirty());
+
 function updateFind() {
-  $("#find").disabled = !(state.user && specNow()) || state.busy;
+  $("#find").disabled = !(state.user && specNow()) || state.busy || anyDirty();
+}
+
+/** Show the answer only while the boxes match it; Find waits too. Nothing is read again: the facts stay. */
+function syncView() {
+  $("#results").hidden = !state.facts || anyDirty();
+  updateFind();
 }
 
 // ---------- the answer ----------
@@ -330,10 +374,29 @@ function currentResult() {
   return analyze(state.facts, { ...state.specBase, level: state.kind === "system" ? undefined : state.level });
 }
 
+/** A link to Setup for one named thing: null (no link at all) unless the host and the Id look right. Opens in a new tab. */
+function setupLink(l) {
+  const href = LINK_HOST && l ? setupUrl(LINK_HOST, l.kind, l.id, { groupId: l.groupId }) : null;
+  return href ? el("a", { class: "setup-link", href, target: "_blank", rel: "noopener noreferrer", "aria-label": l.label, text: l.text }) : null;
+}
+/** One card: title, small API name, the card's own link on a line of its own, then the facts. Each named permission set appears once, in a list. */
+function cardEl(it) {
+  const own = setupLink((it.links || []).find((l) => l.own));
+  return el("li", { class: "card" },
+    el("div", { class: "title", text: it.title }),
+    it.apiName ? el("span", { class: "api", text: it.apiName }) : null,
+    own ? el("div", { class: "own-link" }, own) : null,
+    it.body.map((b) => (typeof b === "string"
+      ? el("p", { text: b })
+      : el("div", { class: "named" },
+        el("p", { class: "named-label", text: b.label }),
+        el("ul", { class: "named-items" }, b.items.map((i) => { const a = setupLink(i.link); return el("li", {}, el("span", { text: i.text }), a ? " " : null, a); }))))));
+}
+
 function renderResult() {
   const r = currentResult();
   state.result = r;
-  $("#results").hidden = false;
+  $("#results").hidden = anyDirty();
   const h = $("#headline");
   h.textContent = r.headline;
   h.className = `headline ${r.answer}`;
@@ -347,11 +410,7 @@ function renderResult() {
     el("section", { class: `panel section ${sec.key}` },
       el("h2", { text: sec.title }),
       sec.hint ? el("p", { class: "hint", text: sec.hint }) : null,
-      el("ul", { class: "cards" }, sec.items.map((it) =>
-        el("li", { class: "card" },
-          el("div", { class: "title", text: it.title }),
-          it.apiName ? el("span", { class: "api", text: it.apiName }) : null,
-          it.lines.map((l) => el("p", { text: l }))))))));
+      el("ul", { class: "cards" }, sec.items.map(cardEl)))));
 
   $("#objectAccess").hidden = !r.objectAccess;
   if (r.objectAccess) $("#objectAccessText").textContent = r.objectAccess.text;
@@ -364,7 +423,7 @@ function renderResult() {
 }
 
 $("#copy").addEventListener("click", async () => {
-  if (!state.facts) return;
+  if (!state.facts || anyDirty()) return;
   const text = copyText(currentResult(), { orgName: state.orgName, when: whenStamp(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone });
   const { copied } = await copyWithFallback(text, navigator.clipboard);
   $("#copied").textContent = copied ? "Copied. Paste it into your ticket." : "";

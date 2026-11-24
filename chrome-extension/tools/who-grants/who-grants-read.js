@@ -33,7 +33,10 @@ export function useNewestVersion(api) {
         const list = await api.get("/services/data/");
         const best = Math.max(...(Array.isArray(list) ? list : []).map((v) => Number(v?.version)).filter((n) => Number.isFinite(n)));
         if (Number.isFinite(best) && best > Number(api.apiVersion)) api.apiVersion = best.toFixed(1);
-      } catch { /* keep the default version */ }
+        if (!Number.isFinite(best)) api.versionListFailed = true;
+      } catch {
+        api.versionListFailed = true; // keep the default version, but a column it lacks may exist in the org's newer one
+      }
       return api.apiVersion;
     })();
   }
@@ -47,6 +50,25 @@ async function fieldNames(api, sobject) {
     return new Set((d.fields || []).map((f) => f.name));
   } catch {
     return null;
+  }
+}
+
+/**
+ * Is an optional column there? "yes" (ask for it), "no" (this org's version does not have it: nothing to hedge) or
+ * "unknown" (could not be told: the answer must not be a confident No). With a describe it is read from it, except that
+ * when the version list could not be read the old version may be the only reason it is missing. Without a describe the
+ * column is tried once on its own (`SELECT <column> FROM <object> LIMIT 1`) and left out if Salesforce refuses it.
+ */
+async function columnState(api, sobject, column, names, { probe = true } = {}) {
+  const versionUnknown = api.versionListFailed === true;
+  if (names) return names.has(column) ? "yes" : versionUnknown ? "unknown" : "no";
+  if (!probe) return "unknown";
+  try {
+    await api.query(`SELECT ${column} FROM ${sobject} LIMIT 1`);
+    return "yes";
+  } catch (e) {
+    const refused = /INVALID_FIELD|No such column/i.test(`${e?.errorCode || ""} ${e?.message || ""}`);
+    return refused && !versionUnknown ? "no" : "unknown";
   }
 }
 
@@ -68,7 +90,7 @@ export async function readFieldDescribe(api) {
 
 // ---------- one read of everything ----------
 
-function setRecordToSet(r, spec, { muting = false } = {}) {
+function setRecordToSet(r, spec, { muting = false, states = {} } = {}) {
   const type = r.Type || (muting ? "Muting" : "");
   const kind = muting || type === "Muting" ? "muting" : r.IsOwnedByProfile === true ? "profile" : type === "Group" ? "group" : "set";
   let target;
@@ -78,18 +100,32 @@ function setRecordToSet(r, spec, { muting = false } = {}) {
     label: kind === "profile" ? r.Profile?.Name || r.Label || r.Name : r.Label || r.MasterLabel || r.Name || r.DeveloperName,
     apiName: muting && !r.Name ? r.DeveloperName || "" : qualified(r.NamespacePrefix, r.Name || ""),
     activation: r.HasActivationRequired === true || type === "Session",
+    // Not asked for and not known to be absent: whether it is session-based could not be told.
+    activationUnknown: !muting && kind !== "profile" && type !== "Session" && typeof r.HasActivationRequired !== "boolean" && states.activation === "unknown",
     groupId: r.PermissionSetGroupId || null,
-    sys: { target, viewAllData: bool(r.PermissionsViewAllData), modifyAllData: bool(r.PermissionsModifyAllData), viewAllFieldsGlobal: bool(r.PermissionsViewAllFieldsGlobal) },
+    profileId: kind === "profile" ? r.ProfileId || null : null, // for the link to the profile's Setup page
+    sys: { target, viewAllData: bool(r.PermissionsViewAllData), modifyAllData: bool(r.PermissionsModifyAllData), viewAllFieldsGlobal: viewAllFieldsGlobalOf(r, muting, states) },
     obj: null, fld: null,
   };
 }
 
+// null = could not be told; false when the column is known not to exist in this org's version (a muting set is never asked).
+function viewAllFieldsGlobalOf(r, muting, states) {
+  if (typeof r.PermissionsViewAllFieldsGlobal === "boolean") return r.PermissionsViewAllFieldsGlobal;
+  return !muting && states.global === "no" ? false : null;
+}
+
 const SET_BASE = ["Id", "Name", "Label", "Type", "IsOwnedByProfile", "NamespacePrefix", "Profile.Name"];
 
-function setColumns(names, spec, extra = []) {
-  const wanted = ["HasActivationRequired", "PermissionsViewAllData", "PermissionsModifyAllData", "PermissionsViewAllFieldsGlobal", ...(spec.kind === "system" ? [spec.api] : []), ...extra];
-  // Without a describe, only the columns that every API version has are asked for.
-  const have = (c) => (names ? names.has(c) : c === "PermissionsViewAllData" || c === "PermissionsModifyAllData" || c === spec.api || extra.includes(c));
+function setColumns(names, spec, states, extra = []) {
+  const wanted = ["ProfileId", "HasActivationRequired", "PermissionsViewAllData", "PermissionsModifyAllData", "PermissionsViewAllFieldsGlobal", ...(spec.kind === "system" ? [spec.api] : []), ...extra];
+  // The two optional columns are asked for only when they are there (describe, or tried alone when there is no describe);
+  // without a describe the rest are the columns that every API version has.
+  const have = (c) => {
+    if (c === "HasActivationRequired") return states.activation === "yes";
+    if (c === "PermissionsViewAllFieldsGlobal") return states.global === "yes";
+    return names ? names.has(c) : c === "ProfileId" || c === "PermissionsViewAllData" || c === "PermissionsModifyAllData" || c === spec.api || extra.includes(c);
+  };
   // A column named twice is a 400 ("duplicate field selected"): asking about View All Data, Modify All Data or View All
   // Fields (Global) names the same column in `wanted` twice, so the list is made unique.
   return [...new Set([...SET_BASE, ...wanted.filter(have)])];
@@ -137,6 +173,12 @@ export async function readGrants(api, user, spec, opts = {}) {
   const [aNames, setNames, groupNames, mutingNames] = await Promise.all([
     fieldNames(api, "PermissionSetAssignment"), fieldNames(api, "PermissionSet"), fieldNames(api, "PermissionSetGroup"), fieldNames(api, "MutingPermissionSet"),
   ]);
+  // The optional columns: asked for only if they are there. A failed describe or version list is never read as "not there".
+  const states = {
+    activation: await columnState(api, "PermissionSet", "HasActivationRequired", setNames),
+    global: await columnState(api, "PermissionSet", "PermissionsViewAllFieldsGlobal", setNames, { probe: spec.kind === "field" }),
+    groupActivation: await columnState(api, "PermissionSetGroup", "HasActivationRequired", groupNames),
+  };
   const aOpt = ["ExpirationDate", "IsActive", "IsRevoked"].filter((c) => (aNames ? aNames.has(c) : true));
   let rows;
   try {
@@ -161,10 +203,10 @@ export async function readGrants(api, user, spec, opts = {}) {
 
   const sets = new Map(); // id15 -> set
   const readSets = async (ids, label) => {
-    const cols = setColumns(setNames, spec);
+    const cols = setColumns(setNames, spec, states);
     for (const part of chunk(ids, ID_CHUNK)) {
       const { records } = await api.query(`SELECT ${cols.join(", ")} FROM PermissionSet WHERE Id IN (${idList(part)})`);
-      for (const r of records) sets.set(id15(r.Id), setRecordToSet(r, spec));
+      for (const r of records) sets.set(id15(r.Id), setRecordToSet(r, spec, { states }));
     }
     return label;
   };
@@ -183,7 +225,7 @@ export async function readGrants(api, user, spec, opts = {}) {
     }),
   ];
   if (groupIds.length) {
-    const gCols = ["Id", "DeveloperName", "MasterLabel", "NamespacePrefix", "Status", ...(groupNames ? (groupNames.has("HasActivationRequired") ? ["HasActivationRequired"] : []) : [])];
+    const gCols = ["Id", "DeveloperName", "MasterLabel", "NamespacePrefix", "Status", ...(states.groupActivation === "yes" ? ["HasActivationRequired"] : [])];
     tasks.push((async () => {
       try {
         for (const part of chunk(groupIds, ID_CHUNK)) {
@@ -206,11 +248,11 @@ export async function readGrants(api, user, spec, opts = {}) {
       }
     })());
     tasks.push((async () => {
-      const cols = setColumns(setNames, spec, ["PermissionSetGroupId"]);
+      const cols = setColumns(setNames, spec, states, ["PermissionSetGroupId"]);
       try {
         for (const part of chunk(groupIds, ID_CHUNK)) {
           const { records } = await api.query(`SELECT ${cols.join(", ")} FROM PermissionSet WHERE PermissionSetGroupId IN (${idList(part)}) AND Type = 'Group'`);
-          for (const r of records) sets.set(id15(r.Id), setRecordToSet(r, spec));
+          for (const r of records) sets.set(id15(r.Id), setRecordToSet(r, spec, { states }));
         }
       } catch (e) {
         problem("The combined permissions of the user's groups could not be read.", e, { short: "the groups' combined permissions could not be read" });
@@ -251,7 +293,10 @@ export async function readGrants(api, user, spec, opts = {}) {
     progress("Reading the permissions…");
     const ids = [...sets.values()].map((s) => s.id).filter((i) => ID_RE.test(i));
     const opNames = await fieldNames(api, "ObjectPermissions");
-    const viewAllFields = opNames ? opNames.has("PermissionsViewAllFields") : false;
+    // View All Fields on an object only matters for a field's Read. "unknown" (not told) is never read as "no".
+    const vafState = await columnState(api, "ObjectPermissions", "PermissionsViewAllFields", opNames, { probe: spec.kind === "field" });
+    const viewAllFields = vafState === "yes";
+    const vafOff = vafState === "no" ? false : null; // the value when the column is not asked
     // Does this object take object permissions at all? Task and Event, for example, are not in ObjectPermissions' object list.
     // null = could not be told (describe unreadable or without a list).
     let applies = null;
@@ -260,7 +305,7 @@ export async function readGrants(api, user, spec, opts = {}) {
       if (listed.length) applies = listed.some((i) => i.api === spec.object);
     } catch { /* stays null */ }
     objectPermissionsApply = applies;
-    const blank = () => ({ read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false, viewAllFields: viewAllFields ? false : null });
+    const blank = () => ({ read: false, create: false, edit: false, delete: false, viewAll: false, modifyAll: false, viewAllFields: viewAllFields ? false : vafOff });
     try {
       const cols = `ParentId, PermissionsRead, PermissionsCreate, PermissionsEdit, PermissionsDelete, PermissionsViewAllRecords, PermissionsModifyAllRecords${viewAllFields ? ", PermissionsViewAllFields" : ""}`;
       const found = new Map();
@@ -269,13 +314,13 @@ export async function readGrants(api, user, spec, opts = {}) {
         for (const r of records) {
           found.set(id15(r.ParentId), {
             read: r.PermissionsRead === true, create: r.PermissionsCreate === true, edit: r.PermissionsEdit === true, delete: r.PermissionsDelete === true,
-            viewAll: r.PermissionsViewAllRecords === true, modifyAll: r.PermissionsModifyAllRecords === true, viewAllFields: viewAllFields ? r.PermissionsViewAllFields === true : null,
+            viewAll: r.PermissionsViewAllRecords === true, modifyAll: r.PermissionsModifyAllRecords === true, viewAllFields: viewAllFields ? r.PermissionsViewAllFields === true : vafOff,
           });
         }
       }
       if (found.size) objectPermissionsApply = true; // a row exists, so the object takes object permissions
       for (const s of sets.values()) s.obj = found.get(id15(s.id)) || blank();
-      if (!viewAllFields && spec.kind === "field") notes.push("This org's API version does not show \"View All Fields\" on an object, so access that comes only from it could not be checked.");
+      if (vafState === "unknown" && spec.kind === "field") notes.push(`We could not check "View All Fields" on ${spec.objectLabel || spec.object}, so access that comes only from it may be missing.`);
     } catch (e) {
       problem(`Access to the object ${spec.objectLabel || spec.object} could not be read.`, e, { short: `access to ${spec.objectLabel || spec.object} could not be read` });
     }
@@ -317,7 +362,7 @@ export async function readGrants(api, user, spec, opts = {}) {
     }
     units.push({
       kind: s.kind === "profile" ? "profile" : "set", label: s.label, apiName: s.kind === "profile" ? "" : s.apiName, setId15: key, status,
-      expires: row.ExpirationDate || null, sessionBased: s.activation,
+      expires: row.ExpirationDate || null, sessionBased: s.activation, activationUnknown: s.activationUnknown === true,
     });
   }
   const outGroups = {};
@@ -334,10 +379,13 @@ export async function readGrants(api, user, spec, opts = {}) {
       muting: complete ? parts.filter((s) => s.kind === "muting").map((s) => id15(s.id)) : [],
     };
     const activation = info?.activation === true || agg?.activation === true;
+    // Session-based or not could not be told when neither the group nor its combined set was read with the column.
+    const known = (info && states.groupActivation === "yes") || (agg && typeof agg.activationUnknown === "boolean" && !agg.activationUnknown && states.activation === "yes") || (states.groupActivation === "no" && states.activation === "no");
+    const activationUnknown = !activation && !known;
     const { row, status } = bestRow(list, activation);
     units.push({
       kind: "group", label: outGroups[gid].label, apiName: outGroups[gid].apiName, groupId: gid, status,
-      expires: row.ExpirationDate || null, sessionBased: activation,
+      expires: row.ExpirationDate || null, sessionBased: activation, activationUnknown,
     });
   }
   const order = { profile: 0, set: 1, group: 2 };

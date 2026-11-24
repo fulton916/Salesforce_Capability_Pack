@@ -10,6 +10,7 @@
     "Riley Sample, Access to a field, Opportunity, Amount, Read: the field is given, but Riley has no access to Opportunity, so it does not work.",
     "Jordan Sample (inactive user), Access to an object, Account, Delete: covered by Modify All Data, and the page says the user is inactive.",
     "Jordan Sample, A system permission, View Setup and Configuration: the group is still being recalculated, so the page says it is not sure.",
+    "Access to a field, Account: type rating in the Field box. Account Rating comes first and Operating Hours (which only contains the letters) last.",
     "After an answer, change the Level (for example Read to Edit): the answer is redrawn at once with no new read."
   ],
   "systemPermissions": [
@@ -31,6 +32,7 @@
     "Account": [
       { "api": "Account.AnnualRevenue", "label": "Annual Revenue" },
       { "api": "Account.Industry", "label": "Industry" },
+      { "api": "Account.OperatingHours", "label": "Operating Hours" },
       { "api": "Account.Parent", "label": "Parent Account" },
       { "api": "Account.ParentId", "label": "Parent Account" },
       { "api": "Account.Rating", "label": "Account Rating" }
