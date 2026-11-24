@@ -1,0 +1,45 @@
+/* Additions for the "Where does a user get this permission?" page. pack.css and user-picker.css (shared) come first. */
+.field { margin: 12px 0; max-width: 560px; }
+.field .combo input { width: 100%; }
+#level { padding: 8px 12px; font-size: 15px; min-width: 200px; }
+fieldset.kinds { border: 0; margin: 0 0 8px; padding: 0; display: grid; gap: 6px; }
+fieldset.kinds legend { padding: 0; }
+label.kind { display: flex; align-items: baseline; gap: 8px; cursor: pointer; flex-wrap: wrap; }
+label.kind span { font-weight: 600; }
+label.kind small { color: var(--muted); }
+.psg-list .dev.api { font: 12px var(--mono); }
+.psg-list li.none { color: var(--muted); cursor: default; }
+.demo-hints { margin: 0; padding-left: 20px; font-size: 14px; }
+.demo-hints li { margin: 3px 0; }
+
+.headline { font-size: 20px; font-weight: 700; margin: 0; overflow-wrap: anywhere; }
+.headline.yes { color: var(--good); }
+.headline.no, .headline.muted, .headline.notWorking { color: var(--risk); }
+.headline.unsure { color: var(--b); }
+.inactive-note { background: var(--warn-bg); border-left: 3px solid var(--b); border-radius: 8px; padding: 8px 12px; margin: 12px auto 0; max-width: 700px; text-align: left; }
+.resultactions { display: flex; gap: 12px; align-items: center; justify-content: center; margin-top: 14px; }
+#copied { color: var(--good); font-size: 14px; }
+#copyFallback { margin-top: 12px; text-align: left; }
+#copyFallback textarea { width: 100%; font: 13px var(--mono); }
+
+.section h2 { margin-bottom: 2px; }
+.section .hint { margin: 0 0 10px; }
+.cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.card { border: 1px solid var(--line); border-left: 4px solid var(--good); border-radius: 10px; padding: 10px 12px; }
+.section.muted .card, .section.notPassed .card { border-left-color: var(--risk); }
+.section.activation .card, .section.notActive .card, .section.notSure .card { border-left-color: var(--b); }
+.card .title { font-weight: 600; overflow-wrap: anywhere; }
+.card .api { display: block; font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+.card p { margin: 4px 0 0; font-size: 14px; overflow-wrap: anywhere; }
+details.notes details.tech { margin-top: 10px; font-size: 12px; }
+details.notes details.tech div { font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 4px; }
+
+/* "Open in Setup": small, quiet links. The card's own link has a line of its own under the title and API name (same place for short and long titles);
+   the permission sets a card names are listed once, each with its link after it. */
+.setup-link { font-size: 12px; font-weight: 400; color: var(--muted); text-decoration: underline; }
+.setup-link:hover, .setup-link:focus-visible { color: inherit; }
+.card .own-link { margin-top: 2px; }
+.card .named { margin-top: 4px; }
+.card .named-label { margin: 0; }
+.named-items { list-style: none; margin: 2px 0 0; padding: 0 0 0 12px; display: grid; gap: 2px; font-size: 14px; }
+.named-items li { overflow-wrap: anywhere; }

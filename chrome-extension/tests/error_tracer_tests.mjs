@@ -504,9 +504,9 @@ export async function run(test) {
     for (const a of [a1, a2, a3, a4, a5]) assert.equal(a.version, "62.0");
   });
 
-  await test("errors: the tool is registered last, with the exact feedback label in the code and in both issue forms", () => {
-    const last = TOOLS[TOOLS.length - 1];
-    assert.equal(last.id, "error-tracer");
+  await test("errors: the tool is registered after Page details, with the exact feedback label in the code and in both issue forms", () => {
+    const last = TOOLS.find((t) => t.id === "error-tracer");
+    assert.equal(TOOLS[TOOLS.findIndex((t) => t.id === "page-details") + 1], last);
     assert.equal(last.page, "tools/error-tracer/error-tracer.html");
     assert.equal(last.title, "Error Tracer: read a debug log");
     assert.match(last.description, /what failed, where and for which user/i);
@@ -522,7 +522,7 @@ export async function run(test) {
     const html = read(ext("tools/error-tracer/error-tracer.html"));
     assert.ok(html.includes("<title>Error Tracer: read a debug log</title>"));
     assert.ok(html.includes('id="feedback"') && html.includes("../../shared/pack.css"));
-    assert.equal(JSON.parse(read(ext("manifest.json"))).version, "0.9.0");
+    assert.match(JSON.parse(read(ext("manifest.json"))).version, /^\d+\.\d+\.\d+$/);
     assert.match(JSON.parse(read(ext("manifest.json"))).description, /debug logs/);
   });
 

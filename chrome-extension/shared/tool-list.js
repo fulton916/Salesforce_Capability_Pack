@@ -49,4 +49,10 @@ export const TOOLS = [
     title: "Error Tracer: read a debug log",
     description: "See what failed, where and for which user, from a debug log",
   },
+  {
+    id: "who-grants",
+    page: "tools/who-grants/who-grants.html",
+    title: "Where does a user get this permission?",
+    description: "Find every profile, permission set and group that gives a user one permission",
+  },
 ];

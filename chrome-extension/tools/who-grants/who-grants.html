@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where does a user get this permission?</title>
+<link rel="stylesheet" href="../../shared/pack.css">
+<link rel="stylesheet" href="../../shared/user-picker.css">
+<link rel="stylesheet" href="who-grants.css">
+</head>
+<body>
+<header class="top">
+  <h1>Where does a user get this permission?</h1>
+  <div class="org" id="org">Not connected</div>
+  <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
+</header>
+
+<main>
+  <section class="panel" id="demoHints" hidden>
+    <h2 class="step">Things to try in this demo</h2>
+    <ul class="demo-hints" id="demoHintList"></ul>
+  </section>
+
+  <section class="panel">
+    <h2 class="step">1. Choose the user</h2>
+    <p class="hint">Type part of a name or username.</p>
+    <div class="field org-only">
+      <label class="pick-label" for="userInput">User</label>
+      <div class="combo">
+        <input type="text" id="userInput" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="userList" autocomplete="off" placeholder="Start typing a name or username">
+        <ul class="psg-list" id="userList" role="listbox" hidden></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="step">2. Choose the permission</h2>
+    <fieldset class="kinds org-only" id="kinds">
+      <legend class="pick-label">What kind of permission?</legend>
+      <label class="kind"><input type="radio" name="kind" value="system" checked> <span>A system permission</span> <small>for example Modify All Data or View Setup</small></label>
+      <label class="kind"><input type="radio" name="kind" value="object"> <span>Access to an object</span> <small>Read, Create, Edit, Delete, View All or Modify All</small></label>
+      <label class="kind"><input type="radio" name="kind" value="field"> <span>Access to a field</span> <small>Read or Edit one field</small></label>
+    </fieldset>
+
+    <div class="field org-only" id="systemBox">
+      <label class="pick-label" for="systemInput">System permission</label>
+      <div class="combo">
+        <input type="text" id="systemInput" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="systemList" autocomplete="off" placeholder="Search by name, for example Modify All Data">
+        <ul class="psg-list" id="systemList" role="listbox" hidden></ul>
+      </div>
+    </div>
+
+    <div class="field org-only" id="objectBox" hidden>
+      <label class="pick-label" for="objectInput">Object</label>
+      <div class="combo">
+        <input type="text" id="objectInput" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="objectList" autocomplete="off" placeholder="Search by name, for example Account">
+        <ul class="psg-list" id="objectList" role="listbox" hidden></ul>
+      </div>
+    </div>
+
+    <div class="field org-only" id="fieldBox" hidden>
+      <label class="pick-label" for="fieldInput">Field</label>
+      <div class="combo">
+        <input type="text" id="fieldInput" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="fieldList" autocomplete="off" placeholder="Pick the object first, then search for the field" disabled>
+        <ul class="psg-list" id="fieldList" role="listbox" hidden></ul>
+      </div>
+    </div>
+
+    <div class="field org-only" id="levelBox" hidden>
+      <label class="pick-label" for="level">Level</label>
+      <select id="level"></select>
+    </div>
+
+    <div class="actions">
+      <button id="find" class="primary" disabled>Find where it comes from</button>
+      <span id="progress" role="status"></span>
+    </div>
+    <div id="error" class="error" hidden></div>
+  </section>
+
+  <section id="results" hidden aria-live="polite">
+    <div class="panel hero">
+      <p class="headline" id="headline"></p>
+      <p class="inactive-note" id="inactiveNote" hidden></p>
+      <div class="resultactions">
+        <button id="copy">Copy the answer</button>
+        <span id="copied" role="status"></span>
+      </div>
+      <div id="copyFallback" hidden>
+        <p class="hint">Your browser did not allow copying. Select all and copy it yourself.</p>
+        <textarea id="copyText" rows="10" readonly spellcheck="false" aria-label="Text to copy"></textarea>
+      </div>
+    </div>
+    <div id="sections"></div>
+    <div class="panel" id="objectAccess" hidden>
+      <h2>Access to the object</h2>
+      <p id="objectAccessText"></p>
+    </div>
+    <details class="panel notes" id="notesPanel">
+      <summary id="notesTitle">Notes</summary>
+      <ul id="notes"></ul>
+      <details class="tech" id="techPanel" hidden>
+        <summary>Technical details</summary>
+        <div id="tech"></div>
+      </details>
+    </details>
+  </section>
+
+  <p class="footer">Read-only: this page only reads from your org and never changes anything. Nothing about the user is saved.</p>
+</main>
+<script type="module" src="who-grants.js"></script>
+</body>
+</html>
