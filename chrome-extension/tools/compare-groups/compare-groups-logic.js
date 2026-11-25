@@ -627,6 +627,45 @@ export function sortSection(rows, section, sort, nameA = "A", nameB = "B") {
   return section === "fieldPermissions" ? sortGrouped(rows, col, dir, nameA, nameB) : sortRows(rows, col, dir, nameA, nameB);
 }
 
+/**
+ * The Salesforce API version a saved group was read with, as a number, or null when it is not recorded
+ * (a file saved by an earlier copy, or a hand-edited value that is not a version such as "68.0" or "68").
+ */
+export function versionNumber(s) {
+  const v = s && typeof s === "object" ? s.apiVersion : null;
+  if (typeof v !== "string") return null;
+  const m = /^\s*(\d{1,3})(?:\.(\d{1,2}))?\s*$/.exec(v);
+  return m ? Number(`${m[1]}.${m[2] || "0"}`) : null;
+}
+
+/**
+ * A plain-words note when the two groups were not read with the same API version, or null.
+ * When both groups have the same label the sides are told apart by org name, else "first" / "second".
+ */
+function versionNote(a, b, A, B) {
+  const va = versionNumber(a);
+  const vb = versionNumber(b);
+  const words = (n) => n.toFixed(1);
+  const diffOrgs = !!(a.org?.id && b.org?.id && a.org.id !== b.org.id);
+  if (A === B) {
+    if (diffOrgs && orgLabel(a.org) !== orgLabel(b.org)) [A, B] = [`${A} (${orgLabel(a.org)})`, `${B} (${orgLabel(b.org)})`];
+    else [A, B] = [`${A} (first group)`, `${B} (second group)`];
+  }
+  if (va !== null && vb !== null) {
+    if (va === vb) return null;
+    const [older, newer, vo, vn] = va < vb ? [A, B, va, vb] : [B, A, vb, va];
+    const fix = diffOrgs
+      ? `If the org of ${older} now offers a newer version, read ${older} again (and save its file again if you use a file). If that org is on an older Salesforce release, the note stays until both orgs are on the same release.`
+      : `To fix this, read ${older} again from its org (and save its file again if you use a file), then compare.`;
+    return `${older} was read with Salesforce API version ${words(vo)} and ${newer} with ${words(vn)}. Permissions that exist only in the newer version can look like a difference when they are not (they show as only in ${newer}). ${fix}`;
+  }
+  if (va === null && vb === null) {
+    return "Both files were saved by an earlier copy of this tool, which did not see the newest Salesforce permissions, so some differences may be missing. To fix this, read both groups again from their orgs and save their files again, then compare.";
+  }
+  const [old, other] = va === null ? [A, B] : [B, A];
+  return `The file for ${old} was saved by an earlier copy of this tool, which did not see the newest Salesforce permissions. Permissions that exist only in newer versions can look like a difference when they are not (they show as only in ${other}). To fix this, read ${old} again from its org and save its file again, then compare.`;
+}
+
 /** Plain-language findings. kind: verdict | risk | area | note. */
 function highlights(a, b, sections) {
   const out = [];
@@ -684,6 +723,8 @@ function highlights(a, b, sections) {
       push("note", "info", `${name}: the muting permission set has ${plural(n, "more item")}, but ${n === 1 ? "it removes" : "they remove"} nothing, so ${n === 1 ? "it is" : "they are"} not listed.`);
     }
   }
+  const note = versionNote(a, b, A, B);
+  if (note) push("note", "warn", note);
   for (const [s, name] of [[a, A], [b, B]]) {
     for (const w of s.warnings || []) push("note", "warn", `${name}: ${w}${/^Could not/.test(w) ? " These results may be incomplete. Try Compare again." : ""}`);
   }

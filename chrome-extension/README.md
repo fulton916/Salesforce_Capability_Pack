@@ -1,6 +1,6 @@
 # Salesforce Capability Pack: Chrome extension
 
-(Formerly the `sf-psg-compare` folder. Saved group files still use the schema ids `sf-psg-snapshot/1` and `/2`.)
+(Formerly the `sf-psg-compare` folder. Saved group files still use the schema ids `sf-psg-snapshot/1`, `/2` and `/3`.)
 
 A Chrome extension with eight read-only tools: **Compare permission set groups**, **User access summary and
 comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**,
@@ -403,6 +403,8 @@ file on either side later, in another org or with no org at all. Items are match
 counts. It holds no record data and no user names, but it does hold the org name and host, so treat
 it like any other org export.
 
+Files saved by an earlier copy of the extension still load, but they did not see the newest Salesforce permissions, so the results show a note: read that group again and save its file again. The same note appears when the two groups were read with different Salesforce versions. If the groups come from different orgs and the older one's org is on an older Salesforce release, the note stays until both orgs are on the same release. If this tool could not ask Salesforce which versions it offers, reload the page and read the group again.
+
 **Net access, not the sum of the parts.** The result is what a user assigned to the group actually
 gets: the component permission sets combined, minus the muting permission set.
 
@@ -624,7 +626,7 @@ Before relying on those, compare two groups you know well and check a few rows a
 
 ## How it reads the org
 
-All requests go from the extension page straight to `https://<your org>/services/data/v62.0/`.
+All requests go from the extension page straight to `https://<your org>/services/data/v<version>/`. The shared default is v67.0 (one tested version for every org, one release behind the newest). Compare permission set groups and Where does a user get this permission? first read `/services/data/` and use the org's newest version (even if it is older than v67.0, so an org on an older release is not asked for a version it lacks), because permissions that only newer versions have (many system permissions, and View All Fields on objects) are missing at an older one; if that list cannot be read they stay at v67.0 and the result carries a note.
 Nothing is sent anywhere else. Everything is a read (`SELECT`, describe, `COUNT()`); nothing writes.
 
 The permissions of a group come from its aggregate permission set (`PermissionSet` with
@@ -673,7 +675,7 @@ Einstein Activity Capture is read with plain queries only (never `COUNT()`: it r
 The session is the browser's `sid` cookie for the org, found the same way Salesforce Inspector finds
 it. It is held in memory for that tab only and never stored. Visible text says "license"; data keys
 keep the old `licence` spelling so saved files still load. Saved group files use
-`sf-psg-snapshot/2`; `/1` files still load.
+`sf-psg-snapshot/3` (it adds `apiVersion`, the Salesforce API version the group was read with, for example `"68.0"`); `/1` and `/2` files still load but do not record a version. A saved file from an earlier copy of the extension did not see the newest permissions, so Compare shows a note and the advice to read that group again and save its file again. The same note appears when the two groups were read with different API versions.
 
 ## Choose which tools show in the menu
 
@@ -691,7 +693,7 @@ one again, or press **Show all tools**, to bring it back. Each change saves at o
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.10.0", and all eight pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.10.1", and all eight pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
