@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Scan translation data for mojibake (UTF-8 read as cp1252) and propose exact repairs.
 
 A deploy never reports most of this damage:

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Offline tests: python tests/run_tests.py   (no Salesforce org is called)."""
 import copy
 import glob

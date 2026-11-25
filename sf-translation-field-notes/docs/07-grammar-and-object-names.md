@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Grammar, object names and renamed standard fields
 
 Object names (Setup > Rename Tabs and Labels) and renamed standard field labels are stored as

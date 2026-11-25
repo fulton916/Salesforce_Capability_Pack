@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # CLAUDE.md: sf-translation-toolkit
 
 Instructions for an AI coding assistant running or changing this toolkit.

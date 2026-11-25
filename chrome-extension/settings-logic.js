@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // What the Settings page does when a switch or "Show all tools" is used. Pure: no DOM, no storage of its own.
 // `store` is a settings store (shared/menu-settings.js); `ui` is { draw(hiddenIds), say(text, bad) }.
 //

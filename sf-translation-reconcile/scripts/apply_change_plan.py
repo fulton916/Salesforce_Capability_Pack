@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Apply a change plan from compare_workbook.py to the workbook: Existing Value := org value.
 
 Dry run by default: checks every planned cell and prints what would change.

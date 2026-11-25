@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Synthetic org reads for the tests: a tiny metadata-format retrieve and Bilingual exports.
 
 Nothing here comes from a real org. Objects: Widget__c (custom), Activity (Task/Event

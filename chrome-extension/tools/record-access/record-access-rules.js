@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Restriction rules and scoping rules for "Why can a user see this record?" Pure: no browser, no network.
 //
 // A rule (Tooling API object RestrictionRule) has a TargetEntity (an object API name), an EnforcementType

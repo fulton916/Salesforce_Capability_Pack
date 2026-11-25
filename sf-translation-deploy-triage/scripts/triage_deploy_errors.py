@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Turn Salesforce deploy/validate results for translation metadata into a triage workbook.
 
 One or more deploy logs (`sf project deploy start|validate ... --json`) go in. One .xlsx

@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Pending cleanup (deferred edits)
 
 The shared list of edits that were put off on purpose, so they do not get forgotten. Every

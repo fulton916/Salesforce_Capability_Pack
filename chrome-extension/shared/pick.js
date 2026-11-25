@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Matching for the group search box and the lists. Pure, no DOM.
 
 /** Words to search for: lower case, any punctuation (such as "›", "_", "-") counts as a space. */

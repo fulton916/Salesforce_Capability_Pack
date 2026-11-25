@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Build the download manifests for a translation run from its field scope.
 
 The scripts build the workbook from a local copy of the org's setup. This writes the

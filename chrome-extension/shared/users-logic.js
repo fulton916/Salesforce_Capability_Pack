@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // User matching shared by the user-access and record-access pages. Pure: no browser, no network.
 
 /** Users whose name or username contains every typed word (demo mode searches the samples with this). */

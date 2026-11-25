@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Lock 3, the last gate before the real deploy: the target has not moved since the build, and the
 payload is the one the export check (lock 2) passed.
 

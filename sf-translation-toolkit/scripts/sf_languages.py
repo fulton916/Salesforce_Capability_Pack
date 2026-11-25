@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Salesforce language codes, display names and grammar rules, shared by every script.
 
 LANGUAGES holds every language code Salesforce offers (221), with the English name

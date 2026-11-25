@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // The object view of "Where is it used in flows?": every flow that runs when records of one object are saved or
 // deleted (in the order Salesforce runs them), runs on a schedule over them, or changes or reads them. Pure: no
 // browser or network APIs, nothing is read from the org here. The page hands in, for each flow, its FlowDefinitionView

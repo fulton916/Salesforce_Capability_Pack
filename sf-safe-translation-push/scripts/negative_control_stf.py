@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Negative control for lock 2 (check_vs_stf.py): plant findings in a COPY of the export and prove
 the check catches exactly those.
 

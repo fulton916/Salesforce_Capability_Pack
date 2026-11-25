@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Turn one user's access into rows, and compare two users. Pure: no browser or network APIs.
 //
 // A user's access is the plain JSON object user-access-read.js reads from an org

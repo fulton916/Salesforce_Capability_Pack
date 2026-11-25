@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Development only: reload the page when a file of the extension changes.
 //
 // Active when the page is served by dev/dev_server.py, or when this is an unpacked copy of the

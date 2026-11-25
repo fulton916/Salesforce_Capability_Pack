@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Cleaning a page address, shared by the toolbar menu and the page-details tool. Pure: no browser, no network.
 // Only the path and the filterName parameter are ever kept.
 

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // CSV text for downloads. Pure.
 
 /** RFC 4180 CSV with a BOM so Excel opens UTF-8 correctly. */

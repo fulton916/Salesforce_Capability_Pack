@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Step 1 of a targeted correction: turn a decisions file into scope.json (exact slot values).
 
 Values are taken EXACTLY as given: no trimming, no case change. Numbers become text and

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Offline tests for what makes the toolkit project-neutral: any Salesforce language,
 the generated retrieve manifest, and the shared settings. No org access.
 

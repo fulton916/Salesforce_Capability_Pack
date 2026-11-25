@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 import { isSalesforceHost } from "./shared/sfconn.js";
 import { recordIdFromUrl } from "./shared/recordid.js";
 import { parseUrlContext, contextQuery } from "./shared/urlcontext.js";

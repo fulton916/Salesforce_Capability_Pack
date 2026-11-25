@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Offline tests for Einstein Activity Capture inside the User access page. Called from run_tests.mjs.
 // Synthetic data only.
 import assert from "node:assert/strict";

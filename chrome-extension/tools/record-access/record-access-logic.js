@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // "Why can a user see this record?" Pure reasoning: no browser, no network.
 //
 // `explain(facts)` takes facts gathered from the org by record-access-read.js (schema

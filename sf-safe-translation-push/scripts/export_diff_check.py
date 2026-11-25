@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 r"""Independent after-deploy check from the org's own Bilingual exports, before vs after the push.
 
 A metadata retrieve cannot see everything: for example, managed-package tab and app translations

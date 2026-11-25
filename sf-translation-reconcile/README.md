@@ -181,3 +181,8 @@ Only OURS is released by default. Everything else is held, unless its entry id i
   managed-package values a retrieve cannot show are not handled by `locate.py`.
 - `pulldown.py` lists items from the definitions in the retrieve. Anything the manifest did
   not name will not appear.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

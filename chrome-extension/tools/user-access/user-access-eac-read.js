@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Read Einstein Activity Capture data (read-only: SOQL queries and one describeGlobal, no writes).
 //
 // Never use COUNT() on UserEmailCalendarSync or ActivityUsrConnectionStatus: it returns 0 even when rows

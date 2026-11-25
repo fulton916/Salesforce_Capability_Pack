@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Read one user's access from an org into a plain JSON object (schema "sf-user-access/1").
 //
 // Read-only: every call is a SOQL query through SfApi. Nothing is written to the org.

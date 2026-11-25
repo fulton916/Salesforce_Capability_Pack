@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Which tools show in the toolbar menu. This is the ONLY file in the extension that uses browser
 // storage. It keeps one thing: `hiddenTools`, the ids of the tools the person turned off, in
 // Chrome's local storage on this computer only (never synced, never sent anywhere). Nothing else is ever stored (no session id, host, org data or user names).

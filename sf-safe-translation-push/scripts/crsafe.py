@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Read and write Salesforce metadata XML without losing a carriage return that belongs to a value.
 
 A retrieve writes its files with LF line endings, so a raw CR in a retrieved file is TEXT, for

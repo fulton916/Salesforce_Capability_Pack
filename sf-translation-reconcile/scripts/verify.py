@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Step 11: after the deploy, check every scoped slot - and everything else - in a fresh read.
 
 Retrieve with the SAME manifest as the before read (into run/after), then:

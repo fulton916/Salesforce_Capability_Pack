@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // The org reads behind "Page details for a ticket". GET / SELECT / describe only.
 // Every area fails softly: it returns {data: null, problem: "plain words", raw: "..."} instead of throwing.
 

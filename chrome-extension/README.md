@@ -801,3 +801,8 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `dev/dev_server.py` | Local dev server: pages, read-only org proxy through the `sf` CLI login, live reload |
 | `samples/` | Two synthetic snapshots, two synthetic users, a synthetic record with two users for the record demo, and a synthetic territory model set and role list, each with made-up users (example.com addresses), plus a synthetic set of flows (`flow_usage.json`), five made-up debug logs (`error_tracer_demo.json`) and a made-up org for the permission lookup (`who_grants_demo.json`), for the demos and the tests (the hierarchy and flow samples are written by hand, not by `make_samples.py`) |
 | `tests/` | Offline tests and the sample generator |
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Merge a translation component that more than one retrieve batch returned.
 
 A CustomObjectTranslation can come back from two batches: from its object batch WITH layout

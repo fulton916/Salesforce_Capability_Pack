@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Detect and repair mojibake: UTF-8 text that was read as Windows-1252 (or Latin-1).
 
 The classic damage: a UTF-8 file is opened as cp1252, every multi-byte character turns
