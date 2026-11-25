@@ -157,6 +157,32 @@ def test_make_manifest() -> None:
     check("each language named for custom labels, plus en_US", lab["Translations"] == ["de", "en_US", "fr"])
 
 
+def test_api_version(tmp: Path) -> None:
+    print("api version:")
+    import json
+    import toolkit_settings as ts
+    from make_manifest import build
+    check("built-in default is 67.0", ts._DEFAULTS["api_version"] == "67.0")
+    shipped = json.loads((SCRIPTS.parent / "settings.json").read_text(encoding="utf-8-sig"))
+    check("shipped settings.json is 67.0", shipped["api_version"] == "67.0")
+    check("the setting in force is 67.0", ts.API_VERSION == "67.0" and ts.API_PATH == "v67.0")
+    check("generated package.xml carries 67.0", "<version>67.0</version>" in build({"Account.Industry"}, ["de"], [], [])["labels.xml"])
+    check("permissions manifest is 67.0",
+          "<version>67.0</version>" in (SCRIPTS.parent / "manifest" / "permissions.xml").read_text(encoding="utf-8"))
+    # A copy of the scripts next to a settings.json that says 60.0: every use must follow it.
+    copy = tmp / "api_copy"
+    shutil.copytree(SCRIPTS, copy / "scripts", ignore=shutil.ignore_patterns("__pycache__"))
+    (copy / "settings.json").write_text('{"api_version": "60.0"}', encoding="utf-8")
+    probe = ("import sys; sys.path.insert(0, 'scripts'); import toolkit_settings as t; "
+             "from make_manifest import build; "
+             "print(t.API_VERSION, t.API_PATH); print(build({'Account.Industry'}, ['de'], [], [])['labels.xml'])")
+    r = subprocess.run([sys.executable, "-c", probe], cwd=copy, capture_output=True, text=True)
+    check("copy runs", r.returncode == 0)
+    check("API_VERSION and API_PATH follow settings.json", r.stdout.startswith("60.0 v60.0\n"))
+    check("make_manifest output follows settings.json",
+          "<version>60.0</version>" in r.stdout and "67.0" not in r.stdout)
+
+
 def test_safeguards(tmp: Path) -> None:
     print("safeguards:")
     import sf_languages as L
@@ -229,6 +255,7 @@ def main() -> None:
             test_any_language_end_to_end(Path(td))
             test_error_file_codes()
             test_make_manifest()
+            test_api_version(Path(td))
             test_safeguards(Path(td))
             test_header_colours()
             test_namespaced_filter()

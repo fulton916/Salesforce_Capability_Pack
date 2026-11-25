@@ -472,6 +472,27 @@ class T12ManifestsAndReview(unittest.TestCase):
                   "<name>Translations</name>"):
             self.assertIn(m, lab)
 
+    def test_api_version_default_and_override(self):
+        import build_push
+        import make_manifests
+        self.assertEqual(L.DEFAULT_API_VERSION, "67.0")
+        for mod in (build_push, make_manifests):
+            self.assertIn('L.DEFAULT_API_VERSION', Path(mod.__file__).read_text(encoding="utf-8"))
+        w = H.new_work()
+        run("make_manifests.py", "--source", J(w, "source.json"), "--out", J(w, "manifests"))
+        for f in ("obj_1.xml", "labels.xml"):
+            self.assertIn("<version>67.0</version>", Path(J(w, "manifests", f)).read_text(encoding="utf-8"))
+        run("make_manifests.py", "--source", J(w, "source.json"), "--out", J(w, "manifests2"), "--api-version", "62.0")
+        self.assertIn("<version>62.0</version>", Path(J(w, "manifests2", "labels.xml")).read_text(encoding="utf-8"))
+
+    def test_build_payload_version(self):
+        w = H.new_work()
+        self.assertEqual(build(w).returncode, 0)
+        self.assertIn("<version>67.0</version>", Path(J(w, "payload", "package.xml")).read_text(encoding="utf-8"))
+        w2 = H.new_work()
+        self.assertEqual(build(w2, "--api-version", "62.0").returncode, 0)
+        self.assertIn("<version>62.0</version>", Path(J(w2, "payload", "package.xml")).read_text(encoding="utf-8"))
+
     def test_review_excel(self):
         w, _ = full_run()
         out = J(w, "review.xlsx")

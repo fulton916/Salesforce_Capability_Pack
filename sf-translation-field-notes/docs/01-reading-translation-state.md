@@ -146,7 +146,7 @@ Example manifest (`manifest/read-widget.xml`):
   </types>
   <types><members>*</members><name>CustomLabel</name></types>
   <types><members>de</members><members>fr</members><name>Translations</name></types>
-  <version>62.0</version>
+  <version>67.0</version>
 </Package>
 ```
 
