@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Expand picklist fields in a psg2csv field-permissions CSV into one row per value.
 
 Reads a combined field-permissions CSV (see psg2csv_collect.py, run with

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Error Tracer: the org reads. Read-only: a list of debug logs (one SELECT on ApexLog) and one log's
 // text (a GET). Nothing here creates or changes anything in the org; the page only reads logs that
 // already exist, and the steps for turning one on are done by the person in Setup.

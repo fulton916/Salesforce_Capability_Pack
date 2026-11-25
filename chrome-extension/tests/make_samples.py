@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Write the synthetic sample snapshots (samples) and the extension icons.
 
 Run from anywhere:  python tests/make_samples.py

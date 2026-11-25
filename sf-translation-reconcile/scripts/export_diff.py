@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """After-deploy check from the org's own Bilingual exports: one before, one after one or more pushes.
 
 Every pushed slot the export lists must be TRANSLATED with exactly the value sent (spacing

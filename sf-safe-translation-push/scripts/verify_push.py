@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """After the deploy: prove the push changed only the slots it filled (plus named overwrites), and
 every value landed.
 

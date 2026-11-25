@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """prevalidate_payload (offline, via a snapshot or a stub runner) and compare_retrieve_stf."""
 import json
 import tempfile

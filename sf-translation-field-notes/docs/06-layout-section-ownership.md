@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Layout section headings: Salesforce's or yours?
 
 Some page-layout section headings belong to Salesforce. Their translations come from Salesforce's

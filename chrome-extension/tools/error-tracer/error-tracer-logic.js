@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Error Tracer: understand one Salesforce debug log. Pure: no browser, no network.
 //
 // A debug log is text. Each event starts with a clock time, then a number in brackets, then the

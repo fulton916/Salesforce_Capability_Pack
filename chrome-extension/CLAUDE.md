@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # CLAUDE.md — chrome-extension
 
 (This folder was `sf-psg-compare` until the extension became the pack's main toolkit. Saved-file schema ids such as `sf-psg-snapshot/3` keep the old name on purpose.)

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Territory and role hierarchies: build a tree from flat records, search it, cut a branch, and lay it
 // out for Excel. Pure: no DOM, no network, no storage. Every walk is iterative, so a very deep
 // chain cannot overflow the stack.

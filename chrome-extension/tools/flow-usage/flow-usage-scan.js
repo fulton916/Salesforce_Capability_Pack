@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Looks inside one flow version for a field, or for a piece of text or a record Id. Pure: no browser
 // or network APIs. The caller hands in the flow version's Metadata (the Tooling API shape) and, for
 // relationship paths, a `describe(objectApiName)` function that returns an object describe

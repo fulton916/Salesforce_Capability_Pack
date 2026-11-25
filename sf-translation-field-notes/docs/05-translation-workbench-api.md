@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Translation Workbench through the Connect REST API
 
 Salesforce exposes Translation Workbench export and import jobs under

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Record Ids in Salesforce page addresses, shared by the toolbar menu and the record-access page.
 // Pure: no browser, no network.
 

@@ -185,3 +185,8 @@ cannot map are "not compared", never a pass. Exit 2 on any MISSING, DIFFERENT or
 - compare_retrieve_stf.py maps the common key types (fields, picklists, value sets, record
   types, validation rules, layout sections, buttons, custom labels, apps, tabs). Others are
   counted as not compared.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

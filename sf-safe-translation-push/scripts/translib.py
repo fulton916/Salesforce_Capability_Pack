@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Leaf-level view of Salesforce translation metadata files, and where a translation key lives.
 
 A translation file is reduced to {signature: text} for EVERY leaf element: labels, picklist

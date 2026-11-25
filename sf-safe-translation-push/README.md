@@ -232,3 +232,8 @@ Library modules: `crsafe.py` (CR-safe XML), `retr_merge.py` (multi-batch merge),
 - A slot is never created: a value whose slot the retrieve does not list is reported unplaced.
 - The export file time stamp is read as org time. Confirm the zone with your first export.
 - The tests use a synthetic org. Rehearse a real push in a full-copy sandbox first.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Synthetic fixtures for the offline tests: a run folder with a fake target retrieve, Bilingual
 exports, and a simulated deploy. Nothing here calls Salesforce."""
 import datetime

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """
 Verify that a load file actually landed in the org, by checking every filled
 translation cell against a Translation Workbench Bilingual .stf export.

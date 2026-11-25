@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Export a Salesforce org's State and Country/Territory picklists to Excel.
 
 The script retrieves the org's Address settings (metadata type Settings, member

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Offline tests for user_access_teardown.py. `sf` is mocked; no org is called.
 
     python tests/run_tests.py

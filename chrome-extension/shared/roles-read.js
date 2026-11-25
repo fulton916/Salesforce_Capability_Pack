@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Role read shared by the hierarchy page and the record-access page. Read-only: SELECT and COUNT() only.
 
 const roleRecord = (r) => ({ id: r.Id, parentId: r.ParentRoleId || null, name: r.Name || r.DeveloperName, apiName: r.DeveloperName || "" });

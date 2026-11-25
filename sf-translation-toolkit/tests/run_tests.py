@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Tiny offline regression tests for the toolkit scripts.
 
 Runs the offline scripts (expand_picklists, translation_roundtrip to-csv/to-files) against a

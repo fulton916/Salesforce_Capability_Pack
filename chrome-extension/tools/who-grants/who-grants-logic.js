@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Pure logic for "Where does a user get this permission?". No browser, no network.
 //
 // `analyze(facts, spec)` takes what the reader found (see who-grants-read.js, schema "sf-who-grants/1") and the

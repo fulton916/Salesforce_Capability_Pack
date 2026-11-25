@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Retrieve manifests (package.xml) for the before/, pre/ and after/ reads, built from source.json.
 
 A translation retrieve only returns the translated text when its parent metadata is in the SAME

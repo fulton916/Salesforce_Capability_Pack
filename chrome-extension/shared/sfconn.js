@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Salesforce connection for extension pages.
 //
 // Reuses the session the user already has in the browser (the `sid` cookie), the same way

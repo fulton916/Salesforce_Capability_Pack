@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Builds the link that opens GitHub's "new issue" page with a few fields filled in.
 // Pure: no browser APIs, no network. Nothing is sent anywhere by this code; the person
 // reviews the page on GitHub and presses Submit themselves.

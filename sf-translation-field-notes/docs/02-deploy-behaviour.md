@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Deploy behaviour, payload shape and verification
 
 What happens when you deploy translation metadata, how to shape a payload so it changes only

@@ -97,3 +97,8 @@ These tools can change production metadata and user access. Every package that w
 - CI (an automatic test check, set up in `.github/workflows/tests.yml`) runs on GitHub's own servers, not on your PC, each time someone opens or updates a pull request in this repository, and when a change lands on the main branch. It uses made-up data, never connects to a Salesforce org and needs no passwords or secrets. It is only for people changing this repository: you do not need it to use the tools, and it is not part of a package folder you copy or download.
 - Changes are made with AI assistant roles: a project manager plans the work, a developer makes the change, a tester checks it separately, and the project manager reviews it before anything is saved to the repo (committed). Nothing lands on main unless the owner merges it. See [CLAUDE.md](CLAUDE.md) for the full guide and [.claude/agents/](.claude/agents/) for the agent definitions.
 - `sf-user-password-reset` is a local one-off tool. It is not part of the pack and is never committed.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission. See [LICENSE](LICENSE).

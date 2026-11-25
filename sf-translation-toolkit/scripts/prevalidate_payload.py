@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Strip references the TARGET org cannot resolve from a translation payload.
 
 Salesforce caps the errors it enumerates per component and fails a component whole for one

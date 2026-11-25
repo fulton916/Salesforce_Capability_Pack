@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // "Page details for a ticket": reading the page address and writing the text a person pastes
 // into a support ticket. Pure: no browser or network APIs (Intl is fine), so the tests run in Node.
 //

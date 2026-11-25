@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+   or distribute this software without written permission. */
 /* Additions for the Territory & role hierarchy page. pack.css (shared) is loaded first and does the rest. */
 .kinds { margin-bottom: 14px; }
 .modelrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }

@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Salesforce Capability Pack (repo guide for AI assistants)
 
 A set of standalone Salesforce admin and translation tools. Each `sf-*` folder is a self-contained

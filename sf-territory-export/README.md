@@ -131,3 +131,8 @@ The tests build two synthetic JSON folders (`tests/fixtures/build_fixtures.py`, 
 - Excel holds about 1 million rows per sheet; larger tabs are cut and flagged.
 - The access audit's proposal is a starting point (majority pattern per branch), not a rule.
 - The filter-logic reading in the rule report assumes the non-focus lines match.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Copy the translation column from a source CSV into a destination CSV.
 
 Rows are matched on key columns (default: type, component, field, masterLabel). Every

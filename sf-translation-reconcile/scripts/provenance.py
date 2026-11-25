@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Step 5: provenance of every value a payload would overwrite.
 
 For each CHANGE slot whose current value is not empty (an overwrite, not a fill):

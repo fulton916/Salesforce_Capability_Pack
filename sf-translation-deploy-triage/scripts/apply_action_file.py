@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Apply a returned reviewer action file (from make_action_file.py) to translation CSVs.
 
 Tab 1: Yes/No "starts with a vowel sound" -> the CSV `startsWith` column as Vowel/Consonant.

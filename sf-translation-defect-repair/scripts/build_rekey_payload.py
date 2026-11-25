@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Re-key rows that failed only because the key text was slightly off.
 
 Example: a value set whose org labels carry TRAILING SPACES. The live value is

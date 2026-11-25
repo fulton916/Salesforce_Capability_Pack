@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Reads for "Where does a user get this permission?". GET only: SOQL and describe through shared/sfconn.js.
 //
 // `readGrants(api, user, spec)` returns the facts that who-grants-logic.js `analyze` turns into an answer. Only the

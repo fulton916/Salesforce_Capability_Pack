@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Collect `sf sday psg2csv` output for many Permission Set Groups into one CSV.
 
 Given a shell-style pattern, find every permissionsetgroup metadata file whose name
