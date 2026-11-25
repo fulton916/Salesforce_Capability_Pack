@@ -131,3 +131,8 @@ with `sf` mocked.
   user-level licences, Chatter groups) is not covered.
 - The CLI's `org-max-query-limit` (default 10,000) caps each query. The script stops if a result
   is cut short; raise the limit or lower `--chunk-size`.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Export Enterprise Territory Management data to Excel, one tab per query.
 
 Read-only. Runs a fixed set of SOQL queries through the Salesforce CLI and writes:

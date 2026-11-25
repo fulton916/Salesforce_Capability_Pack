@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Negative controls for the builder (lock 1): plant disguised overwrites in COPIES of the data and
 prove build_push.py refuses every one. Run it after a real build, with the same inputs; it writes
 only *_negctl* paths and never touches the real run's outputs.

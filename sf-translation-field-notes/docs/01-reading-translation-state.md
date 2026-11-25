@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Reading translation state
 
 How to find out what translations an org actually holds. Get this wrong and every later

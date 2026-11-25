@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Point-in-time snapshot of the target before a push, and the read-start stamp the checks need.
 
 A push cannot be taken back out by a deploy (most translation types ignore a blank or an omitted

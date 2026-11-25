@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Find one translation slot (file + element + value tag) inside a metadata-format retrieve.
 
 Used by locate.py, proof.py, verify.py and provenance.py so they all agree on where a

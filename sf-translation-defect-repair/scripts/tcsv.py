@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Read and write translation CSVs (one file per language).
 
 The repair scripts read and write the same simple per-language CSV layout, one row per

@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Project settings and shared helpers for the translation toolkit.
 
 Settings live in settings.json, one folder above this script. Every key is optional;

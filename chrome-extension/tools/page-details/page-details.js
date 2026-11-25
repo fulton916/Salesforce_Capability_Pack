@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readIssueSnapshot } from "./page-details-read.js";
 import { cleanUrl } from "../../shared/pageurl.js";

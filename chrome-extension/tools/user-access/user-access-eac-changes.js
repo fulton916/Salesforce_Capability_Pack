@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Build Einstein Activity Capture changes as text (issue #42). Pure: no browser or network APIs, and nothing here writes to the org.
 //
 // The extension only READS. It prepares rows for the admin to load themselves: pasted into Salesforce Inspector's Data Import,

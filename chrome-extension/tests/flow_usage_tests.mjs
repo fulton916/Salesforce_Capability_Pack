@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Offline tests for the "Where is it used in flows?" page. Called from run_tests.mjs with its shared `test` function.
 // Synthetic data only.
 import assert from "node:assert/strict";

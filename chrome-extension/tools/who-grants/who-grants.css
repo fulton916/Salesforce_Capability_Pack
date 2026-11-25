@@ -1,3 +1,5 @@
+/* Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+   or distribute this software without written permission. */
 /* Additions for the "Where does a user get this permission?" page. pack.css and user-picker.css (shared) come first. */
 .field { margin: 12px 0; max-width: 560px; }
 .field .combo input { width: 100%; }

@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Working habits that prevented (or would have prevented) damage
 
 General lessons from translation work that apply to any metadata change.

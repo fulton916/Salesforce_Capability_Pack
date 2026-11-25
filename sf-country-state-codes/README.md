@@ -103,3 +103,8 @@ No org is called.
 - A missing element (for example `orgDefault` on most countries in some orgs) is written as blank.
 - Translated country and state names are not included; they live in the translation metadata,
   not in Address settings.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

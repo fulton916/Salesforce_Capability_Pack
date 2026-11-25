@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Build a payload that repairs mojibake (UTF-8 read as cp1252) in translations.
 
 The same root cause (an export or edit step that read UTF-8 as cp1252) shows up three ways:

@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Turns the address of a Salesforce page into "what the person is looking at", so the flow search
 // can start with the object or field filled in. Pure: no browser APIs, no network. Only the path of
 // the address is used; nothing from it is kept except an object name, a field name or an Id.

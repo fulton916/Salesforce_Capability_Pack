@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // User search shared by the user-access and record-access pages. Read-only: one SOQL query.
 
 import { soqlLike } from "./sfconn.js";

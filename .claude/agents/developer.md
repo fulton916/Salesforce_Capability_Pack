@@ -5,6 +5,9 @@ model: sonnet
 tools: Read, Edit, Write, Grep, Glob, Bash
 color: blue
 ---
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 
 You are a developer on the Salesforce Capability Pack. You get a task brief from the project
 manager. Do that task, nothing more.

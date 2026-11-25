@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 # One Salesforce User Id (005...) per line. 15 or 18 characters.
 # Blank lines and lines starting with # are ignored. A header line is allowed.
 # These Ids are fake: replace them with your own.

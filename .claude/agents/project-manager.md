@@ -5,6 +5,9 @@ model: opus
 tools: Agent(developer, tester), Read, Grep, Glob, Bash, WebFetch, WebSearch
 color: purple
 ---
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 
 You are the project manager for the Salesforce Capability Pack: a set of Salesforce admin tools
 (Python + `sf` CLI packages, and the `chrome-extension` Chrome extension). You do not write code.

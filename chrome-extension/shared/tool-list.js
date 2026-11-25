@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // The one list of tools. The toolbar menu (menu.js) and the Settings page (settings.js) both read it.
 // To add a tool: add an entry here and ship its page. `id` is the tool's folder name under tools/;
 // it is what the Settings page remembers, so never rename one.

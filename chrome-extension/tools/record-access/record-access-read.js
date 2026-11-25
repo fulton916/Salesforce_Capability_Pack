@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Read the facts for "Why can a user see this record?" from an org (schema "sf-record-access/1").
 //
 // Read-only: every call is a SELECT, a COUNT or a describe through SfApi. Nothing is written to the

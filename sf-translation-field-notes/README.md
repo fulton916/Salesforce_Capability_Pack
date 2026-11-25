@@ -92,3 +92,8 @@ reproduce the relevant part in a sandbox with a read-back.
 
 Examples use generic names: `Widget__c`, `Color__c`, `Color_Set`, `Account`, and the org alias
 `my-sandbox`. Replace them with your own.
+
+## License
+
+Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify, or
+distribute this software without written permission.

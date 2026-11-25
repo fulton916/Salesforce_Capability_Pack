@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Apply a filled grammar file back into the translation CSVs, scoped for a redeploy.
 
 Reads the ANSWER column of the file from make_grammar_file.py, checks every answer against

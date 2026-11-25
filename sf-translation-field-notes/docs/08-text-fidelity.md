@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Text fidelity: carriage returns, spaces, encoding
 
 Invisible characters cause real differences in what Salesforce stores, and most comparison tools

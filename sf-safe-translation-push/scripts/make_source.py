@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Turn a translation workbook or CSV into source.json, the one input build_push.py reads.
 
 The input is never edited. Two layouts are accepted:

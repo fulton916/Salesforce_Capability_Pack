@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Read Salesforce Translation Workbench Bilingual exports (.stf) and look a translation key up in them.
 
 Setup -> Translation Workbench -> Export -> Bilingual writes one file per language, named

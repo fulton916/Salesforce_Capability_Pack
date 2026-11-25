@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Show only the NEW errors in a deploy/validate result, by subtracting a known baseline.
 
 A sandbox that has drifted from production fails a validate for reasons that have nothing

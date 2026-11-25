@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Read territory and role hierarchies from an org. Read-only: every call is a SELECT (or a describe)
 // through SfApi, which follows nextRecordsUrl. Nothing is written to the org. Nothing is stored.
 

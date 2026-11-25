@@ -1,3 +1,6 @@
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+
 # Restoring values that were overwritten by accident
 
 A restore is a **named overwrite**: you deploy the old text back over the current text, for

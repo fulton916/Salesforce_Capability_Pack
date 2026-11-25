@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Re-cut a triage workbook so each tab names the party that has to act.
 
 Different problems look alike in a raw deploy log. An encoding defect and a deleted

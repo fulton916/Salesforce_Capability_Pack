@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+// or distribute this software without written permission.
+
 // Einstein Activity Capture (EAC) for the User access page. Pure: no browser or network APIs.
 //
 // Two objects are read (user-access-eac-read.js):

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Overlay a verified retrieve (already converted to source format) onto a local project tree.
 
 Use it after compare_workbook.py has shown the retrieve is the truth, so the local tree

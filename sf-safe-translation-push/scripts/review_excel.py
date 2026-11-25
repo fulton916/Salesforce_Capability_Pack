@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """Review workbook after a no-overwrite push: what the target already held, side by side with what
 was requested, for someone to decide on.
 

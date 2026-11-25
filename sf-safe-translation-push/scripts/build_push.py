@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
 """No-overwrite push builder (lock 1): fill EMPTY target slots only, plus explicitly named overwrites.
 
 Reads source.json (make_source.py) and the TARGET's own retrieve (before/), and:
