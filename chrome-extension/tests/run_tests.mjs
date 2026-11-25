@@ -4,10 +4,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { findSession, isSalesforceHost, SfApi, chunk, soqlString } from "../shared/sfconn.js";
+import { findSession, isSalesforceHost, SfApi, chunk, soqlString, API_VERSION, useNewestVersion } from "../shared/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../tools/compare-groups/compare-groups-read.js";
 import { toCsv } from "../shared/csv.js";
-import { SECTION_TITLES, SECTION_HELP, compareSnapshots, toRows, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection } from "../tools/compare-groups/compare-groups-logic.js";
+import { SECTION_TITLES, SECTION_HELP, versionNumber, compareSnapshots, toRows, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection } from "../tools/compare-groups/compare-groups-logic.js";
 import { matchPsgs, searchWords } from "../shared/pick.js";
 
 const STORE_FILE = "shared/menu-settings.js"; // the only file allowed to use chrome.storage
@@ -57,11 +57,16 @@ function fakeFetch(routes, log = []) {
   return async (url) => {
     const u = new URL(url);
     let body;
-    if (u.pathname.endsWith("/sobjects/")) {
+    routes.urls?.push(u.pathname);
+    if (u.pathname === "/services/data/") {
+      // The org's version list (routes.versions), or a failure (routes.versionsFail: an HTTP status).
+      if (routes.versionsFail) return { ok: false, status: routes.versionsFail, text: async () => JSON.stringify([{ message: routes.versionsFail === 401 ? "Session expired or invalid" : "down", errorCode: "X" }]) };
+      body = (routes.versions || ["60.0", "67.0", "68.0"]).map((v) => ({ version: v, label: v, url: `/services/data/v${v}` }));
+    } else if (u.pathname.endsWith("/sobjects/")) {
       body = { sobjects: [{ name: "Account", label: "Customer Account" }, { name: "Contact", label: "Contact" }] };
     } else if (u.pathname.endsWith("/describe/")) {
       const sobject = u.pathname.split("/").at(-3);
-      body = routes.describe(sobject);
+      body = routes.describe(sobject, /\/v(\d+\.\d)\//.exec(u.pathname)?.[1]);
     } else if (u.pathname.includes("/query")) {
       const q = u.searchParams.get("q");
       log.push(q);
@@ -270,6 +275,230 @@ await test("validateSnapshot accepts the samples and rejects other JSON", () => 
   const broken = sample("sample_a.json");
   delete broken.fieldPermissions;
   assert.throws(() => validateSnapshot(broken), /missing "fieldPermissions"/);
+});
+
+// ---------- API version ----------
+
+console.log("api version");
+
+/** snapshotRoutes plus a permission and an object flag that only API 68.0 and newer describe; calls are noted in `urls`. */
+function versionedRoutes(extra = {}) {
+  const base = snapshotRoutes();
+  base.urls = [];
+  Object.assign(base, extra);
+  const newer = (v) => Number(v) >= 68;
+  base.describe = (s, v) => ({
+    fields: s === "PermissionSet" ? [...PS_FIELDS, ...(newer(v) ? [{ name: "PermissionsNewOnly", label: "New Only", type: "boolean" }] : [])]
+      : s === "ObjectPermissions" ? [...OP_FIELDS, ...(newer(v) ? [{ name: "PermissionsViewAllFields", label: "View All Fields", type: "boolean" }] : [])] : [],
+  });
+  base.query = base.query.map(([re, fn]) => [re, (q, tooling) => {
+    const r = fn(q, tooling);
+    if (/FROM PermissionSet WHERE Id = '0PSAGG/.test(q) && q.includes("PermissionsNewOnly")) r[0].PermissionsNewOnly = true;
+    if (/FROM ObjectPermissions/.test(q) && q.includes("PermissionsViewAllFields") && !q.includes("MUTE")) r.forEach((x) => { x.PermissionsViewAllFields = true; });
+    return r;
+  }]);
+  return base;
+}
+const versioned = (p) => p.filter((x) => x !== "/services/data/");
+
+await test("the default API version is 67.0 and a new client starts there", () => {
+  assert.equal(API_VERSION, "67.0");
+  assert.equal(new SfApi({ apiHost: "x", sessionId: "S" }).apiVersion, "67.0");
+  assert.equal(typeof useNewestVersion, "function");
+});
+
+await test("compare groups reads at the org's newest version: a permission and View All Fields that only it describes show up", async () => {
+  const routes = versionedRoutes();
+  const api = apiWith(routes);
+  const s = await takeSnapshot(api, "0PG1", { org: { id: "00D1", name: "Acme" } });
+  assert.equal(s.apiVersion, "68.0");
+  assert.equal(s.userPermissions.PermissionsNewOnly, "New Only");
+  assert.equal(s.objectPermissions.Account.ViewAllFields, true);
+  assert.ok(versioned(routes.urls).length > 5 && versioned(routes.urls).every((p) => p.startsWith("/services/data/v68.0/")), "nothing is described or queried at the default version");
+  // The same group read by a copy that only sees 67.0 lacks them, so two such groups would have looked the same.
+  const old = await takeSnapshot(apiWith(versionedRoutes({ versions: ["60.0", "67.0"] })), "0PG1", { org: { id: "00D1", name: "Acme" } });
+  assert.equal(old.apiVersion, "67.0");
+  assert.ok(!("PermissionsNewOnly" in old.userPermissions) && !("ViewAllFields" in old.objectPermissions.Account));
+  const r = compareSnapshots(s, old);
+  assert.equal(r.sections.userPermissions.find((x) => x.key === "PermissionsNewOnly").status, "onlyA");
+  assert.deepEqual(r.sections.objectPermissions.find((x) => x.key === "Account").aExtra, ["ViewAllFields"]);
+});
+
+await test("an org whose newest version is below the default is read at its own newest version", async () => {
+  const routes = versionedRoutes({ versions: ["60.0", "66.0"] });
+  const api = apiWith(routes);
+  const s = await takeSnapshot(api, "0PG1");
+  assert.equal(s.apiVersion, "66.0");
+  assert.equal(api.versionListFailed, undefined);
+  assert.ok(versioned(routes.urls).length > 5 && versioned(routes.urls).every((p) => p.startsWith("/services/data/v66.0/")), routes.urls.join(","));
+  const direct = apiWith(versionedRoutes({ versions: ["66.0"] }));
+  assert.equal(await useNewestVersion(direct), "66.0");
+  assert.equal(direct.apiVersion, "66.0");
+  const junk = apiWith(versionedRoutes({ versions: ["0.0", "-5.0"] }));
+  await useNewestVersion(junk);
+  assert.equal(junk.apiVersion, "67.0");
+  assert.equal(junk.versionListFailed, true);
+});
+
+await test("listPsgs asks for the version list first, then reads at the newest version", async () => {
+  const routes = versionedRoutes();
+  const list = await listPsgs(apiWith(routes));
+  assert.equal(list.length, 1);
+  assert.equal(routes.urls[0], "/services/data/");
+  assert.ok(routes.urls.slice(1).every((p) => p.startsWith("/services/data/v68.0/")), routes.urls.join(","));
+});
+
+await test("the version list is asked once per client, however many groups are read", async () => {
+  const routes = versionedRoutes();
+  const api = apiWith(routes);
+  await listPsgs(api);
+  await Promise.all([takeSnapshot(api, "0PG1"), takeSnapshot(api, "0PG1")]);
+  assert.equal(routes.urls.filter((p) => p === "/services/data/").length, 1);
+});
+
+await test("when the version list cannot be read, it still reads at 67.0 and the group says what may be missing", async () => {
+  for (const versionsFail of [500, 404]) {
+    const routes = versionedRoutes({ versionsFail });
+    const api = apiWith(routes);
+    const s = await takeSnapshot(api, "0PG1");
+    assert.equal(api.versionListFailed, true);
+    assert.equal(s.apiVersion, "67.0");
+    assert.ok(versioned(routes.urls).every((p) => p.startsWith("/services/data/v67.0/")));
+    const w = s.warnings.filter((x) => /newest releases/.test(x));
+    assert.deepEqual(w, ["This tool could not ask Salesforce which versions it offers, so permissions added in the newest releases may be missing. Reload the page, then read this group again."]);
+    // On the page it reads well: no "Try Compare again" (it would not help), and no "snapshot" or "PSG".
+    const note = compareSnapshots(s, s).highlights.find((h) => h.text.includes("newest releases"));
+    assert.equal(note.level, "warn");
+    assert.equal(note.text, `Sales: ${w[0]}`);
+    assert.ok(!/snapshot|PSG|Try Compare again/i.test(note.text));
+  }
+});
+
+await test("a list with no usable versions also keeps 67.0 with the warning", async () => {
+  const routes = versionedRoutes({ versions: [] });
+  const s = await takeSnapshot(apiWith(routes), "0PG1");
+  assert.equal(s.apiVersion, "67.0");
+  assert.ok(s.warnings.some((x) => /newest releases/.test(x)));
+});
+
+await test("an expired session (401) still shows the session message, also when the version list is what failed", async () => {
+  const dead = () => new SfApi({ apiHost: "x.my.salesforce.com", sessionId: "S", fetchImpl: async () => ({ ok: false, status: 401, text: async () => JSON.stringify([{ message: "Session expired or invalid", errorCode: "INVALID_SESSION_ID" }]) }) });
+  for (const run of [(api) => listPsgs(api), (api) => takeSnapshot(api, "0PG1")]) {
+    const api = dead();
+    await assert.rejects(run(api), (e) => e.status === 401 && e.message === "Your Salesforce session has expired. Reload the Salesforce tab, then try again.");
+    assert.equal(api.apiVersion, "67.0");
+  }
+  // Only the list answers 401 (the later reads work): the group is read, not blocked by the list.
+  const s = await takeSnapshot(apiWith(versionedRoutes({ versionsFail: 401 })), "0PG1");
+  assert.equal(s.apiVersion, "67.0");
+});
+
+await test("a saved group file records apiVersion as a string and survives a save and load", async () => {
+  const s = await takeSnapshot(apiWith(versionedRoutes()), "0PG1");
+  assert.equal(s.schema, "sf-psg-snapshot/3");
+  assert.equal(typeof s.apiVersion, "string");
+  const back = validateSnapshot(JSON.parse(JSON.stringify(s)));
+  assert.equal(back.apiVersion, "68.0");
+  assert.equal(versionNumber(back), 68);
+  for (const n of ["sample_a.json", "sample_b.json"]) assert.equal(sample(n).apiVersion, "67.0");
+  assert.equal(compareSnapshots(sample("sample_a.json"), sample("sample_b.json")).highlights.filter((h) => /API version|earlier copy/.test(h.text)).length, 0, "the demo shows no version note");
+});
+
+await test("saved files of schema /1 and /2 still load and compare as before", () => {
+  for (const schema of ["sf-psg-snapshot/1", "sf-psg-snapshot/2", "sf-psg-snapshot/3"]) {
+    const f = structuredClone(sample("sample_a.json"));
+    f.schema = schema;
+    if (schema !== "sf-psg-snapshot/3") delete f.apiVersion;
+    assert.equal(validateSnapshot(f), f);
+  }
+  assert.throws(() => validateSnapshot({ ...sample("sample_a.json"), schema: "sf-psg-snapshot/4" }), /Not a saved group file/);
+  const two = structuredClone(sample("sample_a.json"));
+  two.schema = "sf-psg-snapshot/2";
+  delete two.apiVersion;
+  const same = compareSnapshots(two, sample("sample_b.json"));
+  const plain = compareSnapshots(sample("sample_a.json"), sample("sample_b.json"));
+  assert.deepEqual(same.sections, plain.sections);
+  assert.deepEqual(same.counts, plain.counts);
+});
+
+const withVersion = (v, name) => {
+  const s = structuredClone(sample("sample_a.json"));
+  if (v === undefined) delete s.apiVersion; else s.apiVersion = v;
+  if (name) s.psg.label = name;
+  return s;
+};
+const versionNotes = (r) => r.highlights.filter((h) => h.kind === "note" && /API version|earlier copy/.test(h.text));
+
+await test("version note: two known and different versions name which group used which and how to fix it", () => {
+  const r = compareSnapshots(withVersion("67.0", "Older"), withVersion("68.0", "Newer"));
+  const n = versionNotes(r);
+  assert.equal(n.length, 1);
+  assert.equal(n[0].level, "warn");
+  assert.equal(n[0].text, "Older was read with Salesforce API version 67.0 and Newer with 68.0. Permissions that exist only in the newer version can look like a difference when they are not (they show as only in Newer). To fix this, read Older again from its org (and save its file again if you use a file), then compare.");
+  const flipped = versionNotes(compareSnapshots(withVersion("68.0", "Newer"), withVersion("67.0", "Older")));
+  assert.equal(flipped[0].text, n[0].text, "the older group is named whichever side it is on");
+  assert.equal(versionNotes(compareSnapshots(withVersion("68", "A1"), withVersion("68.0", "B1"))).length, 0, "68 equals 68.0");
+  assert.equal(versionNotes(compareSnapshots(withVersion("67.0"), withVersion("67.0"))).length, 0, "same version, no note");
+  assert.equal(versionNotes(compareSnapshots(withVersion("9.0", "Low"), withVersion("10.0", "High")))[0].text.startsWith("Low was read with Salesforce API version 9.0 and High with 10.0."), true, "compared as numbers, not as text");
+});
+
+await test("version note: groups from different orgs say the note stays while the older org is on an older release", () => {
+  const org = (id, name) => ({ id, name, isSandbox: false });
+  const mk = (v, name, o) => Object.assign(withVersion(v, name), { org: o });
+  const n = versionNotes(compareSnapshots(mk("67.0", "Older", org("00D1", "Prod")), mk("68.0", "Newer", org("00D2", "Dev"))));
+  assert.equal(n.length, 1);
+  assert.equal(n[0].text, "Older was read with Salesforce API version 67.0 and Newer with 68.0. Permissions that exist only in the newer version can look like a difference when they are not (they show as only in Newer). If the org of Older now offers a newer version, read Older again (and save its file again if you use a file). If that org is on an older Salesforce release, the note stays until both orgs are on the same release.");
+});
+
+await test("version note: the same group label on both sides is told apart by org name, else by first and second", () => {
+  const org = (id, name) => ({ id, name, isSandbox: false });
+  const mk = (v, o) => Object.assign(withVersion(v, "Sales"), { org: o });
+  const t = versionNotes(compareSnapshots(mk("67.0", org("00D1", "Prod")), mk("68.0", org("00D2", "Dev"))))[0].text;
+  assert.ok(t.startsWith("Sales (Prod) was read with Salesforce API version 67.0 and Sales (Dev) with 68.0."), t);
+  assert.ok(t.includes("only in Sales (Dev)") && t.includes("read Sales (Prod) again"), t);
+  const u = versionNotes(compareSnapshots(mk("68.0", org("00D1", "Prod")), mk("67.0", org("00D1", "Prod"))))[0].text;
+  assert.ok(u.startsWith("Sales (second group) was read with Salesforce API version 67.0 and Sales (first group) with 68.0."), u);
+  assert.ok(u.includes("To fix this, read Sales (second group) again from its org"), u);
+});
+
+await test("version note: one file without a version says it was saved by an earlier copy", () => {
+  const expected = (old, other) => `The file for ${old} was saved by an earlier copy of this tool, which did not see the newest Salesforce permissions. Permissions that exist only in newer versions can look like a difference when they are not (they show as only in ${other}). To fix this, read ${old} again from its org and save its file again, then compare.`;
+  const a = versionNotes(compareSnapshots(withVersion(undefined, "Old file"), withVersion("68.0", "Fresh")));
+  assert.deepEqual(a.map((h) => [h.level, h.text]), [["warn", expected("Old file", "Fresh")]]);
+  const b = versionNotes(compareSnapshots(withVersion("68.0", "Fresh"), withVersion(undefined, "Old file")));
+  assert.deepEqual(b.map((h) => h.text), [expected("Old file", "Fresh")]);
+});
+
+await test("version note: both without a version says some differences may be missing", () => {
+  const n = versionNotes(compareSnapshots(withVersion(undefined, "One"), withVersion(undefined, "Two")));
+  assert.deepEqual(n.map((h) => [h.level, h.text]), [["warn", "Both files were saved by an earlier copy of this tool, which did not see the newest Salesforce permissions, so some differences may be missing. To fix this, read both groups again from their orgs and save their files again, then compare."]]);
+});
+
+await test("version note: odd or hand-edited values count as not recorded and never break the page", () => {
+  const odd = [null, 68, true, [], {}, "", " ", "garbage", "68.0.1", "v68.0", "NaN", "Infinity", "-1", "68,0", "1e3", "<b>x</b>", "9".repeat(5000)];
+  for (const v of odd) {
+    assert.equal(versionNumber({ apiVersion: v }), null, JSON.stringify(v));
+    const f = withVersion(v);
+    validateSnapshot(f);
+    const r = compareSnapshots(f, withVersion("68.0"));
+    assert.equal(versionNotes(r).length, 1, JSON.stringify(v));
+    assert.ok(toRows(r).length > 1);
+  }
+  assert.equal(versionNumber(null), null);
+  assert.equal(versionNumber(undefined), null);
+  assert.equal(versionNumber({ apiVersion: "68" }), 68);
+  assert.equal(versionNumber({ apiVersion: " 67.0 " }), 67);
+});
+
+await test("version note: a result with no differences still carries the note, and no note text says snapshot or PSG", () => {
+  const r = compareSnapshots(withVersion("67.0", "Same Name"), withVersion(undefined, "Same Name 2"));
+  assert.equal(r.highlights.find((h) => h.kind === "verdict").text, "Both groups have exactly the same access.");
+  const n = versionNotes(r);
+  assert.equal(n.length, 1);
+  assert.equal(n[0].level, "warn");
+  for (const h of [...n, ...versionNotes(compareSnapshots(withVersion("67.0"), withVersion("68.0"))), ...versionNotes(compareSnapshots(withVersion(undefined), withVersion(undefined)))]) assert.ok(!/snapshot|PSG/i.test(h.text), h.text);
+  const page = readFileSync(path.join(here, "../tools/compare-groups/compare-groups.js"), "utf-8");
+  assert.ok(/kind === "note"/.test(page) && /h\.level === "warn"/.test(page), "the page lists every note and raises the alert for warn notes, whatever the verdict");
 });
 
 // ---------- compare ----------

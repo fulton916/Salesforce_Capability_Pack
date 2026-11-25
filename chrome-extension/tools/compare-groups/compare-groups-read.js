@@ -7,13 +7,15 @@
 // component permission sets minus the muting permission set, so it is the net access a user
 // assigned to the group gets from it. It is only current when the group's Status is 'Updated'.
 
-import { chunk, soqlString } from "../../shared/sfconn.js";
+import { chunk, soqlString, useNewestVersion } from "../../shared/sfconn.js";
 import { humanize, groupStatus } from "./compare-groups-logic.js";
 
 // v2 adds: fieldLabels, muting.tabSettings and muting.effective (what the muting set really removes).
-// v1 files (saved earlier) are still accepted; the comparison falls back for the missing parts.
-export const SNAPSHOT_SCHEMA = "sf-psg-snapshot/2";
-export const ACCEPTED_SCHEMAS = ["sf-psg-snapshot/1", SNAPSHOT_SCHEMA];
+// v3 adds: apiVersion (the Salesforce API version the group was read with, e.g. "68.0").
+// v1 and v2 files (saved earlier) are still accepted; the comparison falls back for the missing parts
+// (a file with no usable apiVersion counts as "not recorded").
+export const SNAPSHOT_SCHEMA = "sf-psg-snapshot/3";
+export const ACCEPTED_SCHEMAS = ["sf-psg-snapshot/1", "sf-psg-snapshot/2", SNAPSHOT_SCHEMA];
 
 // SetupEntityAccess types we can name. Anything else is kept by Id with a warning.
 export const SETUP_TYPES = {
@@ -323,6 +325,7 @@ async function licenceNames(api, ids, warnings) {
 
 /** Permission set groups in the org, for the picker. */
 export async function listPsgs(api) {
+  await useNewestVersion(api); // before the first versioned read: the describe cache is not keyed by version
   const { records } = await api.query(
     "SELECT Id, DeveloperName, MasterLabel, NamespacePrefix, Status FROM PermissionSetGroup ORDER BY MasterLabel"
   );
@@ -343,6 +346,12 @@ function plain(message) {
 export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}) {
   const warnings = [];
   const idLit = soqlString(psgId);
+
+  // The org's newest version, so permissions that only newer versions have are read (one shared promise per SfApi).
+  await useNewestVersion(api);
+  if (api.versionListFailed) {
+    warnings.push("This tool could not ask Salesforce which versions it offers, so permissions added in the newest releases may be missing. Reload the page, then read this group again.");
+  }
 
   progress("Reading the group");
   const psgRes = await api.query(
@@ -479,6 +488,7 @@ export async function takeSnapshot(api, psgId, { org, progress = () => {} } = {}
   return {
     schema: SNAPSHOT_SCHEMA,
     takenAt: new Date().toISOString(),
+    apiVersion: String(api.apiVersion),
     org: org || null,
     psg: {
       id: g.Id,

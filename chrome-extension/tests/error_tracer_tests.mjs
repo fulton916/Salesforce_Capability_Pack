@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { SfApi } from "../shared/sfconn.js";
+import { SfApi, API_VERSION } from "../shared/sfconn.js";
 import { TOOLS } from "../shared/tool-list.js";
 import { FEEDBACK_TOOLS } from "../shared/feedback.js";
 import {
@@ -45,10 +45,10 @@ export async function run(test) {
   await test("errors: getText returns the plain text, sends the login, sets no method and parses nothing", async () => {
     const f = recordingFetch(() => textRes('{"not":"parsed"}\nsecond line'));
     const api = new SfApi({ apiHost: "x.my.salesforce.com", sessionId: "S", fetchImpl: f });
-    const body = await api.getText("/services/data/v62.0/sobjects/ApexLog/07L000000000001AAA/Body");
+    const body = await api.getText(`/services/data/v${API_VERSION}/sobjects/ApexLog/07L000000000001AAA/Body`);
     assert.equal(body, '{"not":"parsed"}\nsecond line');
     assert.equal(f.calls.length, 1);
-    assert.equal(f.calls[0].url, "https://x.my.salesforce.com/services/data/v62.0/sobjects/ApexLog/07L000000000001AAA/Body");
+    assert.equal(f.calls[0].url, `https://x.my.salesforce.com/services/data/v${API_VERSION}/sobjects/ApexLog/07L000000000001AAA/Body`);
     assert.equal(f.calls[0].opts.headers.Authorization, "Bearer S");
     assert.match(f.calls[0].opts.headers.Accept, /text\/plain/);
     assert.ok(!("method" in f.calls[0].opts));
@@ -89,7 +89,7 @@ export async function run(test) {
 
   await test("errors: the body is one GET of /sobjects/ApexLog/<id>/Body, and a bad Id makes no call", async () => {
     const f = recordingFetch((u) => {
-      assert.equal(u.pathname, "/services/data/v62.0/sobjects/ApexLog/07L000000000001AAA/Body");
+      assert.equal(u.pathname, `/services/data/v${API_VERSION}/sobjects/ApexLog/07L000000000001AAA/Body`);
       return textRes(mk("x"));
     });
     const api = new SfApi({ apiHost: "x", sessionId: "S", fetchImpl: f });
@@ -120,7 +120,7 @@ export async function run(test) {
     const api = new SfApi({ apiHost: "x", sessionId: "S", fetchImpl: f });
     await readLogList(api);
     await readLogBody(api, "07L000000000001AAA");
-    await api.getText("/services/data/v62.0/sobjects/ApexLog/07L000000000001AAA/Body");
+    await api.getText(`/services/data/v${API_VERSION}/sobjects/ApexLog/07L000000000001AAA/Body`);
     assert.equal(f.calls.length, 3);
     for (const c of f.calls) assert.ok(!c.opts.method && !c.opts.body);
   });

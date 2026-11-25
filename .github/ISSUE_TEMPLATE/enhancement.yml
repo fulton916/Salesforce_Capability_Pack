@@ -37,7 +37,7 @@ body:
     id: version
     attributes:
       label: Version (optional)
-      placeholder: "Extension 0.10.0, Chrome 131"
+      placeholder: "Extension 0.10.1, Chrome 131"
   - type: textarea
     id: idea
     attributes:

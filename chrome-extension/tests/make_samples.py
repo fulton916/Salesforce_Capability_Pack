@@ -26,8 +26,9 @@ def comp(name, label, licence="Salesforce", muting=False):
 
 def snap(dev, label, desc, comps, muting, assigned, user, objs, fields, setup, tabs):
     return {
-        "schema": "sf-psg-snapshot/2",
+        "schema": "sf-psg-snapshot/3",
         "takenAt": "2026-11-18T15:00:00.000Z",
+        "apiVersion": "67.0",
         "org": ORG,
         "psg": {"id": "0PG00000000000" + dev[:4].upper(), "developerName": dev, "label": label,
                 "description": desc, "status": "Updated", "aggregatePermissionSetId": "0PS00000000000" + dev[:4].upper()},

@@ -1,4 +1,4 @@
-import { SfApi, findSession, isSalesforceHost } from "../../shared/sfconn.js";
+import { SfApi, findSession, isSalesforceHost, useNewestVersion } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
 import { searchUsers } from "../../shared/users-read.js";
 import { matchUsers } from "../../shared/users-logic.js";
@@ -6,7 +6,7 @@ import {
   analyze, sectionsOf, copyText, copyWithFallback, matchItems, objectItems, fieldItems, factsFromModel, whenStamp,
   OBJECT_LEVELS, FIELD_LEVELS, UNLISTED_FIELD_HINT, setupUrl, systemApiShort, fieldApiShort, PlainError, errorWords, SessionLookupError, connectErrorWords,
 } from "./who-grants-logic.js";
-import { readGrants, readSystemList, readObjectList, readFieldDescribe, useNewestVersion } from "./who-grants-read.js";
+import { readGrants, readSystemList, readObjectList, readFieldDescribe } from "./who-grants-read.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
 
@@ -484,7 +484,7 @@ async function connect() {
       return false;
     }
     state.api = new SfApi(session);
-    await useNewestVersion(state.api); // this page asks for the org's newest API version (the shared default is unchanged)
+    await useNewestVersion(state.api); // this page asks for the org's newest API version (the shared default stays 67.0)
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
     showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
     return true;

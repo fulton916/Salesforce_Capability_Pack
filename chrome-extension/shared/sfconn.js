@@ -4,7 +4,9 @@
 // Salesforce Inspector does. No connected app, no OAuth, no server: requests go straight from
 // this page to the org's REST API. The extension's host permissions let it skip CORS.
 
-export const API_VERSION = "62.0";
+// One tested API version for every org, one release behind the newest. A page that needs permissions only newer
+// versions have asks the org for its newest with `useNewestVersion` below.
+export const API_VERSION = "67.0";
 
 // Hosts a Salesforce UI or API can be served from.
 const SF_HOST = /(^|\.)(salesforce|force|salesforce-setup|cloudforce|visualforce)\.(com|mil)$|(^|\.)sfcrmproducts\.cn$/i;
@@ -141,6 +143,28 @@ export class SfApi {
     }
     return this.cache.get(key);
   }
+}
+
+/** Use the org's newest API version for this page only (the shared default `API_VERSION` is left alone).
+ * The org's newest listed version is used whether it is higher or lower than the default (an org on an older release
+ * does not know the default and answers 404). Zero, negative and non-numeric entries are not versions.
+ * Falls back to the default when the list cannot be read (`api.versionListFailed` is then true). Safe to call more than
+ * once: one shared promise per SfApi. Call it before the first versioned read; the describe cache is not keyed by version. */
+export function useNewestVersion(api) {
+  if (!api.newestVersionPromise) {
+    api.newestVersionPromise = (async () => {
+      try {
+        const list = await api.get("/services/data/");
+        const best = Math.max(...(Array.isArray(list) ? list : []).map((v) => Number(v?.version)).filter((n) => Number.isFinite(n) && n > 0));
+        if (Number.isFinite(best)) api.apiVersion = best.toFixed(1);
+        if (!Number.isFinite(best)) api.versionListFailed = true;
+      } catch {
+        api.versionListFailed = true; // keep the default version, but a column it lacks may exist in the org's newer one
+      }
+      return api.apiVersion;
+    })();
+  }
+  return api.newestVersionPromise;
 }
 
 /** Escape a value for a SOQL string literal. */

@@ -4,14 +4,14 @@ import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { SfApi, API_VERSION } from "../shared/sfconn.js";
+import { SfApi, API_VERSION, useNewestVersion } from "../shared/sfconn.js";
 import { TOOLS } from "../shared/tool-list.js";
 import { FEEDBACK_TOOLS } from "../shared/feedback.js";
 import {
   analyze, sectionsOf, copyText, copyWithFallback, matchItems, systemItems, objectItems, fieldItems, factsFromModel, whenStamp, dateWords, expiryWords,
   permissionWords, setupUrl, systemApiShort, fieldApiShort, NOT_CHECKED_NOTE, UNLISTED_FIELD_HINT, OBJECT_LEVELS, FIELD_LEVELS, KIND_CHOICES, PlainError, errorWords, notPassedText, connectErrorWords, SessionLookupError, andList,
 } from "../tools/who-grants/who-grants-logic.js";
-import { readGrants, readSystemList, readObjectList, readFieldDescribe, useNewestVersion } from "../tools/who-grants/who-grants-read.js";
+import { readGrants, readSystemList, readObjectList, readFieldDescribe } from "../tools/who-grants/who-grants-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);
@@ -835,7 +835,7 @@ export async function run(test) {
     const facts1 = await readGrants(api, userPick, { kind: "system", api: "PermissionsViewSetup", label: "View Setup" }, { now: NOW });
     assert.equal(api.apiVersion, API_VERSION);
     assert.equal(facts1.apiVersion, API_VERSION);
-    assert.ok(org.log.filter((l) => l.includes("/query/")).every((l) => l.startsWith("/services/data/v62.0/")));
+    assert.ok(org.log.filter((l) => l.includes("/query/")).every((l) => l.startsWith(`/services/data/v${API_VERSION}/`)));
   });
 
   const VIEW_SETUP = { kind: "system", api: "PermissionsViewSetup", label: "View Setup and Configuration" };
@@ -1200,7 +1200,7 @@ export async function run(test) {
     assert.ok(html.includes("<title>Where does a user get this permission?</title>"));
     assert.ok(html.includes('id="feedback"') && html.includes("../../shared/pack.css") && html.includes("../../shared/user-picker.css"));
     const manifest = JSON.parse(read(ext("manifest.json")));
-    assert.equal(manifest.version, "0.10.0");
+    assert.equal(manifest.version, "0.10.1");
     assert.ok(manifest.description.length <= 132, `manifest description is ${manifest.description.length} characters (Chrome allows 132)`);
     assert.match(manifest.description, /permission/);
     assert.match(read(ext("package.json")), /eight read-only tools/);

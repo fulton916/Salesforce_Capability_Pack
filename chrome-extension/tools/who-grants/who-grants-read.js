@@ -6,7 +6,7 @@
 //
 // The PermissionSet columns the org does not have (older API versions) are left out, judged from describe.
 
-import { soqlString, chunk } from "../../shared/sfconn.js";
+import { soqlString, chunk, useNewestVersion } from "../../shared/sfconn.js";
 import { FACTS_SCHEMA, systemItems, objectItems, PlainError } from "./who-grants-logic.js";
 
 const ID_CHUNK = 200;
@@ -21,27 +21,6 @@ const qualified = (ns, name) => (ns ? `${ns}__${name}` : name);
 const bool = (v) => (typeof v === "boolean" ? v : null);
 const rawOf = (e) => (e?.status === 401 ? "" : e?.message || String(e || ""));
 const uniq = (a) => [...new Set(a.filter(Boolean))];
-
-// ---------- the API version ----------
-
-/** Use the org's newest API version for this page only (SfApi's shared default is left alone).
- * Falls back to the default when the list cannot be read. Safe to call more than once. */
-export function useNewestVersion(api) {
-  if (!api.newestVersionPromise) {
-    api.newestVersionPromise = (async () => {
-      try {
-        const list = await api.get("/services/data/");
-        const best = Math.max(...(Array.isArray(list) ? list : []).map((v) => Number(v?.version)).filter((n) => Number.isFinite(n)));
-        if (Number.isFinite(best) && best > Number(api.apiVersion)) api.apiVersion = best.toFixed(1);
-        if (!Number.isFinite(best)) api.versionListFailed = true;
-      } catch {
-        api.versionListFailed = true; // keep the default version, but a column it lacks may exist in the org's newer one
-      }
-      return api.apiVersion;
-    })();
-  }
-  return api.newestVersionPromise;
-}
 
 /** The field names of an object, or null when its describe cannot be read. */
 async function fieldNames(api, sobject) {

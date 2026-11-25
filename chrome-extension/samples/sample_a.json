@@ -1,6 +1,7 @@
 {
-  "schema": "sf-psg-snapshot/2",
+  "schema": "sf-psg-snapshot/3",
   "takenAt": "2026-11-18T15:00:00.000Z",
+  "apiVersion": "67.0",
   "org": {
     "id": "00D000000000001EAA",
     "name": "Example Corp (sample)",
