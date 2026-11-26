@@ -608,29 +608,35 @@ export function chooseFocus(before, after, key, prefer = null) {
  * `cov`: {status: "complete"|"capped"|"stopped"|"failed"|"short", read, total (number or null), oldestMs, cap}.
  * Returns the sentence that stays above the results whenever the list is not the whole period, or null when it is.
  */
-export function partialNote(cov, tz) {
-  const note = partialNoteBase(cov, tz);
+export function partialNote(cov, tz, { onPage = false } = {}) {
+  const note = partialNoteBase(cov, tz, onPage);
   return note && cov.searched ? `${note} Entries about this person in the part that was not read are not in this list.` : note;
 }
 
-function partialNoteBase(cov, tz) {
+// `onPage`: the note sits above the real button, so it can name it. In exported text (CSV, copy) there is no button to press.
+function partialNoteBase(cov, tz, onPage) {
   if (!cov || cov.status === "complete") return null;
   const have = Number.isFinite(cov.total) ? `${nf(cov.read)} of ${nf(cov.total)} entries` : `${nf(cov.read)} entries (the total is not known)`;
   const back = Number.isFinite(cov.oldestMs) ? `, going back to ${formatLocal(cov.oldestMs, tz)}` : "";
   const atLimit = Number.isFinite(cov.maxHeld) && cov.read >= cov.maxHeld;
   // What can be done about the rest: read older entries with the button, or (page full, or no button) choose less.
   const fix = cov.canMore
-    ? "Entries older than that are not in this list yet. More can be read: press the \"Read ... older entries\" button below. Or choose a shorter period, or only one person's changes."
+    ? `Entries older than that are not in this list yet. ${onPage ? `More can be read: press the "${olderLabel(cov)}" button below.` : "More entries can be read on the Search the Setup Audit Trail page."} Or choose a shorter period, or only one person's changes.`
     : atLimit
       ? `Entries older than that are not in this list. ${OLDER_LIMIT_WORDS(cov.maxHeld)}`
       : "Entries older than that are not in this list. Choose a shorter period, or only one person's changes, to see them all.";
   const step = Number.isFinite(cov.cap) ? cov.cap : READ_STEP;
   if (cov.status === "reading") return `The read was still running when this was made, so only part of this period is here: ${have}${back}. Entries older than that are not in this list. Wait until the read has finished and make this again to get them all.`;
   if (cov.status === "continuing") return `Still reading older entries: ${have} so far${back}. Entries older than that are not in this list yet.`;
-  if (cov.status === "capped") return `Only part of this period is shown: the newest ${have} were read${back} (one read takes at most ${nf(step)}). ${fix}`;
+  if (cov.status === "capped") {
+    // After "Read older entries" more than one read's worth is held: no "newest" and no per-read limit beside the bigger number.
+    return cov.read > step
+      ? `Only part of this period is shown: ${have} were read${back}. ${fix}`
+      : `Only part of this period is shown: the newest ${have} were read${back} (one read takes at most ${nf(step)}). ${fix}`;
+  }
   if (cov.status === "stopped") return `You stopped the read. Only part of this period is shown: ${have}${back}. ${fix}`;
   if (cov.status === "short") return `Only part of this period is shown: Salesforce counted more entries than it returned (${have}${back}). Read it again, or choose a shorter period.`;
-  return `The read stopped part way, so only part of this period is shown: ${have}${back}. ${fix}${cov.canMore ? " The button also tries again." : " Or try again."}`;
+  return `The read stopped part way, so only part of this period is shown: ${have}${back}. ${fix}${cov.canMore && onPage ? " The button also tries again." : " Or try again."}`;
 }
 
 /** How many of these entries are certain (made by them, or found by Id, username or email) and how many only match their name. */

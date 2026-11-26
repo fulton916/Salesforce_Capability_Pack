@@ -1470,14 +1470,26 @@ export async function run(test) {
     const ctxOf = (o = {}) => ({ periodDetail: "Everything Salesforce keeps", who: null, tz: "UTC", filters: emptyFilters(), people: new Map(), ...o });
     const mk = (status, extra = {}) => buildCoverage({ status, read: 100000, total: 626000, oldestMs: oldest, ...extra });
     const capped = mk("capped");
-    for (const [status, lead] of [["capped", /the newest 100,000 of 626,000 entries were read/], ["stopped", /You stopped the read.*100,000 of 626,000 entries/], ["failed", /stopped part way.*100,000 of 626,000 entries/]]) {
-      const note = partialNote(mk(status), "UTC");
+    const label = olderLabel(capped);
+    for (const [status, lead] of [["capped", /^Only part of this period is shown: 100,000 of 626,000 entries were read, going back to 2026-11-02 14:03:00\. /], ["stopped", /You stopped the read.*100,000 of 626,000 entries/], ["failed", /stopped part way.*100,000 of 626,000 entries/]]) {
+      const note = partialNote(mk(status), "UTC", { onPage: true });
       assert.match(note, lead, status);
       assert.match(note, /going back to 2026-11-02 14:03:00/, status);
-      assert.match(note, /More can be read: press the "Read \.\.\. older entries" button below/, status);
-      assert.ok(!/\bcomplete\b|\ball entries\b/i.test(note), status);
+      assert.ok(note.includes(`press the "${label}" button below`), status);
+      assert.ok(!note.includes("..."), status);
+      assert.ok(!/\bcomplete\b|\ball entries\b|newest|at most 50,000/i.test(note), status);
+      // exported text never tells the reader to press a button
+      const out = partialNote(mk(status), "UTC");
+      assert.match(out, /More entries can be read on the Search the Setup Audit Trail page\./, status);
+      assert.match(out, /choose a shorter period, or only one person's changes/i, status);
+      assert.ok(!/button|press|\.\.\./i.test(out), status);
+      assert.ok(!/newest|at most 50,000/i.test(out), status);
     }
-    assert.match(partialNote(mk("failed"), "UTC"), /The button also tries again/);
+    // a single first read keeps its wording
+    assert.match(partialNote({ status: "capped", read: 50000, total: 90000, oldestMs: oldest, cap: 50000 }, "UTC"), /the newest 50,000 of 90,000 entries were read.*one read takes at most 50,000/);
+    assert.match(partialNote(mk("failed"), "UTC", { onPage: true }), /The button also tries again/);
+    assert.match(partialNote(mk("failed"), "UTC"), /Or try again\./);
+    assert.ok(!/button/.test(partialNote(mk("failed"), "UTC")));
     assert.match(partialNote({ ...capped, status: "continuing", read: 130000 }, "UTC"), /^Still reading older entries: 130,000 of 626,000 entries so far, going back to 2026-11-02 14:03:00/);
     // the status line
     assert.equal(statusLine(5, 100000, capped, null, "UTC"), "Showing 5 of 100,000 entries read (not the whole period: 100,000 of 626,000 entries read, going back to 2026-11-02 14:03:00; more can be read; see above)");
@@ -1487,9 +1499,10 @@ export async function run(test) {
     assert.match(emptyText({ read: 0, partial: true, filtered: false, cover: "9 of 99 entries read" }), /Only part of the period was read \(9 of 99 entries read\), so there may be entries/);
     // copy and CSV
     const text = shownText(list, ctxOf({ cov: capped }));
-    assert.match(text, /NOTE: Only part of this period is shown: the newest 100,000 of 626,000 entries were read, going back to 2026-11-02 14:03:00/);
+    assert.match(text, /NOTE: Only part of this period is shown: 100,000 of 626,000 entries were read, going back to 2026-11-02 14:03:00\./);
+    assert.ok(!/newest|press|button/.test(text.split("\n").find((l) => l.startsWith("NOTE:"))));
     const rows = csvRows(list, ctxOf({ cov: capped }));
-    assert.ok(/100,000 of 626,000.*going back to 2026-11-02 14:03:00.*More can be read/.test(rows.find((r) => r[0] === "Note")[1]));
+    assert.ok(/100,000 of 626,000.*going back to 2026-11-02 14:03:00.*More entries can be read on the Search the Setup Audit Trail page/.test(rows.find((r) => r[0] === "Note")[1]));
     assert.ok(rows.some((r) => r[0] === "Entries read" && r[1] === "100,000 of 626,000"));
     // an export taken while older entries are still being read
     const running = { ...capped, status: "reading", read: 130000 };

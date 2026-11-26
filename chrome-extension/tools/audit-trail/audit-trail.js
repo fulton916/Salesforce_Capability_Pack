@@ -300,7 +300,7 @@ function drawPartial() {
   // While older entries are read the list is still only part of the period: say so with the numbers so far.
   let cov = state.cov && state.continuing ? { ...state.cov, status: "continuing", read: state.entries.length, total: state.total, oldestMs: timeSpan(state.entries).min } : state.cov;
   if (cov && cov.canMore && periodSig() !== state.readSig) cov = { ...cov, canMore: false };
-  const note = cov ? partialNote({ ...cov, searched: searchedInMemory() }, TZ) : null;
+  const note = cov ? partialNote({ ...cov, searched: searchedInMemory() }, TZ, { onPage: true }) : null;
   const box = $("#partial");
   box.hidden = !note;
   box.textContent = note || "";
