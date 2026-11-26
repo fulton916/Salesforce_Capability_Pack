@@ -177,7 +177,7 @@ LABELS = HEAD + f"""<CustomLabels {X}>
 
 PACKAGE = HEAD + f"""<Package {X}>
     <types><members>*</members><name>CustomObjectTranslation</name></types>
-    <version>62.0</version>
+    <version>67.0</version>
 </Package>
 """
 

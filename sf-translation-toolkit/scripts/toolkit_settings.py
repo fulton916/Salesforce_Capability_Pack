@@ -16,7 +16,7 @@ from pathlib import Path
 SETTINGS_PATH = Path(__file__).resolve().parent.parent / "settings.json"
 
 _DEFAULTS = {
-    "api_version": "62.0",
+    "api_version": "67.0",
     "probe_language": "ja",
     "banner_to_populate": "To Populate",
     "standard_object_labels": {},
@@ -38,8 +38,8 @@ def _load() -> dict:
 
 SETTINGS = _load()
 
-API_VERSION = str(SETTINGS["api_version"])          # "62.0"
-API_PATH = f"v{API_VERSION}"                         # "v62.0", for REST URLs
+API_VERSION = str(SETTINGS["api_version"])          # "67.0" (one version for all orgs; settings.json can change it)
+API_PATH = f"v{API_VERSION}"                         # "v67.0", for REST URLs
 PROBE_LANG = str(SETTINGS["probe_language"])
 BANNER_TO_POPULATE = str(SETTINGS["banner_to_populate"])
 STANDARD_OBJECT_LABELS = {k: tuple(v) for k, v in SETTINGS["standard_object_labels"].items()}

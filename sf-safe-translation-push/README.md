@@ -26,7 +26,10 @@ Two details that are easy to get wrong are handled for you:
 - **Carriage returns inside values** (`crsafe.py`). A help text can be stored with a CRLF line break.
   Standard XML parsing and writing silently drop that CR, so a payload that re-sends the value would
   rewrite it, and every parsed-XML check would miss the change. All reads and writes here keep it,
-  and payloads are written LF-only with each content CR as `&#13;`.
+  and payloads are written LF-only with each content CR as `&#13;`. A file is refused if a CR sits
+  anywhere else (CRLF line endings, or a CR between elements). The one exception is a CR inside an
+  XML comment, such as the English source Salesforce leaves for an untranslated item: comments are
+  never written back, so those CRs are ignored.
 - **Components returned by more than one retrieve batch** (`retr_merge.py`). An object translation
   can come back from its object batch (with layout sections) and from another batch (with quick
   actions). Both copies are merged, so no block goes missing.
@@ -123,6 +126,13 @@ builder holds the slot and fails. A CSV with columns `lang,key,was` also works.
 Use one run folder per push, for example `runs/2026-01-15_labels/`. `$W` is that folder, `$S` is this
 package's `scripts/` folder, `my-prod` is the org alias. Any failed pass condition stops the run.
 Never fix a failure by loosening a flag.
+
+Keep one API version through the whole run. `make_manifests.py` (step 2) and `build_push.py` (step 4)
+both default to 67.0, and the retrieves in steps 3, 13 and 16 reuse the manifests made in step 2. A run
+started with an earlier copy of the tools (62.0) should be restarted from step 2 (`make_manifests.py`). To finish it
+instead, pass `--api-version 62.0` to `build_push.py`, and to `make_manifests.py` only if the manifests
+are made again. The tools do not detect a mixed run (the locks compare translation files, which do not
+record the version).
 
 | # | Step | Pass condition |
 |---|---|---|

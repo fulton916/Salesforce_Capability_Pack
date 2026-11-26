@@ -106,7 +106,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--api-version",
-        help="Optional API version for the retrieve (e.g. 62.0). Default: the CLI's choice.",
+        help="Optional API version for the retrieve (e.g. 67.0). Default: the CLI's choice.",
     )
     return parser.parse_args(argv)
 

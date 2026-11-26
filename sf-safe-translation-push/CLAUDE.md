@@ -116,6 +116,8 @@ default en_US).
 
 ## Known pitfalls
 
+- Keep one API version through a whole run. The default is 67.0 in both `make_manifests.py` (step 2) and `build_push.py` (step 4); the retrieves in steps 3, 13 and 16 reuse the step 2 manifests. A run started with an earlier copy of the tools (62.0) should be restarted from step 2 (`make_manifests.py`), or finished by passing `--api-version 62.0` to `build_push.py`, and to `make_manifests.py` only if the manifests are made again. The tools do not detect a mixed run (the locks compare translation files, which do not record the version).
+- `crsafe.parse` refuses a file whose carriage returns (raw, `&#13;`, `&#xD;`) are not all inside leaf values (CRLF line endings, a CR between elements). CRs inside XML comments do not count: Salesforce writes an untranslated item's English source as a comment, and comments are never written back. Never loosen this any further.
 - Run the offline tests after any code change: `python tests/run_tests.py` (no org calls).
 - Paths given after `--work` are relative to the run folder.
 - The export must be **Bilingual**. "Outdated and untranslated" fails the header check. An export

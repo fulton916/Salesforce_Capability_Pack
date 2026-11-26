@@ -45,7 +45,7 @@ from pathlib import Path
 NS_URI = "http://soap.sforce.com/2006/04/metadata"
 NS = "{" + NS_URI + "}"
 ET.register_namespace("", NS_URI)
-DEFAULT_API_VERSION = "62.0"
+DEFAULT_API_VERSION = "67.0"
 
 # Display name (lower case) -> Salesforce language code, as Translation Workbench names
 # them. A reference, not a list of languages any org must have. Extend or replace with

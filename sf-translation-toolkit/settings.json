@@ -1,8 +1,8 @@
 {
   "_help": "Project settings for the translation toolkit. Every key is optional; delete one to use its default. See README.md.",
 
-  "api_version": "62.0",
-  "_api_version": "Salesforce API version the scripts call. 62.0 is the version the toolkit was tested with.",
+  "api_version": "67.0",
+  "_api_version": "Salesforce API version the scripts call. The default is one version for every org, one release behind the newest. Raise it here if you need a newer one.",
 
   "probe_language": "ja",
   "_probe_language": "A language your org has NEVER translated into. Used to tell Salesforce-owned layout headings from yours. Change it if you translate Japanese.",

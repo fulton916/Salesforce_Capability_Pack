@@ -20,7 +20,7 @@ deploy) and after (verify):
         --unzip --target-org <alias> --wait 30 --json > run/before.json
 
 Example:
-    python manifest.py run/scope.json --out run/manifest.xml [--api-version 62.0]
+    python manifest.py run/scope.json --out run/manifest.xml [--api-version 67.0]
 """
 from __future__ import annotations
 

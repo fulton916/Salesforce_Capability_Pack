@@ -111,6 +111,7 @@ payload writing) are shared modules, not commands.
 
 ## Known pitfalls
 
+- Keep one API version through a whole run. In workflow (d) that is `manifest.py`, the retrieves, and `locate.py --build`; in (a) and (b) it is `read_manifests.py` and its retrieves. The default is 67.0. A run started with an earlier copy (62.0) should be restarted from `manifest.py` (in (a) and (b): from `read_manifests.py`), or finished by passing `--api-version 62.0` to `manifest.py` (if the manifest is made again) and `locate.py --build`. The tools do not detect a mixed run (the locks compare translation files, which do not record the version). Baseline folders read at another version (for `provenance.py`) are evidence as read; they are not re-read.
 - Task and Event custom fields are stored under Activity. A Task row and an Event row for
   the same field are one slot, and both must carry the same value. Older payloads may have
   sent them as `Task-<lang>` files. `provenance.py` checks both.

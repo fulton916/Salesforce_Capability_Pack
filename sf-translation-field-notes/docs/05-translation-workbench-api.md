@@ -5,7 +5,9 @@
 
 Salesforce exposes Translation Workbench export and import jobs under
 `/services/data/vXX.X/connect/i18n/translation/`. Replace `vXX.X` with your org's API version
-(for example `v62.0`). What was found by testing against a sandbox:
+(for example `v67.0`).
+
+What was found by testing against a sandbox:
 
 | Step | Status |
 |---|---|

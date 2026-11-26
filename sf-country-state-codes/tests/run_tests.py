@@ -87,10 +87,10 @@ class ErrorTests(unittest.TestCase):
 
 class CommandTests(unittest.TestCase):
     def test_org_is_passed_when_given(self):
-        cmd = m.build_retrieve_command("sf", "my-sandbox", "62.0")
+        cmd = m.build_retrieve_command("sf", "my-sandbox", "67.0")
         self.assertIn("Settings:Address", cmd)
         self.assertEqual(cmd[cmd.index("--target-org") + 1], "my-sandbox")
-        self.assertEqual(cmd[cmd.index("--api-version") + 1], "62.0")
+        self.assertEqual(cmd[cmd.index("--api-version") + 1], "67.0")
 
     def test_default_org_when_omitted(self):
         self.assertNotIn("--target-org", m.build_retrieve_command("sf", None, None))

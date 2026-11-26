@@ -37,6 +37,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import crsafe  # noqa: E402
 
 NS_URI = crsafe.NS_URI
+# Default Salesforce API version for the package.xml files and the payload. One value, so the
+# manifests (make_manifests.py) and the payload (build_push.py) cannot differ in a run.
+DEFAULT_API_VERSION = "67.0"
 NS = "{" + NS_URI + "}"
 
 # child elements that identify a block (skipped as leaves; they are part of the block's id)
