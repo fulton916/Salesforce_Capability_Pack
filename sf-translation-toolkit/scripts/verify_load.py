@@ -134,6 +134,23 @@ def resolve(row: dict, table: dict[str, str], pidx: dict[str, str],
     return None, ks
 
 
+def print_warnings(nokey: list, missing: list) -> None:
+    """Plain ASCII-safe text: a cp1252 Windows console cannot print symbols such as a warning sign."""
+    if nokey:
+        print(f"  WARNING: {len(nokey):,} cells are UNVERIFIED. This is not evidence they landed —")
+        print( "     it means the check could not address them. Treat as unknown, and fix")
+        print( "     the key mapping before relying on this report. Most common causes:")
+        print( "     layout sections (positional '_N' suffix) and value-set-backed picklists.")
+        by = collections.Counter(f"{r[2]}.{r[3]}" for r in nokey)
+        for k, n in by.most_common(5):
+            print(f"       {k:44} {n:6,}")
+        print()
+    if missing:
+        print(f"  WARNING: {len(missing):,} cells were sent but the org has NO translation.")
+        print( "     Check whether the component failed to deploy — a CustomObjectTranslation")
+        print( "     is all-or-nothing, so one bad reference discards the whole object.\n")
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -227,19 +244,7 @@ def main():
     print(f"  UNVERIFIED {len(nokey):7,}   could not build an .stf key — NOT a pass")
     print(f"  total      {tot:7,}\n")
 
-    if nokey:
-        print(f"  ⚠  {len(nokey):,} cells are UNVERIFIED. This is not evidence they landed —")
-        print( "     it means the check could not address them. Treat as unknown, and fix")
-        print( "     the key mapping before relying on this report. Most common causes:")
-        print( "     layout sections (positional '_N' suffix) and value-set-backed picklists.")
-        by = collections.Counter(f"{r[2]}.{r[3]}" for r in nokey)
-        for k, n in by.most_common(5):
-            print(f"       {k:44} {n:6,}")
-        print()
-    if missing:
-        print(f"  ⚠  {len(missing):,} cells were sent but the org has NO translation.")
-        print( "     Check whether the component failed to deploy — a CustomObjectTranslation")
-        print( "     is all-or-nothing, so one bad reference discards the whole object.\n")
+    print_warnings(nokey, missing)
 
     HDR = ["Sheet", "Row", "Component", "Field", "Master Label", "Language",
            "Load file value", "Org value", ".stf key"]

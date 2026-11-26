@@ -318,6 +318,15 @@ def preflight(org: str, ids: list[str], keep: list[str], chunk: int, out: Path) 
 
 # ---------------------------------------------------------------- main
 
+EXIT_CHECK_FAILED = 3   # changes were made, but the query afterwards failed
+
+
+def write_summary(out: Path, summary: dict) -> None:
+    (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+    write_csv(out / "summary.csv", ["step", "object", "operation", "records"],
+              [[x["step"], x["object"], x["operation"], x["records"]] for x in summary["steps"]])
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--user-ids", type=Path, required=True, help="text file, one User Id (005...) per line")
@@ -382,14 +391,22 @@ def main(argv=None, ask=input, interactive=None) -> int:
             confirm(a.target_org, total, a.confirm, sys.stdin.isatty() if interactive is None else interactive, ask)
             print("\nExecuting:")
             summary["execute"] = execute(a.target_org, steps, found, out, a.wait)
+            # Save what was done before the check afterwards, so a failed check loses nothing.
+            write_summary(out, summary)
             print("\nQuerying again to check what is left:")
-            after = run_queries(a.target_org, steps, ids, keep, a.chunk_size, out, label="_after")
+            try:
+                after = run_queries(a.target_org, steps, ids, keep, a.chunk_size, out, label="_after")
+            except TeardownError as e:
+                summary["remaining_check_failed"] = str(e)
+                write_summary(out, summary)
+                print(f"ERROR: Changes were made, but the check afterwards failed: {e}. "
+                      "Re-run without --execute to see what is left.", file=sys.stderr)
+                print(f"What was done is saved in {out / 'summary.json'}.")
+                return EXIT_CHECK_FAILED
             summary["remaining"] = {s.name: len(after[s.key]) for s in steps}
             left = sum(summary["remaining"].values())
             print(f"  {'REMAINING':36} {left:6}" + ("" if not left else "  <- check the *_after.csv files"))
-        (out / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-        write_csv(out / "summary.csv", ["step", "object", "operation", "records"],
-                  [[x["step"], x["object"], x["operation"], x["records"]] for x in summary["steps"]])
+        write_summary(out, summary)
         if not a.execute:
             print(f"\nQuery only. Nothing was changed. Review the CSVs in {out}, then re-run with --execute.")
             return 0

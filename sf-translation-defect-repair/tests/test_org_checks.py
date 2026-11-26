@@ -191,6 +191,33 @@ class CompareRetrieveStf(unittest.TestCase):
         self.assertEqual(rep["by_type"]["CustomField"].get("CR only"), 1)
 
 
+class RunSfParsing(unittest.TestCase):
+    """run_sf must read sf's JSON past a BOM or a warning line printed before it."""
+
+    def _run(self, stdout: bytes, stderr: bytes = b""):
+        import types
+        real_run, real_which = PV.subprocess.run, PV.shutil.which
+        PV.shutil.which = lambda name: "sf"
+        PV.subprocess.run = lambda *a, **k: types.SimpleNamespace(
+            stdout=stdout, stderr=stderr, returncode=0)
+        try:
+            return PV.run_sf(["org", "display", "-o", "x"])
+        finally:
+            PV.subprocess.run, PV.shutil.which = real_run, real_which
+
+    def test_plain(self):
+        self.assertEqual(self._run(b'{"status": 0, "result": {"a": 1}}')["result"], {"a": 1})
+
+    def test_bom_and_leading_text(self):
+        raw = b'\xef\xbb\xbf Warning: a new sf version is available\n{"status": 0, "result": {"a": 1}}'
+        self.assertEqual(self._run(raw)["result"], {"a": 1})
+
+    def test_no_json_is_an_org_error(self):
+        with self.assertRaises(PV.OrgError) as ctx:
+            self._run(b"not json", b"boom")
+        self.assertIn("boom", str(ctx.exception))
+
+
 class HelpRuns(unittest.TestCase):
     def test_every_script_has_help(self):
         scripts = sorted(p.name for p in (Path(__file__).resolve().parent.parent / "scripts").glob("*.py"))

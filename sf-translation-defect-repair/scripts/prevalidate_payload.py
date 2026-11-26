@@ -62,12 +62,17 @@ def run_sf(args: list[str]) -> dict:
     exe = shutil.which("sf")
     if not exe:
         raise OrgError("Salesforce CLI 'sf' not found on PATH")
-    p = subprocess.run([exe, *args, "--json"], capture_output=True, text=True,
-                       encoding="utf-8", errors="replace")
+    p = subprocess.run([exe, *args, "--json"], capture_output=True)
+    err = (p.stderr or b"").decode("utf-8", "replace")
     try:
-        return json.loads(p.stdout)
+        # sf may print a BOM or a warning line before the JSON: start at the first "{".
+        text = (p.stdout or b"").decode("utf-8-sig", "replace").lstrip("\ufeff")
+        start = text.find("{")
+        if start < 0:
+            raise ValueError("no JSON")
+        return json.loads(text[start:])
     except ValueError:
-        raise OrgError(f"sf {' '.join(args[:3])}: no JSON output. stderr: {p.stderr[:300]}")
+        raise OrgError(f"sf {' '.join(args[:3])}: no JSON output. stderr: {err[:300]}")
 
 
 class OrgIndex:
