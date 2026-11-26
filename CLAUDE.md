@@ -48,6 +48,11 @@ fixes have no bar. The tester, who is not given the developer's self-assessment,
 bar and names the biggest gap (or, if ours wins, our biggest remaining weakness). At most 3
 rounds, then the user decides.
 
+Releasing: bump `version` in `chrome-extension/manifest.json`, merge, then push a tag `vX.Y.Z` equal to it.
+`.github/workflows/release.yml` builds `salesforce-capability-pack-extension.zip` (extension files at the zip root,
+plus LICENSE; no `tests/` or `dev/`) and attaches it to that tag's release, and fails if tag and version differ.
+It never deletes old releases; that cleanup stays manual.
+
 ## Deferred edits
 
 `PENDING_CLEANUP.md` lists edits that were put off because a session's scope kept it out of a file.
