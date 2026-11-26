@@ -3,7 +3,7 @@
 
 import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
-import { readLogList, readLogBody, ReadProblem } from "./error-tracer-read.js";
+import { readLogList, readLogBody, ReadProblem, listNote } from "./error-tracer-read.js";
 import { analyzeLog, rawAround, elapsedWords, humanSize, whatRan, statusWords, filterLogs, userChoices, summaryText, whenText } from "./error-tracer-logic.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
@@ -59,8 +59,9 @@ function drawList() {
   const body = $("#logRows");
   body.replaceChildren();
   $("#logTable").hidden = rows.length === 0;
+  const note = listNote(state.rows.length);
   $("#listStatus").textContent = state.rows.length
-    ? `${rows.length} of ${state.rows.length} logs shown (newest first).`
+    ? `${rows.length} of ${state.rows.length} logs shown (newest first).${note ? " " + note : ""}`
     : "No debug logs were found. Turn one on with the steps above, repeat the action, then refresh.";
   for (const r of rows) {
     const s = statusWords(r);
@@ -144,10 +145,9 @@ function findingCard(analysis, f) {
 }
 
 function renderResult(row, analysis, meta) {
-  const bad = analysis.problemCount > 0;
   const box = $("#resultBody");
   const parts = [
-    el("p", { class: `headline ${bad ? "bad" : analysis.notLog ? "" : "good"}`, text: analysis.headline }),
+    el("p", { class: `headline ${analysis.tone === "bad" ? "bad" : analysis.tone === "good" ? "good" : ""}`, text: analysis.headline }),
     analysis.subline ? el("p", { class: "subline", text: analysis.subline }) : null,
     el("dl", { class: "facts" },
       fact("Who", [meta.userName, analysis.user.username && `(${analysis.user.username})`].filter(Boolean).join(" ") || "Not stated"),
@@ -213,7 +213,7 @@ async function start() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       $("#refresh").disabled = true;
       return;
     }
@@ -225,7 +225,7 @@ async function start() {
   const api = new SfApi(session);
   state.source = { list: () => readLogList(api), body: (id) => readLogBody(api, id) };
   const host = DEV ? (HOST || "") : (HOST || session.apiHost);
-  $("#org").textContent = DEV ? "Dev server" : host;
+  $("#org").textContent = DEV ? "Local dev server" : host;
   try {
     const org = await readOrg(api, host);
     $("#org").replaceChildren(el("strong", { text: org.name || host }), " ", el("span", { class: `badge ${org.isSandbox ? "sbx" : "prod"}`, text: org.isSandbox ? "Sandbox" : "Production" }));

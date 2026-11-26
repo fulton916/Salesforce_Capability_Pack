@@ -656,6 +656,17 @@ export function csvText(r) {
 }
 
 /** File name for the download, for example "flows_using_Account.Status__c_202611191530.csv". */
+/** The time part of a download file name, "202611251530", in the person's LOCAL time (never UTC). `d` is injectable. */
+export function localStamp(d = new Date()) {
+  const p = (n, w = 2) => String(n).padStart(w, "0");
+  return `${p(d.getFullYear(), 4)}${p(d.getMonth() + 1)}${p(d.getDate())}${p(d.getHours())}${p(d.getMinutes())}`;
+}
+
+/** Starting a search: the technical notes of the search before it are dropped; notes found while getting ready for this one (`pending`) are kept. */
+export function startSearchNotes(pending = []) {
+  return { tech: [...pending], pending: [] };
+}
+
 export function csvFileName(target, stamp) {
   const what = target?.kind === "text" ? `text_${target.text}` : `${target?.object || "object"}.${target?.field || "field"}`;
   return `flows_using_${what.replace(/[^\w.-]+/g, "_").slice(0, 60)}_${stamp}.csv`;

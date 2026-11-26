@@ -27,11 +27,18 @@ export async function readOrgDetails(api, host) {
   }
 }
 
-/** Why a read failed: "session" (401), "denied" (permission), "unreachable" (connection, timeout, 502/503/504) or "other". */
+export const REQUEST_LIMIT_TEXT = "Salesforce turned this request away because the org has used up its daily API request limit. This is not a missing permission. Try again later, or ask your Salesforce admin to check API usage.";
+/** True when Salesforce refused because the org's daily API request limit is used up (it answers 403 for this). */
+export function isRequestLimit(e) {
+  return /REQUEST_LIMIT_EXCEEDED/i.test(`${e?.errorCode || ""} ${e?.message || ""} ${e?.detail || ""}`);
+}
+
+/** Why a read failed: "limit" (daily API limit), "session" (401), "denied" (permission), "unreachable" (connection, timeout, 502/503/504) or "other". */
 export function failureCause(e) {
   if (e?.status === 401) return "session";
   const text = `${e?.errorCode || ""} ${e?.message || ""}`;
   const status = e?.status;
+  if (isRequestLimit(e)) return "limit";
   if (status === 403 || /INSUFFICIENT_ACCESS|INVALID_TYPE|FORBIDDEN|not supported|insufficient access|permission|not allowed/i.test(text)) return "denied";
   if (status === 0 || status === 502 || status === 503 || status === 504 || e?.name === "TypeError" ||
       /INVALID_SESSION_ID|failed to fetch|network|timed? ?out|ECONN|ENOTFOUND|session|connection/i.test(text)) return "unreachable";
@@ -42,6 +49,7 @@ export function failureCause(e) {
 function causeProblem(e, { denied, other, what }) {
   switch (failureCause(e)) {
     case "session": return e.message;
+    case "limit": return REQUEST_LIMIT_TEXT;
     case "unreachable": return `Salesforce could not be reached to read ${what}. ${RECONNECT}`;
     case "denied": return denied;
     default: return other;
@@ -77,6 +85,7 @@ function whoProblem(errors) {
   const causes = errors.map(failureCause);
   const session = errors[causes.indexOf("session")];
   if (session) return session.message;
+  if (causes.includes("limit")) return REQUEST_LIMIT_TEXT;
   if (causes.includes("unreachable")) return `Salesforce could not be reached to find out who you are. ${RECONNECT}`;
   if (causes.includes("denied")) return "Salesforce would not say who you are from this page.";
   return "Who you are could not be read from this page.";
@@ -112,6 +121,7 @@ export async function readCurrentUser(api) {
     return {
       data: { id: who.id, name: c.name, username: c.username, profile: null, role: null, language: c.language || null, locale: c.locale || null, timeZone: c.timeZone || null, userType: c.userType || null },
       problem: cause === "session" ? e.message
+        : cause === "limit" ? REQUEST_LIMIT_TEXT
         : cause === "unreachable" ? `${part} Salesforce could not be reached for the rest. ${RECONNECT}`
         : cause === "denied" ? `${part} Your user may not be allowed to read the user record.` : part,
       raw: rawOf(e),

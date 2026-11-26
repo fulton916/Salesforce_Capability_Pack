@@ -5,7 +5,7 @@ import { SfApi, findSession } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
 import { listPsgs, takeSnapshot, validateSnapshot } from "./compare-groups-read.js";
 import { toCsv } from "../../shared/csv.js";
-import { compareSnapshots, toRows, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, groupStatus, tabDiffText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./compare-groups-logic.js";
+import { compareSnapshots, toRows, filterRows, cardLines, tabDiffCount, sortRows, sortGrouped, statusText, groupStatus, tabDiffText, changeClearsResults, sameGroupOnBothSides, SAME_GROUP_NOTE, connectFailureText, SECTION_TITLES, SECTION_HELP, FLAG_LABELS, PART_SETS, PART_SETS_HELP, PART_MUTED } from "./compare-groups-logic.js";
 import { matchPsgs } from "../../shared/pick.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
@@ -129,15 +129,21 @@ async function connect() {
       return;
     }
     state.api = new SfApi(session);
-    state.org = await readOrg(state.api, DEV ? "local test server" : session.apiHost);
-    showOrg(state.org, DEV ? "" : session.apiHost, DEV ? "Local test server" : null);
+    state.org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
+    showOrg(state.org, DEV ? "" : session.apiHost, DEV ? "Local dev server" : null);
+  } catch (e) {
+    $("#org").textContent = "Not connected";
+    showError(connectFailureText("connect", e), e.message);
+    return;
+  }
+  try {
     state.psgs = await listPsgs(state.api);
     if (!state.psgs.length) showError("This org has no permission set groups, or your user cannot see them.");
     combos.a.skipOpen = true;
     $("#input-a").focus();
   } catch (e) {
-    $("#org").textContent = "Not connected";
-    showError("Could not connect to the org. If you have been away a while, reload the Salesforce tab and try again.", e.message);
+    if (e?.status === 401) $("#org").textContent = "Not connected";
+    showError(connectFailureText("list", e), e.message);
   }
 }
 
@@ -221,11 +227,39 @@ function highlight(side, i) {
   if (li) { li.scrollIntoView({ block: "nearest" }); c.input.setAttribute("aria-activedescendant", li.id); }
 }
 
+/** Any change to either side clears the shown results, so nothing stale is visible or exportable. */
+function clearResults() {
+  state.result = null;
+  state.tab = "overview";
+  state.allRisks = { a: false, b: false };
+  state.toggled = new Set();
+  state.sort = {};
+  state.search = "";
+  $("#results").hidden = true;
+  $("#warnAlert").hidden = true;
+  $("#notesPanel").hidden = true;
+  $("#notes").replaceChildren();
+  $("#cards").replaceChildren();
+  $("#verdict").textContent = "";
+  $("#verdictNote").textContent = "";
+}
+
+/** Run `change` on one side; clear the results if it really changed that side. */
+function changeSide(side, change) {
+  const before = { ...state.sides[side] };
+  change();
+  if (changeClearsResults(!!state.result, before, state.sides[side])) clearResults();
+}
+
 function pick(side, p, { quiet = false } = {}) {
   const s = state.sides[side];
+  const before = { ...s };
   s.psgId = p.id;
+  s.groupName = p.developerName || p.label || "";
   s.snapshot = p.demo || null; // a new pick means a fresh read (demo: the sample)
   s.fileName = null;
+  if (changeClearsResults(!!state.result, before, s)) clearResults();
+  showError("");
   $(`.snap[data-side="${side}"]`).value = "";
   combos[side].input.value = p.label;
   combos[side].close();
@@ -256,7 +290,8 @@ function renderChosen(side) {
 }
 
 function clearSide(side) {
-  Object.assign(state.sides[side], { snapshot: null, fileName: null, psgId: "" });
+  changeSide(side, () => Object.assign(state.sides[side], { snapshot: null, fileName: null, psgId: "", groupName: "" }));
+  showError("");
   $(`.snap[data-side="${side}"]`).value = "";
   combos[side].input.value = "";
   renderChosen(side);
@@ -278,7 +313,7 @@ for (const input of $$(".snap")) {
     if (!file) return;
     try {
       const snap = validateSnapshot(JSON.parse(await file.text()));
-      Object.assign(state.sides[side], { snapshot: snap, fileName: file.name, psgId: "" });
+      changeSide(side, () => Object.assign(state.sides[side], { snapshot: snap, fileName: file.name, psgId: "", groupName: "" }));
       combos[side].input.value = "";
       showError("");
     } catch (err) {
@@ -292,10 +327,27 @@ for (const input of $$(".snap")) {
 
 // ---------- comparing ----------
 
+/** The org and group API name each side points at, before anything is read. */
+function sideIdentity(side) {
+  const s = state.sides[side];
+  if (s.fileName && s.snapshot) return { org: s.snapshot.org, developerName: s.snapshot.psg.developerName, live: false };
+  return { org: state.org, developerName: s.groupName, live: true };
+}
+
+function sameGroupPicked() {
+  return sameGroupOnBothSides(sideIdentity("a"), sideIdentity("b"));
+}
+
 async function runCompare() {
   showError("");
   $("#compare").disabled = true;
   try {
+    if (sameGroupPicked()) {
+      clearResults();
+      setProgress("");
+      showError(SAME_GROUP_NOTE);
+      return;
+    }
     // Read both groups at the same time, again on every Compare, so the result reflects the org now.
     const reading = ["a", "b"].filter((side) => !(state.sides[side].fileName || DEMO));
     const at = Object.fromEntries(reading.map((side) => [side, 0])); // step each group is on (0 = not started)

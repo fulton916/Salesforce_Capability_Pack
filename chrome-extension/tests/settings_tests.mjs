@@ -441,7 +441,7 @@ export async function run(test) {
   await test("settings: the page has one labelled checkbox per tool, a Show all button and the note", () => {
     const html = read("settings.html");
     const js = read("settings.js");
-    assert.ok(html.includes("<h1>Settings</h1>") && html.includes("Choose which tools show in the toolbar menu."));
+    assert.ok(html.includes("<h1>Settings</h1>") && html.includes("Choose which tools show in the Salesforce Capability Pack menu."));
     assert.ok(html.includes("Show all tools") && html.includes("changes nothing in Salesforce"));
     assert.ok(js.includes('createElement("label")') && js.includes('box.type = "checkbox"'));
     assert.ok(read("settings-logic.js").includes('"Saved"') && read("settings-logic.js").includes("not kept"));

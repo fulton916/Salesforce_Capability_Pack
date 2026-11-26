@@ -38,8 +38,13 @@ Every package has `README.md` (for people) and `CLAUDE.md` (for you). Beyond tha
 The main session is the project-manager agent (`.claude/settings.json`). Definitions are in
 `.claude/agents/`. The manager plans and writes task briefs; a developer agent codes; a tester agent
 checks independently and reports PASS/FAIL with evidence; the manager reads the diff and approves,
-and commits only with passing tests. Work goes in through a pull request, which the manager merges
-when the user says so in the chat; direct pushes to main happen only when the user asks.
+and commits only with passing tests. Work goes in through a pull request. The manager merges it
+itself, without asking, once the tester passed it, the manager approved the diff, the branch is up
+to date and re-tested, and CI is green; it stops and asks the user first for deletions, permission
+or security changes, production or shared orgs, secrets, unfixable failures or conflicts, work
+beyond its issue, or doubt (full list in `.claude/agents/project-manager.md`). It then tells the
+user in one line what merged. The user can say "wait" in the chat and that wins. Direct pushes to
+main happen only when the user asks.
 Planned work is one GitHub issue per feature, labelled `enhancement` (bugs: `bug`) plus
 `group: <area>` for the part of the pack it touches, and its pull request closes it.
 Developers never commit or push; testers never edit. Briefs for anything people see or use name a
