@@ -102,7 +102,9 @@ python scripts/user_access_teardown.py --user-ids FILE -o ALIAS [options]
 | `--wait MIN` | Minutes to wait per bulk job (default 30). |
 
 Exit codes: 0 done, 1 stopped before changing anything (bad input, failed query, refused
-confirmation), 2 a bulk job failed.
+confirmation), 2 a bulk job failed, 3 changes were made but the check afterwards (the second
+query) failed. On 3, `summary.json` still lists what was done; re-run without `--execute` to see
+what is left.
 
 ## Tests
 
@@ -127,6 +129,8 @@ with `sf` mocked.
 - Some assignments (for example, ones a managed package or Salesforce controls) may not be
   deletable; the bulk job reports them as failed rows.
 - The role step clears `UserRoleId`. It does not change the profile, deactivate or freeze users.
+- Removing a user's role changes record sharing for the records those users own, because
+  sharing that came from the role hierarchy goes away with the role.
 - Other access (account/opportunity team membership, manual sharing, delegated admin groups,
   user-level licences, Chatter groups) is not covered.
 - The CLI's `org-max-query-limit` (default 10,000) caps each query. The script stops if a result

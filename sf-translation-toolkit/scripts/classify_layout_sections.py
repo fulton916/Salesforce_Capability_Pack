@@ -89,6 +89,25 @@ def workbook_languages(wb) -> list[str]:
     return out
 
 
+def parse_sf_json(raw: bytes | str):
+    """Parse sf's output: drop a leading BOM and any text before the first "{" (warnings)."""
+    text = raw.decode("utf-8-sig", "replace") if isinstance(raw, bytes) else raw
+    text = text.lstrip("\ufeff")
+    start = text.find("{")
+    if start < 0:
+        raise ValueError("no JSON in the output")
+    return json.loads(text[start:])
+
+
+def sf_failure_text(r, data=None) -> str:
+    """sf's own message for a failed call, falling back to stderr."""
+    if isinstance(data, dict) and (data.get("message") or data.get("name")):
+        return f"{data.get('name') or 'error'}: {data.get('message') or ''}".strip()
+    err = r.stderr or b""
+    err = err.decode("utf-8", "replace") if isinstance(err, bytes) else err
+    return err.strip()[:300] or f"exit code {r.returncode}"
+
+
 def composite(urls: list[str], lang: str, org: str) -> list[dict]:
     out: list[dict] = []
     for i in range(0, len(urls), BATCH):
@@ -107,8 +126,14 @@ def composite(urls: list[str], lang: str, org: str) -> list[dict]:
         finally:
             os.unlink(path)
         try:
-            res = json.loads(r.stdout.decode("utf-8", "replace")).get("results", [])
-        except Exception as exc:
+            body_out = parse_sf_json(r.stdout)
+            if r.returncode != 0:
+                sys.exit(f"error: composite/batch failed for {lang}: "
+                         f"{sf_failure_text(r, body_out)}")
+            res = body_out.get("results", [])
+        except (ValueError, AttributeError) as exc:
+            if r.returncode != 0:
+                sys.exit(f"error: composite/batch failed for {lang}: {sf_failure_text(r)}")
             sys.exit(f"composite/batch failed for {lang}: {exc}. Refusing to continue — "
                      "a swallowed batch error is indistinguishable from 'no sections'.")
         if len(res) != len(chunk):
@@ -121,7 +146,14 @@ def composite(urls: list[str], lang: str, org: str) -> list[dict]:
 def tooling(soql: str, org: str) -> list[dict]:
     r = subprocess.run([_sf(), "data", "query", "--use-tooling-api", "-q", soql,
                         "-o", org, "--json"], capture_output=True, timeout=300)
-    return json.loads(r.stdout.decode("utf-8", "replace"))["result"]["records"]
+    try:
+        data = parse_sf_json(r.stdout)
+    except ValueError:
+        sys.exit(f"error: tooling query in {org} gave no readable output: "
+                 f"{sf_failure_text(r)}")
+    if r.returncode != 0 or data.get("status") != 0:
+        sys.exit(f"error: tooling query in {org} failed: {sf_failure_text(r, data)}")
+    return (data.get("result") or {}).get("records") or []
 
 
 def layout_targets(objects: list[str], org: str) -> list[tuple[str, str]]:

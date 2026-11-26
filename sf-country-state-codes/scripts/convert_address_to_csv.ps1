@@ -7,7 +7,8 @@
 
 .DESCRIPTION
   Needs no Python. Reads the XML, writes one row per state (or one row per country
-  without states), sorted by Country then State, UTF-8 CSV.
+  without states), sorted by Country then State, UTF-8 CSV with a BOM (Excel opens it correctly).
+  Runs in Windows PowerShell 5.1 (powershell) and PowerShell 7 (pwsh).
   It does not call Salesforce. Retrieve the file first, for example:
       sf project retrieve start --metadata Settings:Address --target-org my-sandbox
 
@@ -35,19 +36,19 @@ if (-not $countries) {
 
 function New-Row($country, $state) {
     [PSCustomObject]@{
-        Country                   = [string]$country.label
-        CountryCode               = [string]$country.isoCode
-        CountryIntegrationValue   = [string]$country.integrationValue
-        CountryActive             = [string]$country.active
-        CountryVisible            = [string]$country.visible
-        CountrySalesforceStandard = [string]$country.standard
-        CountryOrgDefault         = [string]$country.orgDefault
-        State                     = if ($state) { [string]$state.label } else { "" }
-        StateCode                 = if ($state) { [string]$state.isoCode } else { "" }
-        StateIntegrationValue     = if ($state) { [string]$state.integrationValue } else { "" }
-        StateActive               = if ($state) { [string]$state.active } else { "" }
-        StateVisible              = if ($state) { [string]$state.visible } else { "" }
-        StateSalesforceStandard   = if ($state) { [string]$state.standard } else { "" }
+        Country                      = [string]$country.label
+        'Country Code'               = [string]$country.isoCode
+        'Country Integration Value'  = [string]$country.integrationValue
+        'Country Active'             = [string]$country.active
+        'Country Visible'            = [string]$country.visible
+        'Country Salesforce Standard' = [string]$country.standard
+        'Country Org Default'        = [string]$country.orgDefault
+        State                        = if ($state) { [string]$state.label } else { "" }
+        'State Code'                 = if ($state) { [string]$state.isoCode } else { "" }
+        'State Integration Value'    = if ($state) { [string]$state.integrationValue } else { "" }
+        'State Active'               = if ($state) { [string]$state.active } else { "" }
+        'State Visible'              = if ($state) { [string]$state.visible } else { "" }
+        'State Salesforce Standard'  = if ($state) { [string]$state.standard } else { "" }
     }
 }
 
@@ -60,8 +61,12 @@ $rows = foreach ($country in $countries) {
     }
 }
 
-$rows |
+# UTF-8 WITH a byte order mark in Windows PowerShell 5.1 and PowerShell 7 alike, so Excel
+# shows accented names correctly. (Export-Csv -Encoding UTF8 has no BOM in PowerShell 7.)
+$lines = $rows |
     Sort-Object Country, State |
-    Export-Csv -LiteralPath $OutFile -NoTypeInformation -Encoding UTF8
+    ConvertTo-Csv -NoTypeInformation
+$target = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutFile)
+[System.IO.File]::WriteAllLines($target, [string[]]@($lines), (New-Object System.Text.UTF8Encoding $true))
 
 Write-Host "Created $OutFile with $(@($rows).Count) rows."

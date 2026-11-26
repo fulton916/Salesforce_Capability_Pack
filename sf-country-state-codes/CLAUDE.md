@@ -36,8 +36,9 @@ python scripts/export_country_state_codes.py --skip-retrieve --xml-path <path>/A
 
 CSV variant, no Python (XML must already be retrieved):
 ```
-pwsh scripts/convert_address_to_csv.ps1 -XmlPath <xml> -OutFile <file>.csv
+pwsh scripts/convert_address_to_csv.ps1 -XmlPath <xml> -OutFile <file>.csv   # or: powershell -File ...
 ```
+The CSV is UTF-8 with a BOM in both Windows PowerShell 5.1 and PowerShell 7.
 
 ## Inputs and outputs
 

@@ -56,7 +56,7 @@ Output folder: `users.csv`, `missing_user_ids.txt`, `<step>.csv` (readable), `<s
 `BULK_COMMANDS.sh`, `summary.json`, `summary.csv`; after `--execute` also `execute_<step>.json`
 and `<step>_after.csv`.
 
-Exit codes: 0 ok, 1 stopped before any change, 2 a bulk job failed.
+Exit codes: 0 ok, 1 stopped before any change, 2 a bulk job failed, 3 changes were made but the check afterwards failed.
 
 ## Guardrails
 
@@ -83,9 +83,10 @@ Exit codes: 0 ok, 1 stopped before any change, 2 a bulk job failed.
 ```
 python tests/run_tests.py
 ```
-15 offline tests (sf mocked): Id parsing, SOQL generation and chunking, generate-only files,
+16 offline tests (sf mocked): Id parsing, SOQL generation and chunking, generate-only files,
 query-only CSVs, `#N/A` role file, confirm/production/terminal guards, execute order,
-stop on failure, own-user exclusion, truncated query.
+stop on failure, own-user exclusion, truncated query, failed check after execute still saves
+the summary (exit 3).
 
 ## Known pitfalls
 

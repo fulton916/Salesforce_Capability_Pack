@@ -127,6 +127,41 @@ class WorkbookTests(unittest.TestCase):
         self.assertIn("CountryStateCodes", ws.tables)
 
 
+class PowerShellCsvTests(unittest.TestCase):
+    """Run convert_address_to_csv.ps1 under Windows PowerShell 5.1 and PowerShell 7."""
+    PS1 = HERE.parent / "scripts" / "convert_address_to_csv.ps1"
+
+    def test_csv_has_bom_no_type_line_and_accents(self):
+        shells = [s for s in ("powershell", "pwsh") if shutil.which(s)]
+        if not shells:
+            self.skipTest("neither powershell nor pwsh found on PATH")
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        xml = tmp / "accent.xml"
+        text = FIXTURE.read_text(encoding="utf-8").replace(
+            "<label>Ontario</label>", "<label>Bundesland Württemberg</label>")
+        xml.write_text(text, encoding="utf-8")
+        import csv
+        import io
+        import subprocess
+        for shell in shells:
+            with self.subTest(shell=shell):
+                out = tmp / (shell + ".csv")
+                proc = subprocess.run(
+                    [shutil.which(shell), "-NoProfile", "-ExecutionPolicy", "Bypass",
+                     "-File", str(self.PS1), "-XmlPath", str(xml), "-OutFile", str(out)],
+                    capture_output=True, text=True, timeout=120)
+                self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+                raw = out.read_bytes()
+                self.assertEqual(raw[:3], b"\xef\xbb\xbf")
+                decoded = raw.decode("utf-8-sig")
+                self.assertNotIn("#TYPE", decoded)
+                rows = list(csv.reader(io.StringIO(decoded)))
+                self.assertEqual(rows[0], m.HEADERS)
+                self.assertEqual(len(rows), 6)
+                self.assertIn("Bundesland Württemberg", [r[7] for r in rows[1:]])
+
+
 if __name__ == "__main__":
     result = unittest.main(exit=False, verbosity=2).result
     sys.exit(0 if result.wasSuccessful() else 1)

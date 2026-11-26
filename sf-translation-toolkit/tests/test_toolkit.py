@@ -248,6 +248,55 @@ def test_namespaced_filter() -> None:
     check("standard object with managed field kept", not NAMESPACED_OBJECT.search(obj("Account.mypkg__Zone__c")))
 
 
+def test_verify_load_cp1252_console() -> None:
+    print("verify_load warnings on a cp1252 console:")
+    import os
+    code = ("import verify_load; "
+            "verify_load.print_warnings([('S', 2, 'Account', 'F__c', 'L', 'de', 'x', '', 'k')], "
+            "[('S', 3, 'Account', 'G__c', 'L', 'de', 'y', '', 'k')])")
+    env = {**os.environ, "PYTHONIOENCODING": "cp1252", "PYTHONUTF8": "0"}
+    r = subprocess.run([PY, "-c", code], capture_output=True, cwd=SCRIPTS, env=env)
+    check("exits cleanly", r.returncode == 0, r.stderr.decode("cp1252", "replace")[-500:])
+    out = r.stdout.decode("cp1252")
+    check("unverified warning is printed as plain text", "WARNING: 1 cells are UNVERIFIED" in out)
+    check("missing warning is printed as plain text", "WARNING: 1 cells were sent" in out)
+
+
+def test_classify_sf_json() -> None:
+    print("classify_layout_sections: sf output handling:")
+    import json as _json
+    import types
+    import classify_layout_sections as C
+    good = _json.dumps({"status": 0, "result": {"records": [{"Id": "1"}]}})
+    check("BOM and leading text are skipped",
+          C.parse_sf_json(("\ufeff" + "Warning: update available\n" + good).encode("utf-8"))
+          ["result"]["records"] == [{"Id": "1"}])
+
+    def fake(stdout: bytes, code: int, stderr: bytes = b""):
+        return lambda *a, **k: types.SimpleNamespace(stdout=stdout, stderr=stderr, returncode=code)
+
+    real = C.subprocess.run
+    try:
+        C.subprocess.run = fake(b"\xef\xbb\xbfnote\n" + good.encode(), 0)
+        check("tooling() reads records past a BOM and text", C.tooling("SELECT Id", "o") == [{"Id": "1"}])
+        bad = _json.dumps({"status": 1, "name": "INVALID_SESSION", "message": "Session expired"})
+        C.subprocess.run = fake(bad.encode(), 1)
+        try:
+            C.tooling("SELECT Id", "o")
+            check("tooling() stops on a failed sf call", False)
+        except SystemExit as e:
+            check("failure message carries sf's own message",
+                  "Session expired" in str(e) and "KeyError" not in str(e), str(e))
+        C.subprocess.run = fake(b"", 1, b"No authorization found for o")
+        try:
+            C.tooling("SELECT Id", "o")
+            check("tooling() stops on empty output", False)
+        except SystemExit as e:
+            check("empty output falls back to stderr", "No authorization found" in str(e), str(e))
+    finally:
+        C.subprocess.run = real
+
+
 def main() -> None:
     with tempfile.TemporaryDirectory() as td:
         try:
@@ -259,6 +308,8 @@ def main() -> None:
             test_safeguards(Path(td))
             test_header_colours()
             test_namespaced_filter()
+            test_verify_load_cp1252_console()
+            test_classify_sf_json()
         except AssertionError as e:
             print(f"\n{e}", file=sys.stderr)
             sys.exit(1)

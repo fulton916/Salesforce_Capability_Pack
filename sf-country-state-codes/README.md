@@ -75,10 +75,15 @@ python scripts/export_country_state_codes.py --skip-retrieve --xml-path path/to/
 ### Optional: CSV without Python
 
 `scripts/convert_address_to_csv.ps1` converts an already-retrieved XML to CSV with the same
-columns. It does not call Salesforce.
+columns. It does not call Salesforce. It works in Windows PowerShell 5.1 (`powershell`) and in
+PowerShell 7 (`pwsh`), and writes the CSV as UTF-8 with a byte order mark so Excel shows
+accented names correctly.
 
 ```
 sf project retrieve start --metadata Settings:Address --target-org my-sandbox
+# Windows PowerShell
+powershell -ExecutionPolicy Bypass -File scripts/convert_address_to_csv.ps1 -XmlPath force-app/main/default/settings/Address.settings-meta.xml -OutFile codes.csv
+# PowerShell 7
 pwsh scripts/convert_address_to_csv.ps1 -XmlPath force-app/main/default/settings/Address.settings-meta.xml -OutFile codes.csv
 ```
 

@@ -236,6 +236,26 @@ class ExecuteTests(Base):
         summary = json.loads((self.out / "summary.json").read_text())
         self.assertEqual(summary["remaining"]["3_PermissionSetLicenseAssignments"], 1)
 
+    def test_failed_check_afterwards_still_saves_summary(self):
+        class QueryDiesAfterBulk(FakeOrg):
+            def __call__(self, args):
+                if args[:2] == ["data", "query"] and self.bulk_calls():
+                    return {"status": 1, "message": "simulated query outage"}
+                return super().__call__(args)
+        org = QueryDiesAfterBulk()
+        rc = self.main(["--execute", "--confirm", "13"], org=org)
+        self.assertEqual(rc, td.EXIT_CHECK_FAILED)
+        self.assertEqual(td.EXIT_CHECK_FAILED, 3)
+        self.assertIn("Changes were made, but the check afterwards failed", self.stderr)
+        self.assertIn("simulated query outage", self.stderr)
+        self.assertIn("Re-run without --execute to see what is left.", self.stderr)
+        summary = json.loads((self.out / "summary.json").read_text())
+        self.assertEqual(summary["execute"][0]["numberRecordsProcessed"], 2)
+        self.assertNotIn("remaining", summary)
+        self.assertIn("simulated query outage", summary["remaining_check_failed"])
+        self.assertTrue((self.out / "summary.csv").is_file())
+        self.assertEqual(len(org.bulk_calls()), 6)   # the writes themselves ran as before
+
     def test_own_user_is_kept(self):
         org = FakeOrg(include_me=True)
         p = ids_file(self.tmp, U + [ME])
