@@ -26,7 +26,10 @@ Two details that are easy to get wrong are handled for you:
 - **Carriage returns inside values** (`crsafe.py`). A help text can be stored with a CRLF line break.
   Standard XML parsing and writing silently drop that CR, so a payload that re-sends the value would
   rewrite it, and every parsed-XML check would miss the change. All reads and writes here keep it,
-  and payloads are written LF-only with each content CR as `&#13;`.
+  and payloads are written LF-only with each content CR as `&#13;`. A file is refused if a CR sits
+  anywhere else (CRLF line endings, or a CR between elements). The one exception is a CR inside an
+  XML comment, such as the English source Salesforce leaves for an untranslated item: comments are
+  never written back, so those CRs are ignored.
 - **Components returned by more than one retrieve batch** (`retr_merge.py`). An object translation
   can come back from its object batch (with layout sections) and from another batch (with quick
   actions). Both copies are merged, so no block goes missing.

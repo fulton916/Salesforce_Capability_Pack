@@ -18,6 +18,7 @@ import helpers as H  # noqa: E402
 from helpers import L, run  # noqa: E402
 
 import crsafe  # noqa: E402
+import xml.etree.ElementTree as ET  # noqa: E402
 
 SCRIPTS = ["make_source.py", "make_manifests.py", "build_push.py", "negative_control.py", "check_vs_stf.py",
            "negative_control_stf.py", "pre_deploy_check.py", "verify_push.py", "export_diff_check.py",
@@ -69,6 +70,57 @@ class T02CrSafe(unittest.TestCase):
     def test_cr_between_elements_is_refused(self):
         p = J(self.d, "between.xml")
         Path(p).write_bytes(b'<?xml version="1.0" encoding="UTF-8"?>\n<a>\n  <b>x</b>\r\n  <c>y</c>\n</a>\n')
+        with self.assertRaises(SystemExit):
+            crsafe.parse(p)
+
+    def _p(self, name, body):
+        p = J(self.d, name)
+        Path(p).write_bytes(b'<?xml version="1.0" encoding="UTF-8"?>\n' + body)
+        return p
+
+    def test_comment_with_crlf_is_not_counted(self):
+        p = self._p("c1.xml", b"<a>\n    <help><!-- English help\r\ntext --></help>\n</a>\n")
+        root = crsafe.parse(p).getroot()
+        self.assertFalse(root.find("help").text)
+        self.assertEqual(len(root.find("help")), 0)
+        self.assertNotIn(b"English", ET.tostring(root))
+
+    def test_comment_with_written_cr_references(self):
+        for ref in (b"&#13;", b"&#xD;"):
+            p = self._p("c2.xml", b"<a><help><!-- one" + ref + b"two " + ref + b"--></help></a>\n")
+            self.assertFalse(crsafe.parse(p).getroot().find("help").text)
+
+    def test_comment_cr_and_value_cr_in_one_file(self):
+        p = self._p("c3.xml", b"<a>\n <help><!-- src\r\ntext --></help>\n <b>one\r\ntwo</b>\n</a>\n")
+        root = crsafe.parse(p).getroot()
+        self.assertEqual(root.find("b").text, "one\r\ntwo")
+        q = J(self.d, "c3out.xml")
+        crsafe.write_xml(root, q)
+        data = Path(q).read_bytes()
+        self.assertEqual(data.count(b"&#13;"), 1)
+        self.assertNotIn(b"\r", data)
+        self.assertNotIn(b"<!--", data)
+        self.assertEqual(crsafe.parse(q).getroot().find("b").text, "one\r\ntwo")
+
+    def test_multiline_comment_mixed_endings(self):
+        p = self._p("c4.xml", b"<a><help><!-- l1\nl2\r\nl3\nl4\r\nl5 --></help></a>\n")
+        self.assertFalse(crsafe.parse(p).getroot().find("help").text)
+
+    def test_crlf_endings_with_comment_still_refused(self):
+        p = self._p("c5.xml", b"<a>\r\n  <help><!-- x\r\ny --></help>\r\n</a>\r\n")
+        with self.assertRaises(SystemExit):
+            crsafe.parse(p)
+
+    def test_comment_does_not_cover_cr_between_elements(self):
+        p = self._p("c6.xml", b"<a>\n <help><!-- x\r\ny --></help>\r\n <c>y</c>\n</a>\n")
+        with self.assertRaises(SystemExit):
+            crsafe.parse(p)
+
+    def test_comment_marker_in_cdata_or_text_does_not_hide_a_cr(self):
+        p = self._p("c7.xml", b"<a>\n <b><![CDATA[ <!-- ]]></b>\r\n <c>x --> y</c>\n</a>\n")
+        with self.assertRaises(SystemExit):
+            crsafe.parse(p)
+        p = self._p("c8.xml", b"<a>\n <b>&lt;!-- </b>\r\n <c>x --&gt; y</c>\n</a>\n")
         with self.assertRaises(SystemExit):
             crsafe.parse(p)
 
