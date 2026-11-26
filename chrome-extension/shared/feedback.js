@@ -20,6 +20,7 @@ export const FEEDBACK_TOOLS = {
   snapshot: "Page details for a ticket (extension)",
   errors: "Error Tracer: read a debug log (extension)",
   grants: "Where does a user get this permission? (extension)",
+  audit: "Search the Setup Audit Trail (extension)",
   menu: "Extension menu / other",
 };
 
@@ -53,7 +54,7 @@ export function browserName(nav) {
   return "unknown browser";
 }
 
-/** "Extension 0.10.1, Chrome 131" (or "Extension dev server, ..." when there is no manifest). */
+/** "Extension 0.11.0, Chrome 131" (or "Extension dev server, ..." when there is no manifest). */
 export function versionText(manifestVersion, nav) {
   return `Extension ${manifestVersion || "dev server"}, ${browserName(nav)}`;
 }

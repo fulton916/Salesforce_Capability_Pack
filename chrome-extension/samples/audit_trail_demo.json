@@ -1,0 +1,4900 @@
+{
+ "note": "Made-up audit trail entries for the demo page. Each entry is dated secondsAgo before the moment the page is opened, so the default period always shows some. All names, addresses and texts are invented.",
+ "org": {
+  "name": "Demo org"
+ },
+ "hints": [
+  "Type My_Set and Region__c in the search box: every change about one permission set and one field, with who and when.",
+  "Open \"Kind of change\" and press Hide on the busiest kind to take the noise out.",
+  "Two people are called Sam Rivera; the Person list tells them apart by username.",
+  "Pick Everything Salesforce keeps, then Stop, to see how a partly read list is announced.",
+  "Pick Riley Quinn (type riley) and choose \"Changes made to them\": the entries that mention them by Id, username, email or name, and how each one matched. The second Riley Quinn is told apart by Id.",
+  "Type zoe, jamie or team.alerts@example.com to see names with accents and an email that two people share.",
+  "Pick Casey Admin and read \"Changes made by them\": the Login-As entries made by Sam Rivera show up marked as delegate entries.",
+  "Paste the user Id 005Dm000003Hd8qIAC (or the first 15 characters) in the person box: nobody can be read for it, but you can use the Id itself."
+ ],
+ "users": [
+  {
+   "id": "005000000000001AAA",
+   "name": "Casey Admin",
+   "username": "casey.admin@example.com",
+   "isActive": true,
+   "profile": "System Administrator",
+   "email": "casey.admin@example.com"
+  },
+  {
+   "id": "005000000000002AAA",
+   "name": "Jordan Sample",
+   "username": "jordan.sample@example.com",
+   "isActive": true,
+   "profile": "System Administrator",
+   "email": "jordan.sample@example.com"
+  },
+  {
+   "id": "005000000000003AAA",
+   "name": "Sam Rivera",
+   "username": "sam.rivera@example.com",
+   "isActive": true,
+   "profile": "Standard User",
+   "email": "sam.rivera@example.com"
+  },
+  {
+   "id": "005000000000004AAA",
+   "name": "Sam Rivera",
+   "username": "sam.rivera2@example.com",
+   "isActive": true,
+   "profile": "Standard User",
+   "email": "sam.rivera2@example.com"
+  },
+  {
+   "id": "005000000000005AAA",
+   "name": "Morgan Demo",
+   "username": "morgan.demo@example.com",
+   "isActive": true,
+   "profile": "System Administrator",
+   "email": "morgan.demo@example.com"
+  },
+  {
+   "id": "005Dm000003Kq1vIAC",
+   "name": "Riley Quinn",
+   "username": "riley.quinn@example.com.uat",
+   "email": "riley.quinn@example.com",
+   "isActive": true,
+   "profile": "Standard User"
+  },
+  {
+   "id": "005Dm000003Kq9zIAC",
+   "name": "Riley Quinn",
+   "username": "riley.quinn2@example.com",
+   "email": "riley.quinn2@example.com",
+   "isActive": true,
+   "profile": "Standard User"
+  },
+  {
+   "id": "005Dm000003Lm2aIAC",
+   "name": "Jamie Okoro",
+   "username": "jamie.okoro@example.com",
+   "email": "team.alerts@example.com",
+   "isActive": true,
+   "profile": "Standard User"
+  },
+  {
+   "id": "005Dm000003Lm7cIAC",
+   "name": "Taylor Okoro",
+   "username": "taylor.okoro@example.com",
+   "email": "team.alerts@example.com",
+   "isActive": false,
+   "profile": "Standard User"
+  },
+  {
+   "id": "005Dm000003Nz4bIAC",
+   "name": "Zoë O'Brien-Núñez",
+   "username": "zoe.obrien@example.com",
+   "email": "zoe.obrien@example.com",
+   "isActive": true,
+   "profile": "Standard User"
+  }
+ ],
+ "entries": [
+  {
+   "id": "0Ym000000000188AAA",
+   "secondsAgo": 245,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000229AAA",
+   "secondsAgo": 344,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000078AAA",
+   "secondsAgo": 751,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000164AAA",
+   "secondsAgo": 1360,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000285AAA",
+   "secondsAgo": 1410,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000243AAA",
+   "secondsAgo": 1862,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000060AAA",
+   "secondsAgo": 5319,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000264AAA",
+   "secondsAgo": 5823,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Partner_Managers to user Sam Rivera",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000296AAA",
+   "secondsAgo": 8004,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000386AAA",
+   "secondsAgo": 8640,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000201AAA",
+   "secondsAgo": 11686,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Industry on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000237AAA",
+   "secondsAgo": 11915,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000382AAA",
+   "secondsAgo": 17280,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "=HYPERLINK(\"http://example.com/x\",\"click me\")",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000117AAA",
+   "secondsAgo": 18788,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Finance_Readonly to user Jordan Sample",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000343AAA",
+   "secondsAgo": 20284,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000225AAA",
+   "secondsAgo": 20641,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000125AAA",
+   "secondsAgo": 21213,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000341AAA",
+   "secondsAgo": 21460,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000383AAA",
+   "secondsAgo": 21600,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "<img src=x onerror=alert(1)> created field Note__c <b>bold</b> &amp; more",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000384AAA",
+   "secondsAgo": 25920,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "+49 plus sign at the start, then -1 and @example mention",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000366AAA",
+   "secondsAgo": 25920,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000050AAA",
+   "secondsAgo": 30096,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000003AAA",
+   "secondsAgo": 30348,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000034AAA",
+   "secondsAgo": 34406,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000358AAA",
+   "secondsAgo": 34560,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000157AAA",
+   "secondsAgo": 43118,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000385AAA",
+   "secondsAgo": 43200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account on permission set Sales_Cloud_Users: Custom_Field_1__c, Custom_Field_2__c, Custom_Field_3__c, Custom_Field_4__c, Custom_Field_5__c, Custom_Field_6__c, Custom_Field_7__c, Custom_Field_8__c, Custom_Field_9__c, Custom_Field_10__c, Custom_Field_11__c, Custom_Field_12__c, Custom_Field_13__c, Custom_Field_14__c, Custom_Field_15__c, Custom_Field_16__c, Custom_Field_17__c, Custom_Field_18__c, Custom_Field_19__c, Custom_Field_20__c, Custom_Field_21__c, Custom_Field_22__c, Custom_Field_23__c, Custom_Field_24__c, Custom_Field_25__c, Custom_Field_26__c, Custom_Field_27__c, Custom_Field_28__c, Custom_Field_29__c, Custom_Field_30__c, Custom_Field_31__c, Custom_Field_32__c, Custom_Field_33__c, Custom_Field_34__c, Custom_Field_35__c, Custom_Field_36__c, Custom_Field_37__c, Custom_Field_38__c, Custom_Field_39__c, Custom_Field_40__c, Custom_Field_41__c, Custom_Field_42__c, Custom_Field_43__c, Custom_Field_44__c, Custom_Field_45__c, Custom_Field_46__c, Custom_Field_47__c, Custom_Field_48__c, Custom_Field_49__c, Custom_Field_50__c, Custom_Field_51__c, Custom_Field_52__c, Custom_Field_53__c, Custom_Field_54__c, Custom_Field_55__c, Custom_Field_56__c, Custom_Field_57__c, Custom_Field_58__c, Custom_Field_59__c, Custom_Field_60__c, Custom_Field_61__c, Custom_Field_62__c, Custom_Field_63__c, Custom_Field_64__c, Custom_Field_65__c, Custom_Field_66__c, Custom_Field_67__c, Custom_Field_68__c, Custom_Field_69__c, Custom_Field_70__c, Custom_Field_71__c, Custom_Field_72__c, Custom_Field_73__c, Custom_Field_74__c, Custom_Field_75__c, Custom_Field_76__c, Custom_Field_77__c, Custom_Field_78__c, Custom_Field_79__c, Custom_Field_80__c, Custom_Field_81__c, Custom_Field_82__c, Custom_Field_83__c, Custom_Field_84__c, Custom_Field_85__c, Custom_Field_86__c, Custom_Field_87__c, Custom_Field_88__c, Custom_Field_89__c, Custom_Field_90__c were all set to Read",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000312AAA",
+   "secondsAgo": 44951,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000266AAA",
+   "secondsAgo": 47398,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000281AAA",
+   "secondsAgo": 48633,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000375AAA",
+   "secondsAgo": 60479,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_1",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000316AAA",
+   "secondsAgo": 62847,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000273AAA",
+   "secondsAgo": 63070,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000025AAA",
+   "secondsAgo": 63483,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Case from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000001AAA",
+   "secondsAgo": 66584,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_3",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000019AAA",
+   "secondsAgo": 68183,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000044AAA",
+   "secondsAgo": 68935,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Account from Text to Picklist",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000274AAA",
+   "secondsAgo": 81469,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_3",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000253AAA",
+   "secondsAgo": 82636,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000202AAA",
+   "secondsAgo": 85825,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000344AAA",
+   "secondsAgo": 92639,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000359AAA",
+   "secondsAgo": 103680,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000048AAA",
+   "secondsAgo": 106565,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000149AAA",
+   "secondsAgo": 107868,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000166AAA",
+   "secondsAgo": 111961,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000221AAA",
+   "secondsAgo": 113441,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_4",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000226AAA",
+   "secondsAgo": 114043,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Annual_Revenue__c on Account",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000249AAA",
+   "secondsAgo": 114701,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Widget__c from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000016AAA",
+   "secondsAgo": 115751,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000120AAA",
+   "secondsAgo": 128542,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000035AAA",
+   "secondsAgo": 130234,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Contact from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000043AAA",
+   "secondsAgo": 135699,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000295AAA",
+   "secondsAgo": 137360,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000242AAA",
+   "secondsAgo": 144337,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000129AAA",
+   "secondsAgo": 147335,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000212AAA",
+   "secondsAgo": 147574,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000002AAA",
+   "secondsAgo": 161995,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000023AAA",
+   "secondsAgo": 162904,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_1",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000365AAA",
+   "secondsAgo": 164160,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Sam Rivera",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000031AAA",
+   "secondsAgo": 172302,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000392AAA",
+   "secondsAgo": 172800,
+   "action": "loginasgrantedtopartnersupport",
+   "section": null,
+   "display": "Granted login access to Example Support",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000367AAA",
+   "secondsAgo": 172800,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000032AAA",
+   "secondsAgo": 187365,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000319AAA",
+   "secondsAgo": 189293,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000239AAA",
+   "secondsAgo": 189435,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000161AAA",
+   "secondsAgo": 191968,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000335AAA",
+   "secondsAgo": 197448,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000191AAA",
+   "secondsAgo": 201256,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000147AAA",
+   "secondsAgo": 214479,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000181AAA",
+   "secondsAgo": 215193,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000287AAA",
+   "secondsAgo": 221146,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000126AAA",
+   "secondsAgo": 223921,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000360AAA",
+   "secondsAgo": 224640,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000142AAA",
+   "secondsAgo": 226383,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000219AAA",
+   "secondsAgo": 229199,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000051AAA",
+   "secondsAgo": 232119,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000008AAA",
+   "secondsAgo": 233999,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000376AAA",
+   "secondsAgo": 250560,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Account",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000322AAA",
+   "secondsAgo": 258882,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000357AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000356AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000355AAA",
+   "secondsAgo": 264200,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Sales_Cloud_Users to user Jordan Sample",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000354AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000353AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Stage_Notes__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000352AAA",
+   "secondsAgo": 264200,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Sales_Cloud_Users to user Sam Rivera",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000351AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000350AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000349AAA",
+   "secondsAgo": 264200,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Sam Rivera",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000348AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Annual_Revenue__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000347AAA",
+   "secondsAgo": 264200,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000346AAA",
+   "secondsAgo": 264200,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Finance_Readonly to user Casey Admin",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000210AAA",
+   "secondsAgo": 268152,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000096AAA",
+   "secondsAgo": 270574,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000282AAA",
+   "secondsAgo": 271839,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Annual_Revenue__c on Case from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000387AAA",
+   "secondsAgo": 276480,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000294AAA",
+   "secondsAgo": 277462,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000171AAA",
+   "secondsAgo": 289484,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Industry on Account from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000095AAA",
+   "secondsAgo": 295232,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Renewal_Date__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000228AAA",
+   "secondsAgo": 298032,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000133AAA",
+   "secondsAgo": 299101,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000170AAA",
+   "secondsAgo": 310503,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000101AAA",
+   "secondsAgo": 317351,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000368AAA",
+   "secondsAgo": 319680,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000118AAA",
+   "secondsAgo": 326800,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000134AAA",
+   "secondsAgo": 335733,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000257AAA",
+   "secondsAgo": 340695,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Stage_Notes__c on Account",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000112AAA",
+   "secondsAgo": 343031,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000233AAA",
+   "secondsAgo": 349277,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000361AAA",
+   "secondsAgo": 354239,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000059AAA",
+   "secondsAgo": 362457,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000091AAA",
+   "secondsAgo": 364908,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000297AAA",
+   "secondsAgo": 372738,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000197AAA",
+   "secondsAgo": 387284,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000024AAA",
+   "secondsAgo": 433791,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000254AAA",
+   "secondsAgo": 438891,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000377AAA",
+   "secondsAgo": 440640,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Region__c on Opportunity",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000258AAA",
+   "secondsAgo": 448983,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000236AAA",
+   "secondsAgo": 449204,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000323AAA",
+   "secondsAgo": 452752,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000168AAA",
+   "secondsAgo": 462303,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000369AAA",
+   "secondsAgo": 466559,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000155AAA",
+   "secondsAgo": 467864,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Renewal_Date__c on Contact",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000299AAA",
+   "secondsAgo": 477425,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000065AAA",
+   "secondsAgo": 501083,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000123AAA",
+   "secondsAgo": 510805,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Contact from Text to Picklist",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000244AAA",
+   "secondsAgo": 518656,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000250AAA",
+   "secondsAgo": 518684,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000107AAA",
+   "secondsAgo": 519639,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jordan Sample from old.address@example.com to new.address@example.com",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000182AAA",
+   "secondsAgo": 520941,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000081AAA",
+   "secondsAgo": 525969,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000130AAA",
+   "secondsAgo": 538245,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000061AAA",
+   "secondsAgo": 540937,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Renewal_Date__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000388AAA",
+   "secondsAgo": 544320,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000362AAA",
+   "secondsAgo": 544320,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000021AAA",
+   "secondsAgo": 558148,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000156AAA",
+   "secondsAgo": 558317,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000022AAA",
+   "secondsAgo": 563573,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000160AAA",
+   "secondsAgo": 568129,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Stage_Notes__c on Widget__c",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000262AAA",
+   "secondsAgo": 574172,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000267AAA",
+   "secondsAgo": 575358,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000135AAA",
+   "secondsAgo": 580045,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000138AAA",
+   "secondsAgo": 585941,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Region__c on Widget__c from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000049AAA",
+   "secondsAgo": 596632,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000327AAA",
+   "secondsAgo": 597483,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000064AAA",
+   "secondsAgo": 599942,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000370AAA",
+   "secondsAgo": 613440,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000378AAA",
+   "secondsAgo": 630720,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Region__c on Opportunity",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000132AAA",
+   "secondsAgo": 637032,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000062AAA",
+   "secondsAgo": 654000,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Opportunity from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000275AAA",
+   "secondsAgo": 659608,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000248AAA",
+   "secondsAgo": 669376,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000137AAA",
+   "secondsAgo": 669403,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000090AAA",
+   "secondsAgo": 703232,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Finance_Readonly to user Sam Rivera",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000146AAA",
+   "secondsAgo": 724952,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000215AAA",
+   "secondsAgo": 726523,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000286AAA",
+   "secondsAgo": 729243,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000193AAA",
+   "secondsAgo": 730194,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Contact from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000278AAA",
+   "secondsAgo": 739395,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000371AAA",
+   "secondsAgo": 760320,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000041AAA",
+   "secondsAgo": 768151,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000105AAA",
+   "secondsAgo": 783486,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000304AAA",
+   "secondsAgo": 785242,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000338AAA",
+   "secondsAgo": 797320,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_9",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000321AAA",
+   "secondsAgo": 800150,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000232AAA",
+   "secondsAgo": 805126,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000308AAA",
+   "secondsAgo": 810127,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000389AAA",
+   "secondsAgo": 812160,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000115AAA",
+   "secondsAgo": 815512,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Stage_Notes__c on Case",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000379AAA",
+   "secondsAgo": 820800,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Widget__c",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000363AAA",
+   "secondsAgo": 820800,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000070AAA",
+   "secondsAgo": 826627,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000077AAA",
+   "secondsAgo": 848379,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000103AAA",
+   "secondsAgo": 852727,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000015AAA",
+   "secondsAgo": 871304,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000055AAA",
+   "secondsAgo": 878530,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jordan Sample from old.address@example.com to new.address@example.com",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000261AAA",
+   "secondsAgo": 904297,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000199AAA",
+   "secondsAgo": 905579,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000372AAA",
+   "secondsAgo": 907200,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Casey Admin",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000178AAA",
+   "secondsAgo": 908992,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000167AAA",
+   "secondsAgo": 918219,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000192AAA",
+   "secondsAgo": 925750,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000320AAA",
+   "secondsAgo": 928557,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000187AAA",
+   "secondsAgo": 930449,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000087AAA",
+   "secondsAgo": 930652,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Casey Admin from old.address@example.com to new.address@example.com",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000056AAA",
+   "secondsAgo": 931385,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000136AAA",
+   "secondsAgo": 938759,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000172AAA",
+   "secondsAgo": 945448,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000231AAA",
+   "secondsAgo": 946122,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000128AAA",
+   "secondsAgo": 953156,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000326AAA",
+   "secondsAgo": 954782,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jordan Sample from old.address@example.com to new.address@example.com",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000200AAA",
+   "secondsAgo": 959193,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000331AAA",
+   "secondsAgo": 963543,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000183AAA",
+   "secondsAgo": 974597,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000269AAA",
+   "secondsAgo": 983214,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000148AAA",
+   "secondsAgo": 986470,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000324AAA",
+   "secondsAgo": 1000860,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000380AAA",
+   "secondsAgo": 1010879,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Renewal_Date__c on Widget__c",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000247AAA",
+   "secondsAgo": 1013376,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Renewal_Date__c on Opportunity from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000074AAA",
+   "secondsAgo": 1027927,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000075AAA",
+   "secondsAgo": 1036221,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000177AAA",
+   "secondsAgo": 1050188,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000373AAA",
+   "secondsAgo": 1054080,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Jordan Sample",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000082AAA",
+   "secondsAgo": 1059513,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000209AAA",
+   "secondsAgo": 1072271,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jordan Sample from old.address@example.com to new.address@example.com",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000306AAA",
+   "secondsAgo": 1072611,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000151AAA",
+   "secondsAgo": 1075214,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000163AAA",
+   "secondsAgo": 1078131,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Case from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000390AAA",
+   "secondsAgo": 1080000,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000328AAA",
+   "secondsAgo": 1089715,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Widget__c from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000309AAA",
+   "secondsAgo": 1097144,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000334AAA",
+   "secondsAgo": 1100045,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000241AAA",
+   "secondsAgo": 1107973,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000238AAA",
+   "secondsAgo": 1132617,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jordan Sample from old.address@example.com to new.address@example.com",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000218AAA",
+   "secondsAgo": 1140819,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Sam Rivera",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000159AAA",
+   "secondsAgo": 1144357,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Renewal_Date__c on Widget__c",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000080AAA",
+   "secondsAgo": 1161294,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000047AAA",
+   "secondsAgo": 1182130,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000214AAA",
+   "secondsAgo": 1196591,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000381AAA",
+   "secondsAgo": 1200960,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Region__c on Widget__c",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": "acme_pkg"
+  },
+  {
+   "id": "0Ym000000000374AAA",
+   "secondsAgo": 1200960,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": "005000000000002AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000279AAA",
+   "secondsAgo": 1207091,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000252AAA",
+   "secondsAgo": 1209608,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000223AAA",
+   "secondsAgo": 1218931,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000106AAA",
+   "secondsAgo": 1220856,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000053AAA",
+   "secondsAgo": 1230205,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000131AAA",
+   "secondsAgo": 1234123,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000140AAA",
+   "secondsAgo": 1245857,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000013AAA",
+   "secondsAgo": 1255145,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000217AAA",
+   "secondsAgo": 1259487,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000102AAA",
+   "secondsAgo": 1261971,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000175AAA",
+   "secondsAgo": 1282324,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000173AAA",
+   "secondsAgo": 1287346,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000364AAA",
+   "secondsAgo": 1296000,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Edit changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000174AAA",
+   "secondsAgo": 1298769,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Widget__c from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000342AAA",
+   "secondsAgo": 1300803,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000153AAA",
+   "secondsAgo": 1301275,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Industry on Widget__c",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000086AAA",
+   "secondsAgo": 1306588,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000162AAA",
+   "secondsAgo": 1319953,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000391AAA",
+   "secondsAgo": 1347840,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000042AAA",
+   "secondsAgo": 1364181,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000089AAA",
+   "secondsAgo": 1376269,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000088AAA",
+   "secondsAgo": 1394756,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_3",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000311AAA",
+   "secondsAgo": 1399750,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000119AAA",
+   "secondsAgo": 1410494,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000058AAA",
+   "secondsAgo": 1420980,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000220AAA",
+   "secondsAgo": 1423551,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000063AAA",
+   "secondsAgo": 1438247,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000329AAA",
+   "secondsAgo": 1441995,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000109AAA",
+   "secondsAgo": 1462110,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000084AAA",
+   "secondsAgo": 1499203,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Case",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000194AAA",
+   "secondsAgo": 1522605,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000027AAA",
+   "secondsAgo": 1537920,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000094AAA",
+   "secondsAgo": 1540753,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000277AAA",
+   "secondsAgo": 1553633,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000113AAA",
+   "secondsAgo": 1572091,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000111AAA",
+   "secondsAgo": 1580282,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000340AAA",
+   "secondsAgo": 1599248,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000280AAA",
+   "secondsAgo": 1603233,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Sam Rivera",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000093AAA",
+   "secondsAgo": 1604630,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_7",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000318AAA",
+   "secondsAgo": 1611298,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000097AAA",
+   "secondsAgo": 1625575,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000067AAA",
+   "secondsAgo": 1645942,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000189AAA",
+   "secondsAgo": 1678504,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Region__c on Opportunity",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000184AAA",
+   "secondsAgo": 1692747,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000268AAA",
+   "secondsAgo": 1703589,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000018AAA",
+   "secondsAgo": 1740209,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000176AAA",
+   "secondsAgo": 1765946,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000165AAA",
+   "secondsAgo": 1768763,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000039AAA",
+   "secondsAgo": 1773375,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000121AAA",
+   "secondsAgo": 1779353,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000333AAA",
+   "secondsAgo": 1791836,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Renewal_Date__c on Widget__c",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000307AAA",
+   "secondsAgo": 1815747,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Renewal_Date__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000345AAA",
+   "secondsAgo": 1817833,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000004AAA",
+   "secondsAgo": 1821713,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_3",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000006AAA",
+   "secondsAgo": 1827112,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000302AAA",
+   "secondsAgo": 1830406,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000092AAA",
+   "secondsAgo": 1842751,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000276AAA",
+   "secondsAgo": 1843096,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000195AAA",
+   "secondsAgo": 1846716,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000005AAA",
+   "secondsAgo": 1856673,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Industry on Widget__c from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000190AAA",
+   "secondsAgo": 1857000,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Case from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000127AAA",
+   "secondsAgo": 1879199,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000100AAA",
+   "secondsAgo": 1898771,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Sales_Cloud_Users to user Sam Rivera",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000289AAA",
+   "secondsAgo": 1908102,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000057AAA",
+   "secondsAgo": 1938727,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000033AAA",
+   "secondsAgo": 1956291,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Industry on Account",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000145AAA",
+   "secondsAgo": 1964521,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_4",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000007AAA",
+   "secondsAgo": 1968899,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000071AAA",
+   "secondsAgo": 1969011,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000124AAA",
+   "secondsAgo": 2009904,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000291AAA",
+   "secondsAgo": 2012053,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000245AAA",
+   "secondsAgo": 2012850,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000313AAA",
+   "secondsAgo": 2013316,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000271AAA",
+   "secondsAgo": 2015677,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000046AAA",
+   "secondsAgo": 2039156,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000085AAA",
+   "secondsAgo": 2046428,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Jordan Sample",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000339AAA",
+   "secondsAgo": 2051553,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000224AAA",
+   "secondsAgo": 2073914,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set My_Set to user Casey Admin",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000012AAA",
+   "secondsAgo": 2076354,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000036AAA",
+   "secondsAgo": 2077898,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Stage_Notes__c on Widget__c",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000292AAA",
+   "secondsAgo": 2084644,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Jordan Sample",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000196AAA",
+   "secondsAgo": 2103337,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000283AAA",
+   "secondsAgo": 2126237,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000310AAA",
+   "secondsAgo": 2129601,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000208AAA",
+   "secondsAgo": 2131751,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000076AAA",
+   "secondsAgo": 2153481,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000108AAA",
+   "secondsAgo": 2160999,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000317AAA",
+   "secondsAgo": 2162728,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000185AAA",
+   "secondsAgo": 2177180,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000017AAA",
+   "secondsAgo": 2212369,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000301AAA",
+   "secondsAgo": 2215999,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000083AAA",
+   "secondsAgo": 2235111,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000288AAA",
+   "secondsAgo": 2245063,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000066AAA",
+   "secondsAgo": 2274530,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000213AAA",
+   "secondsAgo": 2277321,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000020AAA",
+   "secondsAgo": 2285911,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_7",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000116AAA",
+   "secondsAgo": 2290332,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000040AAA",
+   "secondsAgo": 2329901,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000211AAA",
+   "secondsAgo": 2356306,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000038AAA",
+   "secondsAgo": 2375699,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000256AAA",
+   "secondsAgo": 2415388,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000234AAA",
+   "secondsAgo": 2429915,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000303AAA",
+   "secondsAgo": 2433390,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000332AAA",
+   "secondsAgo": 2444865,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Stage_Notes__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000179AAA",
+   "secondsAgo": 2452858,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000122AAA",
+   "secondsAgo": 2459547,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000305AAA",
+   "secondsAgo": 2466719,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000235AAA",
+   "secondsAgo": 2513163,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000158AAA",
+   "secondsAgo": 2540546,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Industry on Contact",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000300AAA",
+   "secondsAgo": 2549216,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000014AAA",
+   "secondsAgo": 2552150,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000263AAA",
+   "secondsAgo": 2552638,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000054AAA",
+   "secondsAgo": 2557440,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_4",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000216AAA",
+   "secondsAgo": 2568837,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000068AAA",
+   "secondsAgo": 2584086,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Discount_Level__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000293AAA",
+   "secondsAgo": 2595409,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000240AAA",
+   "secondsAgo": 2603881,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000098AAA",
+   "secondsAgo": 2618483,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000011AAA",
+   "secondsAgo": 2619396,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Annual_Revenue__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000079AAA",
+   "secondsAgo": 2620857,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000180AAA",
+   "secondsAgo": 2626127,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000150AAA",
+   "secondsAgo": 2633093,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Industry on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000152AAA",
+   "secondsAgo": 2641753,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000207AAA",
+   "secondsAgo": 2697370,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000290AAA",
+   "secondsAgo": 2723748,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000255AAA",
+   "secondsAgo": 2760348,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_8",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000099AAA",
+   "secondsAgo": 2771579,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000144AAA",
+   "secondsAgo": 2791263,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000104AAA",
+   "secondsAgo": 2798525,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000206AAA",
+   "secondsAgo": 2810076,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Case from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000110AAA",
+   "secondsAgo": 2814185,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000143AAA",
+   "secondsAgo": 2848461,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Region__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000260AAA",
+   "secondsAgo": 2855720,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000314AAA",
+   "secondsAgo": 2872529,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000336AAA",
+   "secondsAgo": 2878586,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Stage_Notes__c on Widget__c",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000203AAA",
+   "secondsAgo": 2883375,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000298AAA",
+   "secondsAgo": 2890153,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000251AAA",
+   "secondsAgo": 2891033,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Region__c on Account",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000009AAA",
+   "secondsAgo": 2902250,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000169AAA",
+   "secondsAgo": 2915765,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000230AAA",
+   "secondsAgo": 2920549,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000069AAA",
+   "secondsAgo": 2923421,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Renewal_Date__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000045AAA",
+   "secondsAgo": 2934338,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000010AAA",
+   "secondsAgo": 2940413,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000026AAA",
+   "secondsAgo": 2942184,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Finance_Readonly to user Jordan Sample",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000222AAA",
+   "secondsAgo": 2957285,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000186AAA",
+   "secondsAgo": 2960297,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000204AAA",
+   "secondsAgo": 2969869,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000029AAA",
+   "secondsAgo": 2971265,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Sam Rivera from old.address@example.com to new.address@example.com",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000139AAA",
+   "secondsAgo": 2982584,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Account",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000141AAA",
+   "secondsAgo": 2993349,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000205AAA",
+   "secondsAgo": 2994731,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000030AAA",
+   "secondsAgo": 3000369,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Discount_Level__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000073AAA",
+   "secondsAgo": 3016120,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Case from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000265AAA",
+   "secondsAgo": 3045056,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000337AAA",
+   "secondsAgo": 3050162,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000325AAA",
+   "secondsAgo": 3051191,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Finance_Readonly to user Sam Rivera",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000246AAA",
+   "secondsAgo": 3065398,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000421AAA",
+   "secondsAgo": 3067616,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Sam Rivera",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000284AAA",
+   "secondsAgo": 3067824,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000114AAA",
+   "secondsAgo": 3085299,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000423AAA",
+   "secondsAgo": 3112945,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Annual_Revenue__c on Contact from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000154AAA",
+   "secondsAgo": 3115961,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Stage_Notes__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000330AAA",
+   "secondsAgo": 3129247,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000270AAA",
+   "secondsAgo": 3138324,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Case.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000028AAA",
+   "secondsAgo": 3145563,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Discount_Level__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000072AAA",
+   "secondsAgo": 3157255,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Discount_Level__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000227AAA",
+   "secondsAgo": 3179944,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Region__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000052AAA",
+   "secondsAgo": 3199110,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000198AAA",
+   "secondsAgo": 3215241,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000259AAA",
+   "secondsAgo": 3219311,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Stage_Notes__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": null,
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000037AAA",
+   "secondsAgo": 3236140,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Region__c on permission set Partner_Managers: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000272AAA",
+   "secondsAgo": 3247051,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000315AAA",
+   "secondsAgo": 3253395,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Annual_Revenue__c on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000395AAA",
+   "secondsAgo": 3379335,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000401AAA",
+   "secondsAgo": 3397856,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Renewal_Date__c on Case from Text to Picklist",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000402AAA",
+   "secondsAgo": 3577092,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000408AAA",
+   "secondsAgo": 3680233,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000422AAA",
+   "secondsAgo": 3731066,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_4",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000418AAA",
+   "secondsAgo": 3775094,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Partner_Managers to user Jordan Sample",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000415AAA",
+   "secondsAgo": 3790814,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000428AAA",
+   "secondsAgo": 3824533,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Renewal_Date__c on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000410AAA",
+   "secondsAgo": 3852102,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000429AAA",
+   "secondsAgo": 3997739,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000432AAA",
+   "secondsAgo": 4154272,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_3",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000427AAA",
+   "secondsAgo": 4217688,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Widget__c",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000394AAA",
+   "secondsAgo": 4299560,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000407AAA",
+   "secondsAgo": 4323688,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000405AAA",
+   "secondsAgo": 4373177,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Annual_Revenue__c on Contact from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000425AAA",
+   "secondsAgo": 4449335,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000393AAA",
+   "secondsAgo": 4676346,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Widget__c from Text to Picklist",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000396AAA",
+   "secondsAgo": 4816448,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000399AAA",
+   "secondsAgo": 4838352,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Discount_Level__c on Contact",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000412AAA",
+   "secondsAgo": 5123400,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000403AAA",
+   "secondsAgo": 5164093,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000398AAA",
+   "secondsAgo": 5281045,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Sam Rivera",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000431AAA",
+   "secondsAgo": 5737908,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Industry on Opportunity from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000430AAA",
+   "secondsAgo": 5803637,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Casey Admin",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000426AAA",
+   "secondsAgo": 6099183,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000409AAA",
+   "secondsAgo": 6131223,
+   "action": "createdCustomField",
+   "section": "Custom Objects and Fields",
+   "display": "Created custom field Annual_Revenue__c on Case",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000400AAA",
+   "secondsAgo": 6132888,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Support Profile: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000420AAA",
+   "secondsAgo": 6286728,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_6",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000397AAA",
+   "secondsAgo": 6623663,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_8",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000419AAA",
+   "secondsAgo": 6662067,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Partner_Managers to user Morgan Demo",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000416AAA",
+   "secondsAgo": 6879011,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set My_Set: Read changed from false to true",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000417AAA",
+   "secondsAgo": 6967950,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000424AAA",
+   "secondsAgo": 7020349,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Stage_Notes__c on Opportunity from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000404AAA",
+   "secondsAgo": 7045299,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Sales_Cloud_Users to user Sam Rivera",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000406AAA",
+   "secondsAgo": 7080053,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000413AAA",
+   "secondsAgo": 7133838,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Region__c on Case from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000414AAA",
+   "secondsAgo": 7137422,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Discount_Level__c on Opportunity from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000411AAA",
+   "secondsAgo": 7263812,
+   "action": "changedPasswordPolicy",
+   "section": "Security Controls",
+   "display": "Changed minimum password length from 8 to 10",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000442AAA",
+   "secondsAgo": 8938359,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000450AAA",
+   "secondsAgo": 9068313,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000447AAA",
+   "secondsAgo": 9570679,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Sales_Cloud_Users to user Morgan Demo",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000433AAA",
+   "secondsAgo": 9599617,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Contact.Annual_Revenue__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000437AAA",
+   "secondsAgo": 10536768,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_2",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000445AAA",
+   "secondsAgo": 11171718,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Region__c on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000449AAA",
+   "secondsAgo": 11404836,
+   "action": "loginasgrantedtopartnersupport",
+   "section": "Manage Users",
+   "display": "Granted login access to Example Support",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000452AAA",
+   "secondsAgo": 11617944,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission View All Data set to false",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000444AAA",
+   "secondsAgo": 11905138,
+   "action": "changedHolidayName",
+   "section": null,
+   "display": "Changed holiday name to Founders Day",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000440AAA",
+   "secondsAgo": 11977838,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Morgan Demo from old.address@example.com to new.address@example.com",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000436AAA",
+   "secondsAgo": 12201203,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Annual_Revenue__c on Widget__c from Text to Picklist",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000434AAA",
+   "secondsAgo": 12990699,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Opportunity.Stage_Notes__c on permission set Sales_Cloud_Users: Read changed from false to true",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000439AAA",
+   "secondsAgo": 13701055,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_7",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000443AAA",
+   "secondsAgo": 13738641,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Widget__c.Industry on permission set Support_Agents: Read changed from false to true",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000441AAA",
+   "secondsAgo": 13883094,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_5",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000446AAA",
+   "secondsAgo": 14463684,
+   "action": "changedFieldType",
+   "section": "Custom Objects and Fields",
+   "display": "Changed type of field Region__c on Widget__c from Text to Picklist",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000448AAA",
+   "secondsAgo": 14527433,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Casey Admin from old.address@example.com to new.address@example.com",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000451AAA",
+   "secondsAgo": 14703291,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Sales Profile: permission View All Data set to false",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000435AAA",
+   "secondsAgo": 14941540,
+   "action": "permSetAssign",
+   "section": "Manage Users",
+   "display": "Assigned permission set Support_Agents to user Morgan Demo",
+   "userId": "005000000000003AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000000438AAA",
+   "secondsAgo": 15051219,
+   "action": "insertedApexClass",
+   "section": "Apex Class",
+   "display": "Created Apex class Invoice_Helper_4",
+   "userId": "005000000000004AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009001AAA",
+   "secondsAgo": 9100,
+   "action": "PermSetAssigned",
+   "section": "Manage Users",
+   "display": "Permission set Finance_Readonly assigned to user Riley Quinn (UserID: [005Dm000003Kq1v])",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009002AAA",
+   "secondsAgo": 18400,
+   "action": "PermSetUnassigned",
+   "section": "Manage Users",
+   "display": "Permission set Sales_Ops removed from user Riley Quinn (UserID: [005Dm000003Kq1v])",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009003AAA",
+   "secondsAgo": 27200,
+   "action": "PermSetAssigned",
+   "section": "Manage Users",
+   "display": "Permission set assignment for user Riley Quinn (UserID: [005Dm000003Kq1v]) now expires 2027-01-31",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009004AAA",
+   "secondsAgo": 36000,
+   "action": "groupMembership",
+   "section": "Manage Users",
+   "display": "Riley Quinn (User, 005Dm000003Kq1v) added to public group Sales_Team",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009005AAA",
+   "secondsAgo": 44800,
+   "action": "changedQueueManager",
+   "section": "Manage Users",
+   "display": "Changed queue Escalations manager from 005Dm000003Kq1vIAC to 005Dm000003Hd8qIAC",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009006AAA",
+   "secondsAgo": 53600,
+   "action": "changedUserName",
+   "section": "Manage Users",
+   "display": "Changed username for riley.quinn@example.com.uat to riley.quinn.new@example.com.uat",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009007AAA",
+   "secondsAgo": 62400,
+   "action": "changedUserName",
+   "section": "Manage Users",
+   "display": "Changed username for briley.quinn@example.com.uat to briley.quinn.new@example.com.uat",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009008AAA",
+   "secondsAgo": 71200,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Riley Q from old.riley@example.com to riley.quinn@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009009AAA",
+   "secondsAgo": 80000,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for a contractor to riley.quinn@example.com.invalid",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009010AAA",
+   "secondsAgo": 88800,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for a partner from joriley.quinn@example.com to joriley.quinn@example.com.uat",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009011AAA",
+   "secondsAgo": 97600,
+   "action": "changedUserTitle",
+   "section": "Manage Users",
+   "display": "Changed title for Riley Quinn to Senior Analyst",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009012AAA",
+   "secondsAgo": 106400,
+   "action": "PermSetAssigned",
+   "section": "Manage Users",
+   "display": "Permission set Finance_Readonly assigned to user Riley Quinn (UserID: [005Dm000003Kq9z])",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009013AAA",
+   "secondsAgo": 115200,
+   "action": "changedManager",
+   "section": "Manage Users",
+   "display": "Moved Riley Quinn (UserID: [005Dm000003Kq9z]) under manager Riley Quinn",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009014AAA",
+   "secondsAgo": 124000,
+   "action": "changedUserTitle",
+   "section": "Manage Users",
+   "display": "Changed role for Riley Quinn (UserID: [005Dm000003Kq9z]) to Sales Rep",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009015AAA",
+   "secondsAgo": 7300,
+   "action": "changedOrgLanguage",
+   "section": "Company Profile",
+   "display": "Changed default language for the org to French",
+   "userId": "005Dm000003Hd8qIAC",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009016AAA",
+   "secondsAgo": 40300,
+   "action": "changedOrgLanguage",
+   "section": "Company Profile",
+   "display": "Changed default locale for the org to English (Canada)",
+   "userId": "005Dm000003Hd8qIAC",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009017AAA",
+   "secondsAgo": 133000,
+   "action": "createdCustomField",
+   "section": "Customize Accounts",
+   "display": "Created custom field Region__c on Account",
+   "userId": "005Dm000003Hd8qIAC",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009018AAA",
+   "secondsAgo": 150100,
+   "action": "suOrgAdminLogin",
+   "section": "Manage Users",
+   "display": "Administrator logged in using Login-As access to another user's account",
+   "userId": "005000000000001AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009019AAA",
+   "secondsAgo": 150000,
+   "action": "PermSetFlsChanged",
+   "section": "Permission Sets",
+   "display": "Changed field-level security for Account.Industry on permission set Finance_Readonly: Read changed from false to true",
+   "userId": "005000000000003AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009020AAA",
+   "secondsAgo": 149900,
+   "action": "changedProfilePerm",
+   "section": "Manage Users",
+   "display": "Changed profile Standard User: permission Export Reports set to true",
+   "userId": "005000000000003AAA",
+   "delegate": "Casey.Admin@Example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009021AAA",
+   "secondsAgo": 149800,
+   "action": "PermSetAssigned",
+   "section": "Manage Users",
+   "display": "Permission set Sales_Ops assigned to user Jordan Sample (UserID: [005000000000002])",
+   "userId": "005000000000003AAA",
+   "delegate": "casey.admin@example.com",
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009022AAA",
+   "secondsAgo": 22000,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed notification email for a shared mailbox to team.alerts@example.com",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009023AAA",
+   "secondsAgo": 31000,
+   "action": "changedUserEmail",
+   "section": "Manage Users",
+   "display": "Changed email for Jamie Okoro from jamie.okoro@example.com to team.alerts@example.com",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009024AAA",
+   "secondsAgo": 58000,
+   "action": "changedUserTitle",
+   "section": "Manage Users",
+   "display": "Changed role for Zoë O'Brien-Núñez to Regional Lead",
+   "userId": "005000000000001AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009025AAA",
+   "secondsAgo": 66000,
+   "action": "changedUserTitle",
+   "section": "Manage Users",
+   "display": "Changed role for Zoë O’Brien-Núñez to Regional Lead (second change)",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009026AAA",
+   "secondsAgo": 74000,
+   "action": "PermSetAssigned",
+   "section": "Manage Users",
+   "display": "Permission set Sales_Ops assigned to user Zoë O'Brien-Núñez (UserID: [005Dm000003Nz4b])",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009027AAA",
+   "secondsAgo": 82000,
+   "action": "changedUserTitle",
+   "section": "Manage Users",
+   "display": "Changed role for Zoe OBrien-Nunez to Regional Lead",
+   "userId": "005000000000005AAA",
+   "delegate": null,
+   "namespace": null
+  },
+  {
+   "id": "0Ym000000009028AAA",
+   "secondsAgo": 90000,
+   "action": "changedOwner",
+   "section": "Manage Users",
+   "display": "Changed default case owner from 005Dm000003Nz4bIAC to 005Dm000003Lm2aIAC",
+   "userId": "005000000000002AAA",
+   "delegate": null,
+   "namespace": null
+  }
+ ]
+}

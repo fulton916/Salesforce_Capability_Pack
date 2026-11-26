@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+     or distribute this software without written permission. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search the Setup Audit Trail</title>
+<link rel="stylesheet" href="../../shared/pack.css">
+<link rel="stylesheet" href="../../shared/user-picker.css">
+<link rel="stylesheet" href="audit-trail.css">
+</head>
+<body>
+<header class="top">
+  <h1>Search the Setup Audit Trail</h1>
+  <div class="org" id="org">Not connected</div>
+  <div class="feedback-links" id="feedback" aria-label="Feedback"></div>
+</header>
+
+<main>
+  <section class="panel" id="demoHints" hidden>
+    <h2 class="step">Things to try in this demo</h2>
+    <ul class="demo-hints" id="demoHintList"></ul>
+  </section>
+
+  <section class="panel" id="readPanel">
+    <h2 class="step">What to read</h2>
+    <div class="readrow">
+      <div class="field">
+        <label class="pick-label" for="period">Period</label>
+        <select id="period"></select>
+      </div>
+      <div class="field" id="datesBox" hidden>
+        <label class="pick-label" for="dateFrom">From (first day)</label>
+        <input type="date" id="dateFrom">
+      </div>
+      <div class="field" id="datesBox2" hidden>
+        <label class="pick-label" for="dateTo">To (last day, included)</label>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="field person">
+        <label class="pick-label" for="personInput">Person <span class="optional">(optional)</span></label>
+        <div class="combo">
+          <input type="text" id="personInput" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="personList" autocomplete="off" placeholder="Everyone. Type a name, username, email or user Id to pick one person">
+          <ul class="psg-list" id="personList" role="listbox" hidden></ul>
+        </div>
+        <div id="personError" class="error" role="alert" hidden></div>
+      </div>
+      <div class="field" id="choiceBox" hidden>
+        <label class="pick-label" for="choice">What to find</label>
+        <select id="choice"></select>
+      </div>
+      <div class="actions">
+        <button id="read" class="primary">Show the audit trail</button>
+        <button id="stop" hidden>Stop</button>
+      </div>
+    </div>
+    <p class="hint" id="choiceHint" hidden></p>
+    <p id="progress" role="status"></p>
+    <p class="hint">Times are shown in your time zone: <b id="tzName"></b>. Salesforce keeps about 180 days. One read takes at most 50,000 entries, newest first. If the period has more, a button then reads the next older ones (up to 250,000 on this page).</p>
+    <div id="error" class="error" hidden></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="panel">
+      <p class="hint readline" id="readLine"></p>
+      <p class="alert stale" id="stale" role="status" hidden></p>
+      <div id="resultBody">
+      <p class="alert partial" id="partial" role="status" hidden></p>
+      <p class="hint" id="memNote" hidden></p>
+      <div class="older" id="older" hidden>
+        <p class="hint" id="olderNote" role="status"></p>
+        <button type="button" id="readOlder" hidden></button>
+      </div>
+
+      <div class="searchrow">
+        <label class="pick-label" for="search">Search</label>
+        <input type="search" id="search" autocomplete="off" placeholder="For example: My_Set Region__c, or &quot;permission set&quot; -login">
+      </div>
+      <p class="hint" id="searchHint"></p>
+
+      <div class="facets" id="facets">
+        <details class="facet" data-facet="section"><summary><span class="ft">Section</span> <span class="fn" id="fn-section"></span></summary><div class="fbody"></div></details>
+        <details class="facet" data-facet="kind"><summary><span class="ft">Kind of change</span> <span class="fn" id="fn-kind"></span></summary><div class="fbody"></div></details>
+        <details class="facet" data-facet="person"><summary><span class="ft">Person</span> <span class="fn" id="fn-person"></span></summary><div class="fbody"></div></details>
+      </div>
+      <div class="ticks">
+        <label class="check"><input type="checkbox" id="delegateOnly"> Only entries that have a delegate user</label>
+        <label class="check"><input type="checkbox" id="packageOnly"> Only changes from a managed package</label>
+        <label class="check"><input type="checkbox" id="showApi"> Show API names</label>
+      </div>
+
+      <div class="chips" id="chips" hidden></div>
+
+      <div class="statusrow">
+        <span id="status" role="status" class="statusline"></span>
+        <span class="statusbtns">
+          <button id="clear" hidden>Clear filters</button>
+          <button id="copyShown">Copy what is shown</button>
+          <button id="csv">What is shown now (CSV for Excel)</button>
+          <span id="copied" role="status"></span>
+        </span>
+      </div>
+      <div id="copyFallback" hidden>
+        <p class="hint">Your browser did not allow copying. Select all and copy it yourself.</p>
+        <textarea id="copyText" rows="8" readonly spellcheck="false" aria-label="Text to copy"></textarea>
+      </div>
+
+      <p id="empty" class="empty" hidden></p>
+      <div class="tablewrap">
+        <table id="table" hidden>
+          <thead><tr id="headRow"></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <p class="more"><button id="more" hidden></button></p>
+      </div>
+    </div>
+  </section>
+
+  <p class="footer">Read-only: this page only reads the Setup Audit Trail from your org and never changes anything. Nothing is saved. The session id is never kept.</p>
+</main>
+<script type="module" src="audit-trail.js"></script>
+</body>
+</html>

@@ -1186,16 +1186,15 @@ export async function run(test) {
 
   // ===== registration, files and the read-only guards =====
 
-  await test("grants: registered last in the tool list, with the exact feedback label in the code and in both issue forms", () => {
-    const last = TOOLS[TOOLS.length - 1];
-    assert.equal(last.id, "who-grants");
+  await test("grants: registered in the tool list, with the exact feedback label in the code and in both issue forms", () => {
+    const last = TOOLS.find((t) => t.id === "who-grants");
     assert.equal(last.page, "tools/who-grants/who-grants.html");
     assert.equal(last.title, "Where does a user get this permission?");
     assert.equal(last.description, "Find every profile, permission set and group that gives a user one permission");
     assert.equal(FEEDBACK_TOOLS.grants, "Where does a user get this permission? (extension)");
     for (const f of ["bug.yml", "enhancement.yml"]) {
       const y = read(path.join(here, "../..", ".github/ISSUE_TEMPLATE", f)).replace(/\r\n/g, "\n");
-      assert.ok(y.includes("- Error Tracer: read a debug log (extension)\n        - Where does a user get this permission? (extension)\n"), f);
+      assert.ok(y.includes("- Error Tracer: read a debug log (extension)\n        - Where does a user get this permission? (extension)\n        - Search the Setup Audit Trail (extension)\n"), f);
     }
     const js = read(ext("tools/who-grants/who-grants.js"));
     assert.ok(js.includes("FEEDBACK_TOOLS.grants"));
@@ -1203,10 +1202,10 @@ export async function run(test) {
     assert.ok(html.includes("<title>Where does a user get this permission?</title>"));
     assert.ok(html.includes('id="feedback"') && html.includes("../../shared/pack.css") && html.includes("../../shared/user-picker.css"));
     const manifest = JSON.parse(read(ext("manifest.json")));
-    assert.equal(manifest.version, "0.10.1");
+    assert.equal(manifest.version, "0.11.0");
     assert.ok(manifest.description.length <= 132, `manifest description is ${manifest.description.length} characters (Chrome allows 132)`);
     assert.match(manifest.description, /permission/);
-    assert.match(read(ext("package.json")), /eight read-only tools/);
+    assert.match(read(ext("package.json")), /nine read-only tools/);
   });
 
   await test("grants: visible text avoids PSG and snapshot, and uses American 'license'", () => {
