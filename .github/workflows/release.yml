@@ -1,0 +1,59 @@
+# Copyright (c) 2026 Sean R Fulton. All rights reserved. No permission is granted to use, copy, modify,
+# or distribute this software without written permission.
+
+name: Release
+
+# Push a tag such as v0.11.0 (it must equal the "version" in chrome-extension/manifest.json)
+# and this builds the extension zip and attaches it to a GitHub Release for that tag.
+# It never deletes old releases.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to release, for example v0.11.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  extension-zip:
+    name: Build and publish the extension zip
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+      - name: Check the tag matches manifest.json
+        shell: bash
+        run: |
+          version=$(python3 -c "import json; print(json.load(open('chrome-extension/manifest.json'))['version'])")
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "Tag $TAG does not match manifest.json version $version. Bump the version, then tag again."
+            exit 1
+          fi
+      - name: Build the zip
+        shell: bash
+        run: |
+          # manifest.json goes at the zip's root. tests/ and dev/ are not loaded by the extension
+          # (the pages use shared/ and samples/, which stay in). Chrome refuses names starting with "_".
+          cp LICENSE chrome-extension/LICENSE
+          (cd chrome-extension && zip -r -X ../salesforce-capability-pack-extension.zip . \
+            -x "tests/*" "dev/*" "*/__pycache__/*" "__pycache__/*" "node_modules/*" ".DS_Store")
+          unzip -l salesforce-capability-pack-extension.zip
+      - name: Create or update the release
+        shell: bash
+        run: |
+          zip=salesforce-capability-pack-extension.zip
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$zip" --clobber
+          else
+            gh release create "$TAG" "$zip" --title "$TAG" --verify-tag \
+              --notes "Chrome extension $TAG. Download salesforce-capability-pack-extension.zip, unzip it into a folder you keep, then follow the install steps in the README."
+          fi
