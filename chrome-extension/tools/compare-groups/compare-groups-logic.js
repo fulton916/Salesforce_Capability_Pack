@@ -808,3 +808,45 @@ export function toRows(result, onlySection = null, { diffOnly = false, search = 
   }
   return rows;
 }
+
+// ---------- page decisions kept pure so they can be tested ----------
+
+/** Does a change to one side throw away the results on screen? Only a real change does (picking the same thing again does not). */
+export function changeClearsResults(hasResult, before, after) {
+  if (!hasResult) return false;
+  // groupName (the API name) is compared too, so two picks whose Ids collide (the demo samples share one) still count as a change.
+  return (before?.psgId || "") !== (after?.psgId || "") || (before?.fileName || "") !== (after?.fileName || "")
+    || String(before?.groupName || "").toLowerCase() !== String(after?.groupName || "").toLowerCase();
+}
+
+/** The org's identity for matching: its org Id when known, else its name, else "". Never a group Id. */
+function orgKey(org) {
+  if (!org) return "";
+  return String(org.id || org.name || "").toLowerCase();
+}
+
+/**
+ * Are both sides the same group? Same org and same group API name (matched by name, never by group Id).
+ * Each side is `{org, developerName, live}`. Two live picks (`live: true`) come from the one connected org (demo counts as one),
+ * so the name alone decides. If either side comes from a saved file the org must match too; when an org is unknown the
+ * answer is false (we do not guess).
+ */
+export function sameGroupOnBothSides(a, b) {
+  const na = String(a?.developerName || "").toLowerCase();
+  const nb = String(b?.developerName || "").toLowerCase();
+  if (!na || na !== nb) return false;
+  if (a.live && b.live) return true;
+  const oa = orgKey(a.org);
+  const ob = orgKey(b.org);
+  return !!oa && oa === ob;
+}
+
+export const SAME_GROUP_NOTE = "You picked the same group on both sides, so there is nothing to compare. Pick a different group on one side.";
+
+/** The message when reading the org worked or failed at one stage. stage: "connect" | "list". */
+export function connectFailureText(stage, e) {
+  if (stage === "list" && e?.status !== 401) {
+    return `Connected, but could not read the list of permission set groups: ${e?.message || "unknown reason"}.`;
+  }
+  return "Could not connect to the org. If you have been away a while, reload the Salesforce tab and try again.";
+}

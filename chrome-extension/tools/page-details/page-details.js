@@ -140,7 +140,7 @@ async function start() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       return;
     }
   } catch (e) {
@@ -151,7 +151,7 @@ async function start() {
   const api = new SfApi(session);
   const host = DEV ? (HOST || "") : (HOST || session.apiHost);
   model.host = host;
-  $("#org").textContent = DEV ? "Dev server" : host;
+  $("#org").textContent = DEV ? "Local dev server" : host;
   const setup = DEV ? { title: "", raw: "" } : await readSetupTitle(rawUrl);
   applyReads(await readIssueSnapshot(api, { host, url: rawUrl, setupTitle: setup.title }), rawUrl);
   if (setup.raw) model.tech.page = [model.tech.page, setup.raw].filter(Boolean).join("\n");

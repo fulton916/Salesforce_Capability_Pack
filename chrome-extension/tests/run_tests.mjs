@@ -10,7 +10,7 @@ import path from "node:path";
 import { findSession, isSalesforceHost, SfApi, chunk, soqlString, API_VERSION, useNewestVersion } from "../shared/sfconn.js";
 import { takeSnapshot, listPsgs, validateSnapshot, SNAPSHOT_SCHEMA } from "../tools/compare-groups/compare-groups-read.js";
 import { toCsv } from "../shared/csv.js";
-import { SECTION_TITLES, SECTION_HELP, versionNumber, compareSnapshots, toRows, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection } from "../tools/compare-groups/compare-groups-logic.js";
+import { SECTION_TITLES, SECTION_HELP, versionNumber, compareSnapshots, toRows, humanize, filterRows, givesCounts, cardCounts, cardLines, tabDiffCount, groupStatus, tabDiffText, sortRows, sortGrouped, sortSection, changeClearsResults, sameGroupOnBothSides, SAME_GROUP_NOTE, connectFailureText } from "../tools/compare-groups/compare-groups-logic.js";
 import { matchPsgs, searchWords } from "../shared/pick.js";
 
 const STORE_FILE = "shared/menu-settings.js"; // the only file allowed to use chrome.storage
@@ -1319,6 +1319,46 @@ await test("layout: no tool imports or links a file from another tool's folder, 
     const text = readFileSync(path.join(extRoot, top), "utf-8");
     assert.deepEqual(refs(text).filter((r) => /(^|\/)tools\//.test(r)), [], `${top} imports from tools/`);
   }
+});
+
+await test("compare: any change to either side clears the results, picking the same thing again does not", () => {
+  const side = { psgId: "0PG1", fileName: null };
+  assert.equal(changeClearsResults(true, side, { psgId: "0PG2", fileName: null }), true, "another group");
+  assert.equal(changeClearsResults(true, side, { psgId: "", fileName: null }), true, "removed");
+  assert.equal(changeClearsResults(true, side, { psgId: "", fileName: "a.json" }), true, "a new file");
+  assert.equal(changeClearsResults(true, { psgId: "", fileName: "a.json" }, { psgId: "", fileName: "b.json" }), true, "another file");
+  assert.equal(changeClearsResults(true, side, { ...side }), false, "same pick again");
+  assert.equal(changeClearsResults(false, side, { psgId: "0PG2", fileName: null }), false, "nothing shown, nothing to clear");
+  const sales = { psgId: "0PG1", fileName: null, groupName: "Sales_Rep" };
+  assert.equal(changeClearsResults(true, sales, { psgId: "0PG1", fileName: null, groupName: "Support" }), true, "Ids collide (demo samples), name differs");
+  assert.equal(changeClearsResults(true, sales, { ...sales, groupName: "sales_rep" }), false, "same name, any case");
+});
+
+await test("compare: the same group on both sides is found by org and API name, never by Id", () => {
+  const org = { id: "00D000000000001AAA", name: "Acme" };
+  const g = (developerName, o = org) => ({ org: o, developerName });
+  assert.equal(sameGroupOnBothSides(g("Sales"), g("Sales")), true);
+  assert.equal(sameGroupOnBothSides(g("Sales"), g("sales")), true, "names compare without case");
+  assert.equal(sameGroupOnBothSides(g("Sales"), g("Support")), false);
+  assert.equal(sameGroupOnBothSides(g("Sales"), g("Sales", { id: "00D000000000002AAA", name: "Other" })), false, "same name in another org");
+  assert.equal(sameGroupOnBothSides(g("Sales"), g("Sales", null)), false, "unknown org: no guess");
+  assert.equal(sameGroupOnBothSides(g("Sales", { name: "Acme" }), g("Sales", { name: "acme" })), true, "org name when no org Id");
+  assert.equal(sameGroupOnBothSides(g(""), g("")), false);
+  const live = (developerName, o = null) => ({ org: o, developerName, live: true });
+  assert.equal(sameGroupOnBothSides(live("Sales"), live("sales")), true, "two live picks: one org, no org needed (demo)");
+  assert.equal(sameGroupOnBothSides(live("Sales"), live("Support")), false);
+  assert.equal(sameGroupOnBothSides(live("Sales"), { ...g("Sales", null), live: false }), false, "file with no org: no guess");
+  assert.equal(sameGroupOnBothSides(live("Sales", org), { ...g("Sales"), live: false }), true, "file vs live, same org");
+  assert.equal(sameGroupOnBothSides(live("Sales", org), { ...g("Sales", { id: "00D000000000002AAA" }), live: false }), false, "file from another org");
+  assert.equal(sameGroupOnBothSides(undefined, undefined), false);
+  assert.match(SAME_GROUP_NOTE, /same group on both sides.*nothing to compare/);
+});
+
+await test("compare: failing to list the groups is not reported as a failed connection", () => {
+  const listed = connectFailureText("list", new Error("INSUFFICIENT_ACCESS"));
+  assert.equal(listed, "Connected, but could not read the list of permission set groups: INSUFFICIENT_ACCESS.");
+  assert.match(connectFailureText("connect", new Error("x")), /^Could not connect to the org/);
+  assert.match(connectFailureText("list", Object.assign(new Error("expired"), { status: 401 })), /^Could not connect/, "an expired session is a connection problem");
 });
 
 console.log(failures.length ? `\n${failures.length} FAILED, ${passed} passed` : `\nAll ${passed} checks passed.`);

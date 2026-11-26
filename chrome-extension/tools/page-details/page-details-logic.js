@@ -253,7 +253,8 @@ export function snapshotText(s = {}) {
   }
 
   const pg = s.page || {};
-  const rows = [["Kind", KIND_TEXT[pg.kind] || KIND_TEXT.other], ["Address", pg.url || NONE]];
+  // Only the address line gets the strict scrub: a record or org name may contain "code=" or "token=".
+  const rows = [["Kind", KIND_TEXT[pg.kind] || KIND_TEXT.other], ["Address", pg.url ? scrub(pg.url) : NONE]];
   if (pg.kind === "setup") rows.push(["Setup page", pg.setupPage]);
   if (pg.objectApi || pg.objectLabel) rows.push(["Object", objectText(pg)]);
   if (pg.kind === "list") rows.push(["List view", pg.listView || pg.filterName]);
@@ -265,7 +266,8 @@ export function snapshotText(s = {}) {
 
   section("Browser and extension", [["Browser", s.browser], ["Extension version", s.extensionVersion]]);
   lines.push("");
-  const rest = scrub(lines.join("\n"));
+  // Every other line is cleaned only of real session ids and long Bearer tokens (like the note).
+  const rest = scrubNote(lines.join("\n")).text;
   // The person's own note is only cleaned of session-like strings (scrubNote), never run through scrub().
   return note ? `WHAT HAPPENED\n${note}\n${rest}` : rest.replace(/^\n/, "");
 }

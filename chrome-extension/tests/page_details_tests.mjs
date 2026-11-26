@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { cleanUrl } from "../shared/pageurl.js";
 import { parsePageUrl, setupDisplayName, setupTitleFromTabs, cleanTabTitle, snapshotText, fileName, sandboxNameFromHost, whenText, scrub, scrubNote, objectText, NOTE_REMOVED_TEXT } from "../tools/page-details/page-details-logic.js";
-import { readIssueSnapshot, readCurrentUser, readPageDetails, orgProblem, failureCause } from "../tools/page-details/page-details-read.js";
+import { readIssueSnapshot, readCurrentUser, readPageDetails, orgProblem, failureCause, REQUEST_LIMIT_TEXT } from "../tools/page-details/page-details-read.js";
 import { SfApi } from "../shared/sfconn.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -302,6 +302,34 @@ export async function run(test) {
     const none = await readCurrentUser(fakeApi([]));
     assert.equal(none.data, null);
     assert.ok(none.problem && none.raw);
+  });
+
+  await test("snapshot: only the address line is scrubbed; a record or org name with code= or token= stays", () => {
+    const s = full();
+    s.org = { ...s.org, name: "Org code=x token=y" };
+    s.page = { kind: "record", url: "/lightning/r/Account/001000000000001AAA/view?code=abc", objectApi: "Account", recordId: "001000000000001AAA", recordName: "Deal code=x and token=y" };
+    const t = snapshotText(s);
+    assert.ok(t.includes("Org name: Org code=x token=y"), t);
+    assert.ok(t.includes("Record name: Deal code=x and token=y"), t);
+    assert.ok(t.includes("Address: /lightning/r/Account/001000000000001AAA/view?code=[removed]"), t);
+    const sess = snapshotText({ ...s, org: { ...s.org, name: "Bearer 00D000000000001!AQEAQabcdefghijklmnopqrstuvwxyz" } });
+    assert.ok(!/AQEAQ/.test(sess), "a real session id is still removed everywhere");
+  });
+
+  await test("snapshot: a daily API limit answer (403) is not shown as a missing permission", async () => {
+    const limit = Object.assign(new Error("TotalRequests Limit exceeded."), { status: 403, errorCode: "REQUEST_LIMIT_EXCEEDED" });
+    assert.equal(failureCause(limit), "limit");
+    assert.equal(orgProblem(limit), REQUEST_LIMIT_TEXT);
+    assert.match(REQUEST_LIMIT_TEXT, /daily API request limit/);
+    assert.match(REQUEST_LIMIT_TEXT, /not a missing permission/);
+    assert.equal(failureCause(Object.assign(new Error("REQUEST_LIMIT_EXCEEDED: x"), { status: 403 })), "limit", "also found in the message");
+    // Through the real client, so the error code of a 403 is kept.
+    const api = new SfApi({ apiHost: "x", sessionId: "S", fetchImpl: async () => ({ ok: false, status: 403, text: async () => JSON.stringify([{ message: "TotalRequests Limit exceeded.", errorCode: "REQUEST_LIMIT_EXCEEDED" }]) }) });
+    const user = await readCurrentUser(api);
+    assert.equal(user.problem, REQUEST_LIMIT_TEXT);
+    const all = JSON.stringify(await readIssueSnapshot(api, { host: "x.my.salesforce.com", url: ACCOUNT_URL }));
+    assert.ok(all.includes("daily API request limit"), all);
+    assert.ok(!/may not be allowed/.test(all), all);
   });
 
   await test("snapshot: failureCause sorts failures and orgProblem keeps its wording", () => {

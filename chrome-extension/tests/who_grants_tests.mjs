@@ -1202,7 +1202,7 @@ export async function run(test) {
     assert.ok(html.includes("<title>Where does a user get this permission?</title>"));
     assert.ok(html.includes('id="feedback"') && html.includes("../../shared/pack.css") && html.includes("../../shared/user-picker.css"));
     const manifest = JSON.parse(read(ext("manifest.json")));
-    assert.equal(manifest.version, "0.11.0");
+    assert.equal(manifest.version, "0.11.1");
     assert.ok(manifest.description.length <= 132, `manifest description is ${manifest.description.length} characters (Chrome allows 132)`);
     assert.match(manifest.description, /permission/);
     assert.match(read(ext("package.json")), /nine read-only tools/);

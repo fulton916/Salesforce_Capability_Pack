@@ -5,7 +5,7 @@ import { SfApi, findSession, isSalesforceHost } from "../../shared/sfconn.js";
 import { readOrg } from "../../shared/sfread.js";
 import { searchWords, matchesWords } from "../../shared/pick.js";
 import { readFlowList, versionsToRead, readFlowVersion, readVersions, whyUnreadable, resolveContext } from "./flow-usage-read.js";
-import { scanFlow, startInfo, stepName, buildResults, summaryLine, plainFlowType, versionWords, nameWithApi, uniqueSteps, looksLikeId, csvText, csvFileName } from "./flow-usage-scan.js";
+import { scanFlow, startInfo, stepName, buildResults, summaryLine, plainFlowType, versionWords, nameWithApi, uniqueSteps, looksLikeId, csvText, csvFileName, localStamp, startSearchNotes } from "./flow-usage-scan.js";
 import { buildObjectView, RUN_ORDER_RULE, noOrderBlockText, metaWords, objectSummary, objectCsvText, objectCsvFileName } from "./flow-usage-object.js";
 import { contextFromParams } from "../../shared/urlcontext.js";
 import { startLiveReload } from "../../shared/livereload.js";
@@ -42,6 +42,7 @@ const state = {
   readCalls: 0, // flow contents read so far
   target: null, // what was last searched for
   results: null,
+  pending: [], // notes found while getting ready for the next search
   tech: [], // raw messages for Notes
   chain: Promise.resolve(), // reads and searches run one after the other
   seq: 0,
@@ -139,12 +140,12 @@ async function connect() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       return false;
     }
     state.api = new SfApi(session);
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
-    showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
+    showOrg(org, DEV ? "" : session.apiHost, DEV ? "Local dev server" : null);
     return true;
   } catch (e) {
     $("#org").textContent = `Could not connect${HOST ? " to " + HOST : ""}.`;
@@ -312,6 +313,7 @@ async function ensureFlows(includeInactive) {
 
 function run(target) {
   const my = ++state.seq;
+  Object.assign(state, startSearchNotes(state.pending));
   state.target = target;
   // One at a time: a second search waits for the first read, then finds everything already in memory.
   state.chain = state.chain.then(() => (target.kind === "object" ? doRunObject(target, my) : doRun(target, my))).catch(() => {});
@@ -482,7 +484,7 @@ function renderNotes(extra) {
     `Read ${state.readCalls.toLocaleString("en-US")} flow ${state.readCalls === 1 ? "version" : "versions"}, one call to Salesforce each${state.api ? `; ${state.api.calls.toLocaleString("en-US")} calls to Salesforce so far on this page` : ""}. They are kept in memory until you close this page, so the next search is quick.`,
     $("#inactive").checked ? "Inactive flows and the newest draft of each flow were included." : "Only the active version of each active flow was read. Tick “Also look in inactive flows and drafts” to include the rest.",
     ...extra,
-    HOST && isSalesforceHost(HOST) ? null : "The “Open in Flow Builder” links need this page to be opened from the toolbar menu on a Salesforce tab.",
+    HOST && isSalesforceHost(HOST) ? null : "The “Open in Flow Builder” links need this page to be opened from the Salesforce Capability Pack button on a Salesforce tab.",
     ...state.tech,
   ].filter(Boolean);
   $("#notesPanel").hidden = false;
@@ -585,14 +587,14 @@ function renderObject(t) {
   }
   $("#objSections").replaceChildren(...sections);
   renderNotes([
-    `${RUN_ORDER_RULE} The activation date is not available here, so flows with no trigger order are listed by name, as Flow Trigger Explorer lists them. Give each flow a trigger order if the order matters.`,
+    `${RUN_ORDER_RULE} This page can't see when a flow was activated, so flows with no trigger order are listed by name. Give each flow a trigger order if the order matters.`,
     v.unknownSteps ? `${v.unknownSteps} record ${v.unknownSteps === 1 ? "step" : "steps"} in the flows could not be tied to an object (a record variable with no known type), so they are not listed.` : null,
   ]);
 }
 
 // ---------- download ----------
 
-const stamp = () => new Date().toISOString().slice(0, 16).replace(/[-:T]/g, "");
+const stamp = () => localStamp();
 
 function downloadCsv(text, name) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
@@ -625,7 +627,7 @@ async function applyContext() {
       const r = await resolveContext(state.api, ctx);
       object = r.object;
       field = r.field;
-      state.tech.push(...r.notes);
+      state.pending.push(...r.notes);
     }
     state.objects = await source.objects();
     const obj = state.objects.find((o) => o.name.toLowerCase() === String(object).toLowerCase());
@@ -640,7 +642,7 @@ async function applyContext() {
     setFindLabel(f);
     run({ kind: "field", object: obj.name, field: f.name, objectLabel: obj.label, fieldLabel: f.label });
   } catch (e) {
-    state.tech.push(`Starting values: ${rawOf(e)}`);
+    state.pending.push(`Starting values: ${rawOf(e)}`);
   }
 }
 

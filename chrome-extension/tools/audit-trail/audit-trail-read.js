@@ -38,12 +38,19 @@ export function buildWhere({ from, to, userId, delegateUser, olderOrEqualMs } = 
 export const buildQuery = (q) => `SELECT ${FIELDS} FROM SetupAuditTrail${buildWhere(q)} ORDER BY CreatedDate DESC, Id DESC`;
 export const buildCountQuery = (q) => `SELECT COUNT() FROM SetupAuditTrail${buildWhere(q)}`;
 
+export const REQUEST_LIMIT_TEXT = "Salesforce turned this request away because the org has used up its daily API request limit. This is not a missing permission. Try again later, or ask your Salesforce admin to check API usage.";
+/** True when Salesforce refused because the org's daily API request limit is used up (it answers 403 for this). */
+export function isRequestLimit(e) {
+  return /REQUEST_LIMIT_EXCEEDED/i.test(`${e?.errorCode || ""} ${e?.message || ""} ${e?.detail || ""}`);
+}
+
 /** A failed read in plain words, with the raw Salesforce text kept for "Technical details": {message, raw}. */
 export function plainProblem(e) {
   const raw = String(e?.detail || e?.message || e || "");
   const status = e?.status;
   const code = String(e?.errorCode || "");
   if (status === 401) return { message: e.message, raw };
+  if (isRequestLimit(e)) return { message: REQUEST_LIMIT_TEXT, raw };
   if (status === 403 || /INSUFFICIENT_ACCESS|NO_ACCESS/i.test(code)) {
     return { message: "Salesforce did not let you read the Setup Audit Trail. You need the permission \"View Setup and Configuration\". Ask your Salesforce administrator.", raw };
   }
@@ -65,6 +72,7 @@ export function plainUserSearchProblem(e) {
   const raw = String(e?.detail || e?.message || e || "");
   const status = e?.status;
   if (status === 401 || (status === undefined && (e instanceof TypeError || /fetch|network|Failed to fetch/i.test(raw)))) return p;
+  if (isRequestLimit(e)) return p;
   const denied = status === 403 || /INSUFFICIENT_ACCESS|NO_ACCESS/i.test(String(e?.errorCode || ""));
   return {
     message: `Could not search for users.${denied ? " Salesforce did not let you read the list of users." : ""} Try again; if it keeps happening, open Technical details and share them. Entries already on the page are not affected.`,

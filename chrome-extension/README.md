@@ -53,7 +53,7 @@ Search the Setup Audit Trail:
 
 ## Known limits
 
-- Not yet checked from the toolbar button inside Chrome. The checks so far used a local test
+- Not yet checked from the Salesforce Capability Pack button in Chrome's toolbar. The checks so far used a local test
   server (see "What has been tested").
 - A group is only read correctly when its Status is **Updated**. If it is Outdated or Failed, the
   page says so; recalculate the group in Setup and compare again.
@@ -127,7 +127,7 @@ Finds the flows that use an object, a field, a piece of text or a record Id, and
   Then type a field of that object and pick it to see which flows use that field. Suggestions show the label first and
   the API name second. To look for a piece of text or a record Id instead, type it and choose "Find this text in flows".
   A record Id matches in its 15 and 18 character forms.
-- From the toolbar menu the box starts filled in: on a field's page in Setup (Object Manager) the object and field (the
+- Opened from the Salesforce Capability Pack button, the box starts filled in: on a field's page in Setup (Object Manager) the object and field (the
   field search runs), on a record page, an object's list view or an object's Setup page the object (the object view runs).
   Ids in a Setup address (01I objects, 00N fields) are turned into names with two small reads.
 - By default it reads the active version of each active flow. "Also look in inactive flows and drafts" adds the latest
@@ -185,7 +185,7 @@ The toolbar menu opens it as `flow-usage.html?host=<org host>` plus `object=` an
 
 Checked against a live sandbox (read-only, through the dev server): the flow list and contents reads and the matching on
 real flows (about 260 readable flows, read in about a minute), and the object view's list of triggered flows for Account.
-Not checked: the toolbar button inside Chrome, opening the CSV in Excel, the "Open in Flow Builder" links, Process Builder (the sandbox has none).
+Not checked: the Salesforce Capability Pack button in Chrome's toolbar, opening the CSV in Excel, the "Open in Flow Builder" links, Process Builder (the sandbox has none).
 
 ## Page details for a ticket
 
@@ -227,7 +227,7 @@ Paste it only into your company's own ticket system.
 
 Try it: `python dev/dev_server.py --no-org`, then open
 <http://127.0.0.1:8765/tools/page-details/page-details.html?demo=1> (made-up details). The toolbar menu opens it as
-`tools/page-details/page-details.html?host=<org host>&url=<cleaned address>`. Checked read-only against a sandbox (org, user, record pages, a list view, a Setup page and home). Not checked: opening it from the toolbar button in Chrome, and the real clipboard.
+`tools/page-details/page-details.html?host=<org host>&url=<cleaned address>`. Checked read-only against a sandbox (org, user, record pages, a list view, a Setup page and home). Not checked: opening it from the Salesforce Capability Pack button in Chrome's toolbar, and the real clipboard.
 
 ## Error Tracer: read a debug log
 
@@ -239,15 +239,15 @@ below); it reads logs Salesforce has already written.
    the person who does the failing action: for **Traced Entity Type** choose User, and for **Traced Entity Name** pick that person. Set **Start Date** and
    **Expiration Date** to cover the action (a trace flag lasts up to 24 hours). **Debug Level** is a
    lookup: typing a name finds nothing, so use the search icon to pick an existing level, or **New Debug
-   Level** (a small window) to make one. Set Apex Code at Debug or finer, and Database, Validation and
-   Workflow at Info or finer (flows are only recorded when Workflow is at Info or finer). Logs made by
+   Level** (a small window) to make one. Set Apex Code, Database, Validation and
+   Workflow each to Info or finer (flows are only recorded when Workflow is at Info or finer). Logs made by
    running Apex from the Developer Console or the command line use their own levels, so some areas may
    not be recorded.
 2. Ask the user to repeat what failed.
-3. Open **Error Tracer: read a debug log** from the toolbar menu, press **Refresh the list**, and pick the log.
+3. Open **Error Tracer: read a debug log** from the Salesforce Capability Pack button, press **Refresh the list**, and pick the log.
 
-The list shows the newest logs first: when (your local time, with the time zone named), the result, whose log, what ran and the
-size. You can show only logs whose result is not Success (ticked, the box hides logs whose result is Success, and a save stopped by a validation rule can still say Success), or only one user's. Picking a log shows a
+The list shows the newest 100 logs first. When exactly 100 come back, the page says "Showing the newest 100 logs. Older ones are not listed." Otherwise: when (your local time, with the time zone named), the result, whose log, what ran and the
+size. You can tick **Hide logs whose result is Success** (a save stopped by a validation rule can still say Success), or only one user's. Picking a log shows a
 headline ("2 problems found in this log" or "No errors found in this log"), who and when, and one card per
 finding with the message in plain words, how long after the log started it happened (the log's own clock stays in the folded lines), where it happened (for example "Apex trigger AccountTrigger,
 line 3"), what was running at the time, and a folded **Log lines** block with the raw lines around it.
@@ -257,10 +257,12 @@ What it picks out: unhandled Apex errors (with the stack trace turned into "Apex
 n"), saves that failed (a validation rule, a required field, a duplicate, a locked record, missing
 access and so on, with the kind of record being saved), validation rules (which rule, on which
 object, the message the user saw), flows that failed (the flow, the failing step; to find other
-flows that use the same flow, open "Where is it used in flows?" from the menu), Salesforce limits (too
+flows that use the same flow, open "Where is it used in flows?" from the Salesforce Capability Pack button), Salesforce limits (too
 many queries, CPU time), and errors that were raised but may have been handled by the code (listed
 separately, never as the cause). The line under the headline says once when the log was cut off, or when a category was not
-recorded at a level high enough; Notes say what to change in Setup (so "no flow errors" is never claimed when flows were not recorded).
+recorded at a level high enough; Notes say what to change in Setup (so "no flow errors" is never claimed when flows were not recorded). The green headline "No errors found in this log" appears only when the log is complete and everything above was recorded. If an area was not recorded (for example Workflow below Info) or the log was cut off, the headline is plain, not green: "No errors found in the parts of this log that were recorded", and the line under it says what was not recorded. A log with no levels line at all also gets the plain headline "No errors found in this log", and the line under it says the log does not say what it recorded.
+
+If Salesforce turns a request away because the org has used up its daily API request limit (Error Tracer, Search the Setup Audit Trail and Page details for a ticket), the page says: "Salesforce turned this request away because the org has used up its daily API request limit. This is not a missing permission. Try again later, or ask your Salesforce admin to check API usage."
 
 What it reads: `ApexLog` (one `SELECT` for the list, newest 100, and one `GET` of a log's body). GET and
 `SELECT` only. It never creates or changes a trace flag, a debug level or anything else.
@@ -281,7 +283,7 @@ Use it when you need to know **where one user gets one permission**: which profi
 set group gives it, which permission set inside a group, and what muting took away. It is the question behind
 Setup's "User Access Summary" and its "Access Granted By" action, answered on one page and copyable for a ticket.
 
-1. Open **Where does a user get this permission?** from the toolbar menu and pick the user (type part of a name or username; inactive users are tagged).
+1. Open **Where does a user get this permission?** from the Salesforce Capability Pack button and pick the user (type part of a name or username; inactive users are tagged).
 2. Choose the kind: **A system permission** (search by name, for example Modify All Data or View Setup), **Access to an object** (search the object, then a level: Read, Create, Edit, Delete, View All or Modify All) or **Access to a field** (the object, then the field, then Read or Edit). Lists show up to 100 matches; keep typing to narrow them. Names that start with what you typed come first, then names with a word that starts with it, and other names that only contain the letters come last (typing "rating" lists Rating before Operating Hours). Search finds both the label and the API name. The small API name under a label leaves out the leading "Permissions" of system permissions ("ExportReport") and the object part of a field ("Rating"). Every list works with the keyboard (arrow keys, Enter, Escape). If you type in a box without choosing from its list, the answer on the page is hidden and **Find where it comes from** waits; leave the box (click away or press Escape) and your chosen text comes back with the same answer, with no new read. Empty a box and leave it to clear that choice.
 3. Press **Find where it comes from**.
 
@@ -296,7 +298,7 @@ The answer starts with one sentence ("Yes. Casey Sample gets Delete on Account f
 - **Could not be checked**: what could not be read (a group's parts, a group still being recalculated, a directly assigned permission set you are not allowed to see).
 - For a field, **Access to the object**: Read (or Edit, for Edit on the field) on the object is needed for field access to work, and the page says whether the user has it and from where. A field the user is "given" without that object access says it does not work. Some objects (for example Task and Event) have fields that field permissions control but are not set by object permissions at all: for those the page says access to the object is not checked here, and does not say the field does not work.
 - An inactive user is said to be inactive: they cannot log in, so nothing applies now.
-- **Open in Setup**: each profile, permission set and permission set group a card names has a small link on a line of its own under its title, and each permission set inside a group is listed once ("Given inside the group by:", "Taken away by:") with its own link, to fix it there. A muting permission set has no Setup page of its own in these links: its link says **Open the group in Setup** and opens the page of the group it belongs to. The links need the page to be opened from the toolbar menu on a Salesforce tab (the address comes from it); in the demo, or when an Id is missing, the same names show without a link. The links are not in the copied text. Checked live on 2026-11-23 by opening the pages in one developer org: a profile, a permission set, a permission set group, a permission set inside a group and a session-based permission set. Not checked in other orgs or editions.
+- **Open in Setup**: each profile, permission set and permission set group a card names has a small link on a line of its own under its title, and each permission set inside a group is listed once ("Given inside the group by:", "Taken away by:") with its own link, to fix it there. A muting permission set has no Setup page of its own in these links: its link says **Open the group in Setup** and opens the page of the group it belongs to. The links need the page to be opened from the Salesforce Capability Pack button on a Salesforce tab (the address comes from it); in the demo, or when an Id is missing, the same names show without a link. The links are not in the copied text. Checked live on 2026-11-23 by opening the pages in one developer org: a profile, a permission set, a permission set group, a permission set inside a group and a session-based permission set. Not checked in other orgs or editions.
 
 After an answer, changing the **Level** redraws it from what was already read, with no new read. Changing the user or the permission clears the answer. **Copy the answer** puts the org name, the user's name and username, the permission (label and API name), the answer, every section, the notes and the date and time with its time zone on the clipboard as plain text (if the browser blocks copying, a box with the text appears to select and copy).
 
@@ -316,7 +318,7 @@ entries and tells you to download a file for the rest. This page reads the entri
 and filter them on the page, so the download is not needed. It is read-only: it only reads the audit trail (`SELECT` on
 `SetupAuditTrail`), and nothing is saved.
 
-1. Open **Search the Setup Audit Trail** from the toolbar menu. Nothing is read yet.
+1. Open **Search the Setup Audit Trail** from the Salesforce Capability Pack button. Nothing is read yet.
 2. Choose the **Period** (Last 24 hours, Last 7 days (the default), Last 30 days, Last 90 days, Everything Salesforce keeps (about 180 days), or Choose dates, where the last day is included and days are your own days). Optionally pick a **Person**: type part of a name, a username, an email or a user Id (an email that several people share lists all of them; a pasted user Id that no one can be read for can be used as it is). Then **What to find** shows one choice at a time: **Changes made by them** (the default; Salesforce looks for them in the whole period, also finds entries where they are the delegate user, for example an administrator using Login-As, and marks those "As delegate (for example through Login-As)"), **Changes made to them** or **Either**. Salesforce cannot narrow by who was changed, so the last two read the period without a person and then look through the entries read (at first the newest 50,000 of the period, and up to 250,000 if you read older entries, see below); the page says so before it reads. They find entries whose text mentions the person by Id, by username or email, or by full name; a name that is followed by another person's Id is skipped, and a match by name alone is marked "Matched by name only: may be another person with this name". Where a count of matches is given (status line, copied text, CSV) name-only matches are counted apart, for example "7 certain (made by them, or their Id, username or email is in the text), 11 by name only (may be another person)"; which choice counts what as certain: **Changes made by them** and **Either** count an entry they made as certain, and one that also has their name in the text says "Made by them; their name is also in the text" with no warning; **Changes made to them** does not look at who made the entry (being the maker does not prove that the name in the text is them), so an entry they made whose text has only their name is still "Matched by name only: may be another person". When some matches are by name only, the status line says "entries that may be about them". A delegate entry is one whose Delegate User field holds their username. If the person search itself fails, the page says "Could not search for users" next to the Person box and leaves the entries on screen. Opened, a row says how it matched. If you change the person or the choice after reading and the entries read cover it, the list is worked out again at once; if not, the page says "Press Show the audit trail to read again" instead of showing the old list.
 3. Press **Show the audit trail**. It counts the entries first, then shows them as they arrive ("Reading... 4,000 of 18,125 entries"). **Stop** keeps what was read. One read takes at most 50,000 entries (the newest are kept); a new read cancels one still running. If the period has more, **Read the next 50,000 older entries (12,060 left)** appears above the list (or **Read the remaining 12,060** when fewer are left): it continues the same read, with the same period and person, from the second the list goes back to, and adds the older entries. Entries from that second that are already in the list are not added twice and none is missed. The lists, search and counts update as they arrive ("Reading older entries... 112,000 of 626,000", counted against the whole period), **Stop** keeps what was read, and a new **Show the audit trail** cancels it and starts again. After a failed or stopped step the same button reads on from where the list ends. If you change the period after reading, the button is replaced by a line asking you to press Show the audit trail again, so it never continues a read that is not the one on screen. The page holds at most 250,000 entries in memory; at that point the button goes and the page says to choose a shorter period or one person.
 4. Search and narrow what was read. None of this asks Salesforce anything, so it is instant.
@@ -339,7 +341,18 @@ Try it: `python dev/dev_server.py --no-org`, then open
 
 New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
 
-1. Copy this folder anywhere (it must not contain a file or folder whose name starts with `_`, such as `__pycache__`; Chrome refuses to load it).
+**Easiest: the one-click download.** Download
+<https://github.com/fulton916/Salesforce_Capability_Pack/releases/latest/download/salesforce-capability-pack-extension.zip>
+and unzip it. `manifest.json` is at the top of the unzipped folder. Then:
+
+1. Chrome or Edge: open `chrome://extensions` (Edge: `edge://extensions`).
+2. Turn on **Developer mode**.
+3. **Load unpacked** → choose the unzipped folder (the one with `manifest.json` directly inside).
+4. Pin the extension (puzzle icon → pin).
+
+**Or from a checkout of the repository:**
+
+1. Copy the `chrome-extension` folder anywhere (it must not contain a file or folder whose name starts with `_`, such as `__pycache__`; Chrome refuses to load it).
 2. Chrome or Edge: open `chrome://extensions` (Edge: `edge://extensions`).
 3. Turn on **Developer mode**.
 4. **Load unpacked** → choose this `chrome-extension` folder (the one with `manifest.json` directly inside).
@@ -363,9 +376,9 @@ push it by policy.
 ## How to use
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
-2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
+2. Click the Salesforce Capability Pack button in Chrome's toolbar. On a Salesforce tab it shows "Connected to this org:"
    and nine buttons: **Compare permission set groups** ("Find out how two permission set groups
-   differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
+   differ"), **User access summary and comparison** ("See what a user can access, compare two users, or see who is in each Einstein Activity Capture configuration"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
    **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
    **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id") and
@@ -647,11 +660,11 @@ Why can a user see this record?:
 Search the Setup Audit Trail:
 - The facts the page is built on were checked read-only in three real orgs (a few hundred, over 250,000 and over 600,000 entries): which fields exist, that only `CreatedDate`, `CreatedById`, `Action`, `DelegateUser` and `ResponsibleNamespacePrefix` may be in a WHERE (`Section` and `Display` are refused), that `SELECT COUNT()` works and `COUNT(Id)` and `MIN()` do not, and that `ORDER BY CreatedDate DESC, Id DESC` works.
 - Offline tests: the query text, local-day bounds across a daylight-saving change, the pager (progress, Stop, the cap, a failure part way, a stale read, a failed count), the search words, the pick lists and their counts, sorting, the partial-list wording, the CSV and copy text, and 50,000 entries filtered and sorted. The demo page was checked in Chrome (`?demo=1`, narrow and wide, light and dark).
-- Checked live (read-only, two large orgs): reading past 2,000 rows through `nextRecordsUrl`, up to the 50,000 cap. The whole page was also checked read-only through the dev server against three real orgs (a small developer org and two large sandboxes): totals per kind and section, the 7-day and chosen-date counts, "made by" with delegate entries, and "made to" matches equalled direct queries or independent matching; the 50,000 cap showed its warning. NOT checked: the real toolbar button in your own Chrome, a live Login-As, Excel itself, reading beyond 50,000 entries.
+- Checked live (read-only, two large orgs): reading past 2,000 rows through `nextRecordsUrl`, up to the 50,000 cap. The whole page was also checked read-only through the dev server against three real orgs (a small developer org and two large sandboxes): totals per kind and section, the 7-day and chosen-date counts, "made by" with delegate entries, and "made to" matches equalled direct queries or independent matching; the 50,000 cap showed its warning. NOT checked: the real Salesforce Capability Pack button in your own Chrome, a live Login-As, Excel itself, reading beyond 50,000 entries.
 
 Not tested:
 - Muted apps, pages and code (no muting permission set in that org mutes any).
-- The extension's own cookie session from the toolbar button inside Chrome (all live checks used the
+- The extension's own cookie session from the Salesforce Capability Pack button in Chrome (all live checks used the
   dev server).
 - Opening the CSV in Excel.
 
@@ -716,8 +729,8 @@ keep the old `licence` spelling so saved files still load. Saved group files use
 
 ## Choose which tools show in the menu
 
-Not every tool applies to everyone. Open **Settings** (the link at the bottom of the toolbar menu, or right-click the
-extension icon and choose **Options**) and untick the tools you do not use. They disappear from the toolbar menu; tick
+Not every tool applies to everyone. Open **Settings** (the link at the bottom of the Salesforce Capability Pack menu, or right-click the
+extension icon and choose **Options**) and untick the tools you do not use. They disappear from the Salesforce Capability Pack menu; tick
 one again, or press **Show all tools**, to bring it back. Each change saves at once and says "Saved".
 
 - Hiding a tool only removes it from the menu. It changes nothing in Salesforce and does not stop anyone opening the tool.
@@ -730,14 +743,14 @@ one again, or press **Show all tools**, to bring it back. Each change saves at o
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.11.0", and all nine pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.11.1", and all nine pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
 - Nothing is sent from the extension. It only opens the GitHub page. It never puts your org name,
   address, user names or anything from the org into the link.
-- You need a GitHub account with access to this repository (it is private). If GitHub shows a "not
-  found" page, you are not signed in with an account that has access.
+- The repository is public, so anyone can read the page. To file an issue you need a free GitHub account;
+  if GitHub asks you to sign in, sign in or create one, then press Submit.
 - Describe problems with made-up names. Do not paste usernames, record data, org IDs, session IDs
   or screenshots that show org data.
 

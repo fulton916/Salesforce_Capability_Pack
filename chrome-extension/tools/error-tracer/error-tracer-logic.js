@@ -506,7 +506,7 @@ export function analyzeLog(text, meta = {}) {
 
 /** Plain pointer to the flow-usage tool. Words only: tools never link to each other. */
 export function flowPointer(name) {
-  return `To see which other flows use \u201c${name}\u201d, open \u201cWhere is it used in flows?\u201d from the toolbar menu and search for ${name}.`;
+  return `To see which other flows use \u201c${name}\u201d, open \u201cWhere is it used in flows?\u201d from the Salesforce Capability Pack button and search for ${name}.`;
 }
 
 const SETUP_NAME = { APEX_CODE: "Apex Code", DB: "Database", VALIDATION: "Validation", WORKFLOW: "Workflow" };
@@ -518,6 +518,7 @@ function buildNotes(out, meta) {
   const cov = out.coverage;
   const missing = cov.filter((c) => c.ok === false);
   if (out.notLog) {
+    out.tone = "neutral";
     out.headline = "This does not look like a debug log";
     out.subline = "The text is empty or is not debug log text, so nothing could be checked. This is not a result of \u201cno errors\u201d.";
     notes.push("The log looks empty or is not a debug log.");
@@ -537,6 +538,7 @@ function buildNotes(out, meta) {
     : `${out.handledCount} errors were raised but may have been handled by the code. They are listed after the problems and are usually not the cause.`);
   if (out.user.timeZone) notes.push(`The raw lines under \u201cLog lines\u201d show the log's own clock, which is in the user's time zone, ${out.user.timeZone}. The cards say how long after the log started each problem happened.`);
   const n = out.problemCount;
+  out.tone = n > 0 ? "bad" : "good";
   if (n > 0) {
     out.headline = `${n} problem${n === 1 ? "" : "s"} found in this log`;
     const none = missing.filter((c) => !c.partial), part = missing.filter((c) => c.partial);
@@ -547,7 +549,11 @@ function buildNotes(out, meta) {
       missing.length || out.cutOff ? "There may be more." : "",
     ].filter(Boolean).join(" ");
   } else {
-    out.headline = out.handledCount ? "No unhandled errors found in this log" : "No errors found in this log";
+    // Green only when the log is complete and recorded everything the page needs.
+    const complete = !!out.levels && !missing.length && !out.cutOff;
+    out.tone = complete ? "good" : "neutral";
+    const what = complete || !out.levels ? "this log" : "the parts of this log that were recorded";
+    out.headline = `${out.handledCount ? "No unhandled errors" : "No errors"} found in ${what}`;
     const rec = cov.filter((c) => c.ok === true).map(levelWords);
     out.subline = out.levels
       ? `${rec.length ? `Recorded: ${rec.join(", ")}. ` : ""}${missing.some((c) => !c.partial) ? `Not recorded: ${missing.filter((c) => !c.partial).map((c) => c.label).join(", ")}, so errors there would not appear.` : ""}${missing.some((c) => c.partial) ? `${missing.some((c) => !c.partial) ? " " : ""}Recorded only in part: ${missing.filter((c) => c.partial).map((c) => c.label).join(", ")}, so some errors there may not appear.` : ""}${out.cutOff ? " The log was cut off, so the end is missing." : ""}`.trim()

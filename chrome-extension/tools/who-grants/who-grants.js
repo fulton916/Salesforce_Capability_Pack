@@ -482,14 +482,14 @@ async function connect() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       try { session = await findSession(HOST, chrome.cookies); } catch (e) { throw new SessionLookupError(e?.message || ""); } // its messages are plain words
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       hideOrgParts();
       return false;
     }
     state.api = new SfApi(session);
     await useNewestVersion(state.api); // this page asks for the org's newest API version (the shared default stays 67.0)
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
-    showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
+    showOrg(org, DEV ? "" : session.apiHost, DEV ? "Local dev server" : null);
     return true;
   } catch (e) {
     state.api = null; // nothing may use a connection that did not come up
