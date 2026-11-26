@@ -132,6 +132,53 @@ export async function run(test) {
     assert.equal(r.users[0].profile, "Std");
   });
 
+  await test("searchUsers: callers that do not opt in send exactly the same query as before", async () => {
+    const log = [];
+    const api = apiFor([[/FROM User WHERE/, () => []]], log);
+    const exact = "SELECT Id, Name, Username, IsActive, Profile.Name FROM User WHERE (Name LIKE '%ann%' OR Username LIKE '%ann%') AND (Name LIKE '%lee%' OR Username LIKE '%lee%') ORDER BY IsActive DESC, Name LIMIT 51";
+    await searchUsers(api, "ann lee");
+    await searchUsers(api, "ann lee", 50, {});
+    await searchUsers(api, "ann lee", 50, { emailAndId: false });
+    await searchUsers(api, "005Dm000003Kq1v");
+    assert.deepEqual(log.slice(0, 3).map((l) => l.q), [exact, exact, exact]);
+    assert.ok(!/Email|OR Id =/.test(log[3].q), "a pasted Id is not looked up unless asked");
+    const recs = [{ Id: "005A", Name: "A", Username: "a@example.com", Email: "x@example.com", IsActive: true, Profile: { Name: "P" } }];
+    const plain = await searchUsers(apiFor([[/FROM User WHERE/, () => recs]]), "a");
+    assert.deepEqual(Object.keys(plain.users[0]), ["id", "name", "username", "isActive", "profile"], "no new field for old callers");
+  });
+
+  await test("searchUsers with emailAndId also looks at the email and finds a pasted user Id; the 18 character Id needs its checksum", async () => {
+    const log = [];
+    const recs = [{ Id: "005Dm000003Kq1vIAC", Name: "Riley Quinn", Username: "riley.quinn@example.com.uat", Email: "riley.quinn@example.com", IsActive: true, Profile: { Name: "P" } }];
+    const api = apiFor([[/FROM User WHERE/, () => recs]], log);
+    const r = await searchUsers(api, "o'neil@example.com", 50, { emailAndId: true });
+    assert.equal(log[0].q, "SELECT Id, Name, Username, Email, IsActive, Profile.Name FROM User WHERE (Name LIKE '%o\\'neil@example.com%' OR Username LIKE '%o\\'neil@example.com%' OR Email LIKE '%o\\'neil@example.com%') ORDER BY IsActive DESC, Name LIMIT 51");
+    assert.equal(r.users[0].email, "riley.quinn@example.com");
+    await searchUsers(api, "005Dm000003Kq1v", 50, { emailAndId: true });
+    assert.ok(log[1].q.includes(") OR Id = '005Dm000003Kq1v' ORDER BY"), log[1].q);
+    await searchUsers(api, "005Dm000003Kq1vIAC", 50, { emailAndId: true });
+    assert.ok(log[2].q.includes(") OR Id = '005Dm000003Kq1vIAC' ORDER BY"), log[2].q);
+    await searchUsers(api, "005Dm000003Kq1vXYZ", 50, { emailAndId: true });
+    assert.ok(!log[3].q.includes("OR Id ="), "a wrong checksum is not sent as an Id");
+    await searchUsers(api, "riley 005Dm000003Kq1v", 50, { emailAndId: true });
+    assert.ok(!log[4].q.includes("OR Id ="), "only a single pasted Id");
+    await searchUsers(api, "001Dm000003Kq1v", 50, { emailAndId: true });
+    assert.ok(!log[5].q.includes("OR Id ="), "only a user Id (005)");
+  });
+
+  await test("matchUsers: the opt-in also searches the email and a pasted Id; by default it is as before", () => {
+    const users = [
+      { id: "005Dm000003Kq1vIAC", name: "Riley Quinn", username: "riley@example.com.uat", email: "shared@example.com" },
+      { id: "005Dm000003Lm2aIAC", name: "Jamie Okoro", username: "jamie@example.com", email: "shared@example.com" },
+    ];
+    assert.equal(matchUsers(users, "shared@example.com").users.length, 0);
+    assert.equal(matchUsers(users, "shared@example.com", 50, { emailAndId: true }).users.length, 2, "an email several users share lists them all");
+    assert.deepEqual(matchUsers(users, "005Dm000003Lm2a", 50, { emailAndId: true }).users.map((u) => u.name), ["Jamie Okoro"]);
+    assert.deepEqual(matchUsers(users, "005Dm000003Lm2aIAC", 50, { emailAndId: true }).users.map((u) => u.name), ["Jamie Okoro"]);
+    assert.equal(matchUsers(users, "005dm000003lm2a", 50, { emailAndId: true }).users.length, 0, "Ids are case-sensitive");
+    assert.deepEqual(matchUsers(users, "riley").users.length, 1);
+  });
+
   await test("readUserAccess reads profile, role, licences, groups, queues and territories", async () => {
     const a = await readUserAccess(apiFor(userRoutes()), "005A");
     assert.equal(a.schema, "sf-user-access/1");

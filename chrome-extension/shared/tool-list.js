@@ -58,4 +58,10 @@ export const TOOLS = [
     title: "Where does a user get this permission?",
     description: "Find every profile, permission set and group that gives a user one permission",
   },
+  {
+    id: "audit-trail",
+    page: "tools/audit-trail/audit-trail.html",
+    title: "Search the Setup Audit Trail",
+    description: "Find who changed what in Setup, without downloading a file",
+  },
 ];

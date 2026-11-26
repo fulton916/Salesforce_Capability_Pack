@@ -2,9 +2,10 @@
 
 (Formerly the `sf-psg-compare` folder. Saved group files still use the schema ids `sf-psg-snapshot/1`, `/2` and `/3`.)
 
-A Chrome extension with eight read-only tools: **Compare permission set groups**, **User access summary and
+A Chrome extension with nine read-only tools: **Compare permission set groups**, **User access summary and
 comparison**, **Territory & role hierarchy**, **Why can a user see this record?**, **Where is it used in flows?**,
-**Page details for a ticket**, **Error Tracer: read a debug log** and **Where does a user get this permission?**.
+**Page details for a ticket**, **Error Tracer: read a debug log**, **Where does a user get this permission?** and
+**Search the Setup Audit Trail**.
 
 It works in any org you can log in to. It uses the Salesforce login you already have in the
 browser, so there is nothing to set up in the org. It only reads; it never changes anything.
@@ -46,6 +47,9 @@ Error Tracer: read a debug log:
 Where does a user get this permission?:
 - Does this user get Delete on Account (or View Setup, or Edit on a field), and from which profile, permission set or group?
 - Which permission set inside a group gives it, and did a muting permission set take it away?
+
+Search the Setup Audit Trail:
+- Who changed this permission set, field or user in Setup, and when, over the last few days or weeks, without downloading the Setup Audit Trail file?
 
 ## Known limits
 
@@ -305,6 +309,32 @@ Not checked in this version: permission set licenses, sharing, and access to Ape
 Try it: `python dev/dev_server.py --no-org`, then open
 <http://127.0.0.1:8765/tools/who-grants/who-grants.html?demo=1>. The demo has a made-up org with three users (one inactive) and a list of things to try at the top of the page. Checked read-only in a developer org through the dev server: the lists (system permissions, objects, fields), a profile, a directly assigned set, a group with a muting permission set, a session-based set, an expiry date and access from View All Fields. Checked again after a fix for asking about Modify All Data, View All Data or View All Fields (Global), for a test user and an administrator in a developer org: system permissions, object levels and fields all matched a separate query. Not checked in a real org: a group that is not Updated, an expired or revoked assignment, an inactive user, and View All Data or Modify All Data covering an object. Checked by a tester on 2026-11-24 in real Chromium 141 with a made-up org: the real toolbar popup (opened with `chrome.action.openPopup`, not a physical click), the cookie session lookup, all 8 menu entries, the answer pages, the real Windows clipboard, the Setup link opening, Settings on and off, that nothing is stored, and the 401 and no-cookie messages. Still not checked: the toolbar path against a real org's session, and in the user's own Chrome. If the page cannot connect (no session cookie, expired session, org not reachable), it hides the two steps and shows only what to do (log in to the org in this browser, then reload this page); a raw error text is only ever shown under the folded Technical details.
 
+## Search the Setup Audit Trail
+
+Use it when you need to know **who changed what in Setup**. Setup's "View Setup Audit Trail" page shows only the latest
+entries and tells you to download a file for the rest. This page reads the entries for a period and lets you review, search
+and filter them on the page, so the download is not needed. It is read-only: it only reads the audit trail (`SELECT` on
+`SetupAuditTrail`), and nothing is saved.
+
+1. Open **Search the Setup Audit Trail** from the toolbar menu. Nothing is read yet.
+2. Choose the **Period** (Last 24 hours, Last 7 days (the default), Last 30 days, Last 90 days, Everything Salesforce keeps (about 180 days), or Choose dates, where the last day is included and days are your own days). Optionally pick a **Person**: type part of a name, a username, an email or a user Id (an email that several people share lists all of them; a pasted user Id that no one can be read for can be used as it is). Then **What to find** shows one choice at a time: **Changes made by them** (the default; Salesforce looks for them in the whole period, also finds entries where they are the delegate user, for example an administrator using Login-As, and marks those "As delegate (for example through Login-As)"), **Changes made to them** or **Either**. Salesforce cannot narrow by who was changed, so the last two read the period without a person and then look through the entries read (at first the newest 50,000 of the period, and up to 250,000 if you read older entries, see below); the page says so before it reads. They find entries whose text mentions the person by Id, by username or email, or by full name; a name that is followed by another person's Id is skipped, and a match by name alone is marked "Matched by name only: may be another person with this name". Where a count of matches is given (status line, copied text, CSV) name-only matches are counted apart, for example "7 certain (made by them, or their Id, username or email is in the text), 11 by name only (may be another person)"; which choice counts what as certain: **Changes made by them** and **Either** count an entry they made as certain, and one that also has their name in the text says "Made by them; their name is also in the text" with no warning; **Changes made to them** does not look at who made the entry (being the maker does not prove that the name in the text is them), so an entry they made whose text has only their name is still "Matched by name only: may be another person". When some matches are by name only, the status line says "entries that may be about them". A delegate entry is one whose Delegate User field holds their username. If the person search itself fails, the page says "Could not search for users" next to the Person box and leaves the entries on screen. Opened, a row says how it matched. If you change the person or the choice after reading and the entries read cover it, the list is worked out again at once; if not, the page says "Press Show the audit trail to read again" instead of showing the old list.
+3. Press **Show the audit trail**. It counts the entries first, then shows them as they arrive ("Reading... 4,000 of 18,125 entries"). **Stop** keeps what was read. One read takes at most 50,000 entries (the newest are kept); a new read cancels one still running. If the period has more, **Read the next 50,000 older entries (12,060 left)** appears above the list (or **Read the remaining 12,060** when fewer are left): it continues the same read, with the same period and person, from the second the list goes back to, and adds the older entries. Entries from that second that are already in the list are not added twice and none is missed. The lists, search and counts update as they arrive ("Reading older entries... 112,000 of 626,000", counted against the whole period), **Stop** keeps what was read, and a new **Show the audit trail** cancels it and starts again. After a failed or stopped step the same button reads on from where the list ends. If you change the period after reading, the button is replaced by a line asking you to press Show the audit trail again, so it never continues a read that is not the one on screen. The page holds at most 250,000 entries in memory; at that point the button goes and the page says to choose a shorter period or one person.
+4. Search and narrow what was read. None of this asks Salesforce anything, so it is instant.
+   - **Search**: all words, in any order, over the sentence, section, kind of change (and its readable form), person, username, delegate and namespace. Put an exact phrase in "quotes". A minus sign in front of a word or a quoted phrase leaves it out (`-login`). Names such as `Region__c` or `My_Set` are found as you type them; a hyphen inside a word is part of the word. Matches are marked in the text.
+   - **Section**, **Kind of change** and **Person** (three folded lists, each with its own small search and a count beside each choice): tick choices to show only those, or press **Hide** to leave one out. Counts follow the search and the other lists; a choice you picked stays in its list even when its count is 0. Two people with the same name are told apart by username. Kinds are the Salesforce code split into words ("PermSetFlsChanged" is "Perm Set Fls Changed"); nothing is guessed about what they mean. Tick **Show API names** to see the raw code.
+   - Two ticks: **Only entries that have a delegate user**, and **Only changes from a managed package**.
+   - Every row has **Hide this kind**. Active filters show as chips you can remove one by one, and **Clear filters** removes all. Filters stay when you read a new period; the page says when a kept filter hides everything.
+   - The line above the table says "Showing 37 of 18,125 entries read".
+5. The table shows When (your time zone, named above the results), Who, Section, What changed (long text is clipped, with **Show all**) and Kind of change. Click a heading to sort (newest first by default; entries from the same second keep Salesforce's order; entries with nothing recorded sort last). Click a row to open it: every fact (delegate, namespace, username, the raw code and the UTC time), **Copy for a ticket**, **Only this kind** and **Only this person**. The table draws 200 rows at a time with **Show 200 more**.
+6. **Copy what is shown** puts up to 100 entries in plain text (it says when there are more). **What is shown now (CSV for Excel)** downloads every entry that matches the search and filters, in the current sort, with local and UTC time columns. Both start with the period, time zone, person and filters used.
+
+**It never calls a partial list complete.** When the list is not the whole period (more entries than one read takes or than the page holds, you pressed Stop, or a page of the read failed) a yellow line stays above the results and in the CSV and the copied text: how many of how many entries were read in all (counting the older entries you added), the date the list goes back to, whether more can be read, and what to do (read older entries, or choose a shorter period or one person). The status line and "0 found" say the same numbers. When everything in the period has been read there is no such line. A copy or CSV made while the read is still running says so too ("The read was still running when this was made...") and holds exactly what was on screen. "0 found" on a partial list says only part was searched. If the count fails but reading works, the list shows without a total. Errors are in plain words (you need "View Setup and Configuration", the audit trail is not available, the session expired, the connection was lost) with the raw text under "Technical details".
+
+What it reads (`SELECT` only): `SELECT COUNT() FROM SetupAuditTrail WHERE ...`, then `SELECT Id, Action, Section, Display, CreatedDate, CreatedById, CreatedBy.Name, CreatedBy.Username, DelegateUser, ResponsibleNamespacePrefix FROM SetupAuditTrail WHERE ... ORDER BY CreatedDate DESC, Id DESC`, followed through `nextRecordsUrl` by the page's own pager. The period and, for "Changes made by them", the person (`CreatedById = <Id> OR DelegateUser = <username>`) go in the query; Salesforce refuses a WHERE on Section and Display, so words are searched in memory. Salesforce keeps about 180 days.
+
+Try it: `python dev/dev_server.py --no-org`, then open
+<http://127.0.0.1:8765/tools/audit-trail/audit-trail.html?demo=1>. The demo has 480 made-up entries (with Riley Quinn recorded every way, a hidden maker, Login-As, a shared email and an accented name) dated from the moment you open it (a noisy kind, no section, no user, delegate and managed package entries, a very long sentence, two people with one name, same-second entries, and texts such as `=...` and `<img ...>` that show as plain text) and hints at the top. To try "Read older entries" on those 480 entries, add `&cap=200` to the address (demo only): a read then takes 200 entries and the page holds at most 600, so the button, its "remaining" wording and the end of the read can be seen; `&cap=100` shows the limit (300 held).
+
 ## Install (unpacked, for your own browser)
 
 New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
@@ -326,6 +356,7 @@ push it by policy.
 - For User access summary and comparison, also access to see users.
 - For Error Tracer, permission to see debug logs (seeing other people's logs may need more; ask your administrator).
 - For Where does a user get this permission?, access to see users, permission sets, groups and their object and field permissions (View Setup and Configuration is normal).
+- For Search the Setup Audit Trail, View Setup and Configuration (the same permission Setup's audit trail page needs).
 - To name Apex classes and pages: read access to them is normal with View Setup. Items it cannot
   name are kept by Id with a note at the top.
 
@@ -333,7 +364,7 @@ push it by policy.
 
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack icon. On a Salesforce tab it shows "Connected to this org:"
-   and eight buttons: **Compare permission set groups** ("Find out how two permission set groups
+   and nine buttons: **Compare permission set groups** ("Find out how two permission set groups
    differ"), **User access summary and comparison** ("See what a user can access, or compare two users"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
    **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
@@ -341,7 +372,8 @@ push it by policy.
    **Page details for a ticket** ("Copy who you are, which org and which page, to paste into a
    ticket"), **Error Tracer: read a debug log** ("See what failed, where and for which user, from a
    debug log") and **Where does a user get this permission?** ("Find every profile, permission set and group that
-   gives a user one permission"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
+   gives a user one permission") and **Search the Setup Audit Trail** ("Find who changed what in Setup, without
+   downloading a file"). On any other tab the buttons are greyed out; go to a Salesforce tab and click the icon again.
    The record button reads the record Id from the address of the tab. On a Salesforce tab with no
    record open it stays enabled, says "Open a record first", and the page opens with an empty record
    box.
@@ -612,6 +644,11 @@ Why can a user see this record?:
   appear, the territory association field values, how `PermissionSetAssignment` lists permission set
   group components, and the group queries on a large org. The sandbox checks above covered only the fixes listed there.
 
+Search the Setup Audit Trail:
+- The facts the page is built on were checked read-only in three real orgs (a few hundred, over 250,000 and over 600,000 entries): which fields exist, that only `CreatedDate`, `CreatedById`, `Action`, `DelegateUser` and `ResponsibleNamespacePrefix` may be in a WHERE (`Section` and `Display` are refused), that `SELECT COUNT()` works and `COUNT(Id)` and `MIN()` do not, and that `ORDER BY CreatedDate DESC, Id DESC` works.
+- Offline tests: the query text, local-day bounds across a daylight-saving change, the pager (progress, Stop, the cap, a failure part way, a stale read, a failed count), the search words, the pick lists and their counts, sorting, the partial-list wording, the CSV and copy text, and 50,000 entries filtered and sorted. The demo page was checked in Chrome (`?demo=1`, narrow and wide, light and dark).
+- Checked live (read-only, two large orgs): reading past 2,000 rows through `nextRecordsUrl`, up to the 50,000 cap. The whole page was also checked read-only through the dev server against three real orgs (a small developer org and two large sandboxes): totals per kind and section, the 7-day and chosen-date counts, "made by" with delegate entries, and "made to" matches equalled direct queries or independent matching; the 50,000 cap showed its warning. NOT checked: the real toolbar button in your own Chrome, a live Login-As, Excel itself, reading beyond 50,000 entries.
+
 Not tested:
 - Muted apps, pages and code (no muting permission set in that org mutes any).
 - The extension's own cookie session from the toolbar button inside Chrome (all live checks used the
@@ -693,7 +730,7 @@ one again, or press **Show all tools**, to bring it back. Each change saves at o
 
 ## Report a bug or suggest an improvement
 
-The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.10.1", and all eight pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
+The popup ends with a small footer line, "Report a bug · Suggest an improvement · Settings · v0.11.0", and all nine pages have the same two links at the top right. They open a new tab on GitHub with a short form already started: which
 tool, the extension version and your browser (for example "Chrome 131"). You read it, add what
 happened, and press Submit yourself.
 
@@ -724,7 +761,8 @@ Open <http://127.0.0.1:8765/tools/compare-groups/compare-groups.html?demo=1> (tw
 or <http://127.0.0.1:8765/tools/user-access/user-access.html?demo=1> (two made-up users) or
 <http://127.0.0.1:8765/tools/record-access/record-access.html?demo=1> (a made-up account and two made-up users) or
 <http://127.0.0.1:8765/tools/error-tracer/error-tracer.html?demo=1> (five made-up debug logs) or
-<http://127.0.0.1:8765/tools/who-grants/who-grants.html?demo=1> (a made-up org and three users).
+<http://127.0.0.1:8765/tools/who-grants/who-grants.html?demo=1> (a made-up org and three users) or
+<http://127.0.0.1:8765/tools/audit-trail/audit-trail.html?demo=1> (480 made-up audit trail entries).
 
 ## Developing without reloading Chrome
 
@@ -784,6 +822,9 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/who-grants/who-grants.*` | The "Where does a user get this permission?" page (html, js, extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
 | `tools/who-grants/who-grants-logic.js` | Turns what was read into the answer: places, muting, implied access, session and expired assignments, the copy text, the pick lists. Pure, no browser APIs |
 | `tools/who-grants/who-grants-read.js` | Reads the user's assignments, groups, parts, muting sets and the object or field permissions for one permission (GET and `SELECT` only; the newest API version for this page only) |
+| `tools/audit-trail/audit-trail.*` | The "Search the Setup Audit Trail" page (html, js, extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
+| `tools/audit-trail/audit-trail-logic.js` | Period bounds, entries, the search words, the three pick lists and their counts, sorting, the "only part was read" wording, the copy text, the CSV rows and the demo's fake org. Pure, no browser APIs |
+| `tools/audit-trail/audit-trail-read.js` | The query text and the pager (`SELECT COUNT()`, then `SELECT` pages with progress, Stop, a 50,000 cap, the continuation for older entries and plain errors). GET only |
 | `shared/urlcontext.js` | Turns a Salesforce page address into an object and field. Pure |
 | `shared/sfread.js` | `readOrg`: the org name and edition shown in each page's header |
 | `shared/csv.js` | `toCsv`: CSV with a BOM, formula-guarded. Pure |
