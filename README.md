@@ -23,7 +23,7 @@ To update: download the zip again, unzip it over the same folder, then click the
 They use the Salesforce login you already have and never change anything in the org.
 
 - **Compare permission set groups**: find out how two groups differ.
-- **User access summary and comparison**: see what a user can access, compare two users, or see who is in each Einstein Activity Capture configuration.
+- **User access summary and comparison**: see what a user can access, compare two users (or the same person in two orgs), or see who is in each Einstein Activity Capture configuration.
 - **Territory & role hierarchy**: see the whole tree, narrow it to one branch, export it for Excel.
 - **Why can a user see this record?**: explain who can see the record open in the tab, and why.
 - **Where is it used in flows?**: find the flows that use an object, a field or a record Id.

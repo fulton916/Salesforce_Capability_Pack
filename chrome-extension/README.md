@@ -20,6 +20,7 @@ Compare permission set groups:
 User access summary and comparison:
 - What can this user access, and how do they get it (directly or through a group)?
 - How do two users' access differ?
+- How does one person's access in a sandbox differ from the same person's access in production (or any two orgs)?
 - Do two users differ in call center, or in a custom setting (such as a bypass flag) that could make Salesforce behave differently for them?
 - Who is in each Einstein Activity Capture configuration (also past the 500 users Setup lists), who is not connected, and can I get those lists into Excel?
 
@@ -378,7 +379,7 @@ push it by policy.
 1. Open any page of the org in Chrome (Lightning, Setup or Classic) and log in as usual.
 2. Click the Salesforce Capability Pack button in Chrome's toolbar. On a Salesforce tab it shows "Connected to this org:"
    and nine buttons: **Compare permission set groups** ("Find out how two permission set groups
-   differ"), **User access summary and comparison** ("See what a user can access, compare two users, or see who is in each Einstein Activity Capture configuration"),
+   differ"), **User access summary and comparison** ("See what a user can access, compare two users or the same person in two orgs, or see who is in each Einstein Activity Capture configuration"),
    **Territory & role hierarchy** ("See the whole territory or role tree; export it for Excel"),
    **Why can a user see this record?** ("Explain who can see the record open in this tab, and why"),
    **Where is it used in flows?** ("Find the flows that use an object, a field or a record Id") and
@@ -465,6 +466,23 @@ Type part of a name or username (words in any order) and pick the user from the 
 users are marked "Inactive". Add a second user under "Second user (optional, to compare)" to compare;
 "Stop comparing" goes back to one user. It looks and works like the compare tool (cards, tabs,
 "Only differences" / "Everything", "Show API names", search, Download).
+
+**The same person in another org.** Choose "The same person in another org" above the boxes. The page lists the
+other orgs that have a Salesforce tab open and logged in in this browser (several tabs of one org are one
+choice; the org you opened the page from is left out; each is named by its org name and its My Domain host).
+If there is none it says "Open the other org in another tab and log in, then click Refresh." Pick the org,
+pick the person in each org (the second search starts with the first person's name), and you get the same
+compare view with the two sides named by org, and the same CSV download (one file, with the org names in the
+two columns). The other org is read live from its tab with that tab's login; nothing is saved, no file is
+needed, and nothing is added to what the extension may access. A tab whose login cannot be found is skipped
+quietly (the reason is under "Technical details"). Choosing the same org on both sides is refused.
+Items are matched by API name (profile name, role, group and permission set names, license, public group and
+queue, territory, call center, custom setting and field, configuration name), never by Id or label, so the same
+thing in both orgs shows as "Same" even when its Id or label differs. A permission set is "Different" only when it is
+reached differently (directly or through which group, judged by the group's API name). A custom setting only
+appears when its value differs from that org's own default, so an item can show as only in one org when the
+other org's default already has the same value. Not checked in a real Chrome yet: the tab list and login lookup of
+the extension itself (only the dev server and demo were exercised).
 
 | Area | What it shows |
 |---|---|
@@ -791,6 +809,9 @@ Open <http://127.0.0.1:8765/tools/compare-groups/compare-groups.html?dev=1> or `
 `tools/record-access/record-access.html?dev=1&record=<record Id>`. The toolbar menu opens a tool as `tools/<tool>/<tool>.html?host=<org host>`
 (the record tool adds `&record=<record Id>`).
 
+- **A second org** (the user access page, "The same person in another org"): add `--second-org <alias>`. Its calls go
+  under `/sf2/` and are forwarded the same read-only way; the page then offers that org by its real org name. Without
+  it the page says there is no second org. In `?demo=1` a made-up second org (`samples/user_access_other_org.json`) is offered.
 - **Read-only.** Only GET requests to `/services/data/` are forwarded; anything else gets 405.
 - **The token stays in the server.** The page never sees it. The server listens on 127.0.0.1 only
   and refuses requests addressed to any other host name.
@@ -814,7 +835,8 @@ Each tool has its own folder under `tools/`: `<tool>.html/.js/.css` is the page,
 | `tools/compare-groups/compare-groups.*` | The Compare permission set groups page |
 | `tools/user-access/user-access.*` | The User access summary and comparison page (html, js, and a little extra css on top of `shared/pack.css` and `shared/user-picker.css`) |
 | `tools/user-access/user-access-read.js` | Reads one user's access from the org (`readUserAccess`) |
-| `tools/user-access/user-access-logic.js` | Turns user access into rows and compares two users; CSV. Pure, no browser APIs |
+| `tools/user-access/user-access-logic.js` | Turns user access into rows and compares two users, or one person in two orgs (`compareAcrossOrgs`); CSV. Pure, no browser APIs |
+| `tools/user-access/user-access-orgs.js` | Which other orgs are open in this browser (`groupTabsByOrg`: tabs and a session finder in, distinct orgs out), the same-org check and the plain sentences. Pure |
 | `tools/user-access/user-access-eac.js`, `user-access-eac-read.js` | Einstein Activity Capture: status words, joining the two objects into rows, counts, filter and CSV (pure); and the reads (`SELECT` and one describeGlobal) |
 | `tools/user-access/user-access-eac-changes.js` | Einstein Activity Capture changes as text: picks, skip rules, the preview plan, tab-separated text, CSV and undo text, the typed configuration Id check, pasted-name matching (pure; nothing is loaded into the org by the extension) |
 | `tools/page-details/page-details.*` | The Page details for a ticket page (html, js, extra css) |

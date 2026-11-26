@@ -21,9 +21,22 @@
   <section class="panel">
     <h2 class="step">Choose a user to look at</h2>
     <p class="hint">Type part of a name or username. You can add a second user to compare the two side by side. It covers profile, role, call center, permission sets and groups, licenses, public groups, queues, territories, email and calendar connection (Einstein Activity Capture), and custom settings that have a different value for the user or their profile. To see everyone's email and calendar connection at once, use the panel further down.</p>
+    <div class="mode org-only" role="group" aria-label="What to compare">
+      <div class="seg">
+        <button id="modeSame" aria-pressed="true">Users in this org</button>
+        <button id="modeOther" aria-pressed="false">The same person in another org</button>
+      </div>
+    </div>
+    <div class="orgpick" id="orgPick" hidden>
+      <p class="hint">Pick the other org from the ones open in this browser. It is read live from its tab and nothing is saved. Items are matched by API name, so the same profile or permission set in both orgs shows as the same.</p>
+      <label class="pick-label" for="orgB"><span class="side b">B</span> The other org</label>
+      <div class="actions"><select id="orgB" aria-label="The other org"></select><button id="orgRefresh">Refresh</button><span id="orgStatus" role="status"></span></div>
+      <p class="help" id="orgMsg"></p>
+      <details class="tech" id="orgTech" hidden><summary>Technical details</summary><div id="orgTechText"></div></details>
+    </div>
     <div class="pickers">
       <div class="picker" data-side="a">
-        <label class="pick-label" for="input-a"><span class="side a">A</span> First user</label>
+        <label class="pick-label" for="input-a"><span class="side a">A</span> <span id="labelA">First user</span></label>
         <div class="combo org-only">
           <input type="text" id="input-a" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-a" autocomplete="off" placeholder="Start typing a name or username">
           <ul class="psg-list" id="list-a" role="listbox" hidden></ul>
@@ -31,7 +44,7 @@
         <div class="chosen"></div>
       </div>
       <div class="picker" data-side="b">
-        <label class="pick-label" for="input-b"><span class="side b">B</span> Second user (optional, to compare)</label>
+        <label class="pick-label" for="input-b"><span class="side b">B</span> <span id="labelB">Second user (optional, to compare)</span></label>
         <div class="combo org-only">
           <input type="text" id="input-b" class="psg-input" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="list-b" autocomplete="off" placeholder="Start typing a name or username">
           <ul class="psg-list" id="list-b" role="listbox" hidden></ul>
