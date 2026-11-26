@@ -687,7 +687,7 @@ async function start() {
       $("#org").textContent = `Connecting to ${HOST}...`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       $("#read").disabled = true;
       return;
     }
@@ -699,7 +699,7 @@ async function start() {
   }
   state.api = new SfApi(session);
   const host = DEV ? (HOST || "") : (HOST || session.apiHost);
-  $("#org").textContent = DEV ? "Dev server" : host;
+  $("#org").textContent = DEV ? "Local dev server" : host;
   try {
     const org = await readOrg(state.api, host);
     state.orgName = org.name || host;

@@ -56,12 +56,12 @@ export function whenWords(def, start) {
 }
 
 /** The words that say how flows are ordered, for the page's Notes. */
-export const RUN_ORDER_RULE = "Salesforce runs flows with a trigger order of 1 to 1000 first, lowest number first. Next come flows with no trigger order, in the order they were activated. Last come flows with a trigger order of 1001 to 2000. Flows with the same trigger order run in alphabetical order of their API names. Flows that are not active do not run.";
+export const RUN_ORDER_RULE = "Flows run in this order. First, flows with a trigger order from 1 to 1000, lowest number first. Next, flows with no trigger order, in the order they were activated. Last, flows with a trigger order from 1001 to 2000. Flows with the same number run in alphabetical order by name. Flows that are not active do not run.";
 
 /** The words for a block of two or more flows with no trigger order (shown once above the block). */
 export function noOrderBlockText({ above = false, below = false } = {}) {
   const where = above && below ? " after the flows above and before the flows below," : above ? " after the flows above," : below ? " before the flows below," : "";
-  return `No trigger order set. Salesforce runs these${where} in the order they were activated. That date isn't available here, so they are listed by name. To make the order certain, give each flow a trigger order (Flow Trigger Explorer → Edit Order).`;
+  return `No trigger order set. These flows run${where} in the order they were activated. This page can't see that date, so they are listed by name. To be sure of the order, give each flow a trigger order (Flow Trigger Explorer, then Edit Order).`;
 }
 
 /** Which part of a group a flow is in: "low" = trigger order 1 to 1000, "none" = no trigger order, "high" = 1001 to 2000,

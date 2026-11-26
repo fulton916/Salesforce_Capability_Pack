@@ -23,8 +23,8 @@
       <ol class="stepslist">
         <li>In Salesforce, open Setup and type <b>Debug Logs</b> in Quick Find.</li>
         <li>Under User Trace Flags, choose New. For Traced Entity Type choose User. For Traced Entity Name pick the person who will do the failing action (the person who repeats it). Set the Start Date and the Expiration Date so they cover the action (a trace flag can last up to 24 hours).</li>
-        <li>Debug Level is a lookup, so typing a name finds nothing ("No matches found"). Use the search icon to pick a debug level that already exists, or choose New Debug Level (a small window opens) to make one.</li>
-        <li>Set these levels: Apex Code at Debug or finer, Database at Info or finer, Validation at Info or finer, Workflow at Info or finer. Flows are only recorded when Workflow is at Info or finer.</li>
+        <li>Next to Debug Level, click the search icon. Pick a debug level that already exists, or choose New Debug Level to make one. (Typing a name in the box finds nothing.)</li>
+        <li>In the debug level, set Apex Code, Database, Validation and Workflow each to Info or finer (Debug, Fine and so on also work). Flows are recorded only when Workflow is at Info or finer.</li>
         <li>Ask the user to repeat what failed.</li>
         <li>Come back here and press <b>Refresh the list</b>, then pick the log.</li>
       </ol>
@@ -35,8 +35,8 @@
   <section class="panel">
     <div class="actions top-actions">
       <button id="refresh" class="primary">Refresh the list</button>
-      <label class="check"><input type="checkbox" id="onlyProblems"> Only logs whose result is not Success</label>
-      <span class="hint">Ticked, this hides logs whose result is Success. A save stopped by a validation rule can still say Success, so its log would be hidden too.</span>
+      <label class="check"><input type="checkbox" id="onlyProblems"> Hide logs whose result is Success</label>
+      <span class="hint">A save stopped by a validation rule can still say Success, so its log would be hidden too. Leave this unticked if you are not sure.</span>
       <label class="check" for="whoFilter">User <select id="whoFilter"><option value="">Everyone</option></select></label>
       <span id="listStatus" role="status" class="hint"></span>
     </div>

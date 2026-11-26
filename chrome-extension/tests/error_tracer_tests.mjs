@@ -11,10 +11,10 @@ import { SfApi, API_VERSION } from "../shared/sfconn.js";
 import { TOOLS } from "../shared/tool-list.js";
 import { FEEDBACK_TOOLS } from "../shared/feedback.js";
 import {
-  analyzeLog, explainSaveError, frameWords, isLogId, rawAround, summaryText, flowPointer,
+  analyzeLog, CATEGORIES, explainSaveError, frameWords, isLogId, rawAround, summaryText, flowPointer,
   whatRan, statusWords, filterLogs, userChoices, humanSize, elapsedWords, whenText,
 } from "../tools/error-tracer/error-tracer-logic.js";
-import { readLogList, readLogBody, ReadProblem } from "../tools/error-tracer/error-tracer-read.js";
+import { readLogList, readLogBody, ReadProblem, listNote, LIST_LIMIT, REQUEST_LIMIT_TEXT } from "../tools/error-tracer/error-tracer-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);
@@ -101,6 +101,46 @@ export async function run(test) {
       await assert.rejects(readLogBody(api, bad), (e) => e instanceof ReadProblem && /not a debug log Id/.test(e.message));
     }
     assert.equal(f.calls.length, 1, "only the good Id made a call");
+  });
+
+  await test("errors: the list says when it may be cut at the newest 100 logs", () => {
+    assert.equal(LIST_LIMIT, 100);
+    assert.equal(listNote(100), "Showing the newest 100 logs. Older ones are not listed.");
+    assert.equal(listNote(99), "");
+    assert.equal(listNote(0), "");
+  });
+
+  await test("errors: a daily API limit answer (403) is not shown as a missing permission", async () => {
+    const api = new SfApi({ apiHost: "x", sessionId: "S", fetchImpl: async () => ({ ok: false, status: 403, text: async () => JSON.stringify([{ message: "TotalRequests Limit exceeded.", errorCode: "REQUEST_LIMIT_EXCEEDED" }]) }) });
+    await assert.rejects(readLogList(api), (e) => e instanceof ReadProblem && e.message === REQUEST_LIMIT_TEXT && /not a missing permission/.test(e.message) && /Limit exceeded/.test(e.raw));
+    await assert.rejects(readLogBody(api, "07L000000000001AAA"), (e) => e.message === REQUEST_LIMIT_TEXT);
+  });
+
+  await test("errors: the headline is green only for a complete log; unrecorded or cut-off logs get a neutral one", () => {
+    const complete = analyzeLog(mk(TRIGGER_START));
+    assert.equal(complete.tone, "good");
+    assert.equal(complete.headline, "No errors found in this log");
+    const noFlows = analyzeLog([HEADER.replace("WORKFLOW,INFO", "WORKFLOW,NONE"), TRIGGER_START].join("\n"));
+    assert.equal(noFlows.tone, "neutral");
+    assert.equal(noFlows.headline, "No errors found in the parts of this log that were recorded");
+    const cut = analyzeLog(mk(TRIGGER_START), { length: 20000000 });
+    assert.equal(cut.tone, "neutral");
+    assert.equal(cut.headline, "No errors found in the parts of this log that were recorded");
+    assert.match(cut.subline, /cut off/);
+    const bare = analyzeLog(TRIGGER_START);
+    assert.equal(bare.levels, null, "no levels line");
+    assert.equal(bare.tone, "neutral");
+    assert.equal(bare.headline, "No errors found in this log");
+    assert.match(bare.subline, /does not say what it recorded/);
+    assert.equal(analyzeLog([HEADER.replace("APEX_CODE,FINEST", "APEX_CODE,DEBUG"), TRIGGER_START].join("\n")).tone, "good", "Debug is enough for Apex code");
+    assert.equal(analyzeLog([HEADER.replace("APEX_CODE,FINEST", "APEX_CODE,WARN"), TRIGGER_START].join("\n")).tone, "neutral", "Apex code below Info is not enough");
+  });
+
+  await test("errors: page steps and README say Apex Code at Info or finer, like the analyser", () => {
+    assert.equal(CATEGORIES.find((c) => c.key === "APEX_CODE").needs, "INFO");
+    const html = read(ext("tools", "error-tracer", "error-tracer.html"));
+    assert.ok(/Apex Code, Database, Validation and Workflow each to Info or finer/.test(html));
+    assert.ok(!/Apex Code at Debug or finer/.test(html + read(ext("README.md"))));
   });
 
   await test("errors: each read failure is plain words, with the raw text kept for Technical details", async () => {
@@ -282,7 +322,7 @@ export async function run(test) {
     assert.equal(f.where, "Flow Case_Escalation_Flow, step Update_Related_Cases");
     assert.match(f.message, /The flow “Case_Escalation_Flow” failed at the step “Update_Related_Cases” \(record update\)/);
     assert.equal(f.flowPointer, flowPointer("Case_Escalation_Flow"));
-    assert.match(f.flowPointer, /open “Where is it used in flows\?” from the toolbar menu and search for Case_Escalation_Flow/);
+    assert.match(f.flowPointer, /open “Where is it used in flows\?” from the Salesforce Capability Pack button and search for Case_Escalation_Flow/);
     assert.equal(f.handled, false);
   });
 
@@ -368,7 +408,7 @@ export async function run(test) {
     const noFlows = HEADER.replace("WORKFLOW,INFO", "WORKFLOW,NONE");
     const a = analyzeLog([noFlows, TRIGGER_START].join("\n"));
     assert.equal(a.problemCount, 0);
-    assert.equal(a.headline, "No errors found in this log");
+    assert.equal(a.headline, "No errors found in the parts of this log that were recorded");
     assert.match(a.subline, /Not recorded: Flows and workflow/);
     assert.ok(!/Recorded:[^.]*Flows and workflow/.test(a.subline), "flows are not listed as recorded");
     assert.equal(a.notes.filter((n) => /debug level in Setup/.test(n)).length, 1);
@@ -584,8 +624,8 @@ export async function run(test) {
     assert.ok(!/(replaceChildren|append|prepend)\([^;]*:\s*null/.test(js), "no ': null' inside a native call");
     assert.ok(js.includes("filter((x) => x)"));
     const html = read(ext("tools/error-tracer/error-tracer.html"));
-    for (const s of ["Start Date", "Expiration Date", "search icon", "New Debug Level", "No matches found", "Traced Entity Type", "Traced Entity Name", "the person who will do the failing action",
-      "Apex Code at Debug or finer", "Database at Info or finer", "Developer Console or the command line", "up to 24 hours", "Ticked, this hides logs whose result is Success"]) assert.ok(html.includes(s), s);
+    for (const s of ["Start Date", "Expiration Date", "search icon", "New Debug Level", "Traced Entity Type", "Traced Entity Name", "the person who will do the failing action",
+      "Apex Code, Database, Validation and Workflow each to Info or finer", "Developer Console or the command line", "up to 24 hours", "Hide logs whose result is Success"]) assert.ok(html.includes(s), s);
     assert.ok(!html.includes("untick the box") && !html.includes("not the name Setup fills in"));
   });
 

@@ -11,7 +11,7 @@ import path from "node:path";
 import { SfApi } from "../shared/sfconn.js";
 import { parseUrlContext, contextQuery, contextFromParams, pickByDeveloperName } from "../shared/urlcontext.js";
 import {
-  scanFlow, recordElements, elementsOf, idForms, looksLikeId, plainFlowType, buildResults, summaryLine, csvRows, csvText, csvFileName,
+  scanFlow, recordElements, elementsOf, idForms, looksLikeId, plainFlowType, buildResults, summaryLine, csvRows, csvText, csvFileName, localStamp, startSearchNotes,
   hitText, versionWords, flowKey, startInfo, nameWithApi, uniqueSteps, stepLineText,
 } from "../tools/flow-usage/flow-usage-scan.js";
 import {
@@ -812,11 +812,11 @@ export async function run(test) {
     assert.deepEqual([lone.apiName, lone.band, lone.orderKnown, view.groups[0].noOrderCount], ["Before_Only", "none", true, 1]);
     assert.equal(view.unconfirmed, undefined);
     // the words
-    const tail = "in the order they were activated\\. That date isn't available here, so they are listed by name\\. .*Flow Trigger Explorer";
-    assert.match(noOrderBlockText({ above: true }), new RegExp(`^No trigger order set\\. Salesforce runs these after the flows above, ${tail}`));
-    assert.match(noOrderBlockText({ below: true }), new RegExp(`^No trigger order set\\. Salesforce runs these before the flows below, ${tail}`));
-    assert.match(noOrderBlockText({ above: true, below: true }), new RegExp(`^No trigger order set\\. Salesforce runs these after the flows above and before the flows below, ${tail}`));
-    assert.match(noOrderBlockText({}), new RegExp(`^No trigger order set\\. Salesforce runs these ${tail}`));
+    const tail = "in the order they were activated\\. This page can't see that date, so they are listed by name\\. .*Flow Trigger Explorer";
+    assert.match(noOrderBlockText({ above: true }), new RegExp(`^No trigger order set\\. These flows run after the flows above, ${tail}`));
+    assert.match(noOrderBlockText({ below: true }), new RegExp(`^No trigger order set\\. These flows run before the flows below, ${tail}`));
+    assert.match(noOrderBlockText({ above: true, below: true }), new RegExp(`^No trigger order set\\. These flows run after the flows above and before the flows below, ${tail}`));
+    assert.match(noOrderBlockText({}), new RegExp(`^No trigger order set\\. These flows run ${tail}`));
     assert.ok(!/above|below/.test(noOrderBlockText()), "nothing above or below: no mention");
     assert.match(RUN_ORDER_RULE, /activated/);
     assert.ok(!/created/i.test(RUN_ORDER_RULE));
@@ -1045,6 +1045,28 @@ export async function run(test) {
     const evil = buildObjectView("Account", [entry(FD({ label: "=cmd()", apiName: "E" }), { start: startOf(), records: [] })], {});
     assert.ok(objectCsvText(evil).includes("'=cmd()"));
     assert.equal(objectCsvFileName("Account", "202601011200"), "flows_on_Account_202601011200.csv");
+  });
+
+  await test("flow usage: the file name stamp is the person's local time, not UTC", () => {
+    // Built from local parts, so it holds in any time zone (in a zone that is not UTC the UTC form would differ).
+    const d = new Date(2026, 10, 25, 23, 7); // 25 Nov 2026 23:07 local
+    assert.equal(localStamp(d), "202611252307");
+    const early = new Date(2026, 0, 2, 0, 5);
+    assert.equal(localStamp(early), "202601020005");
+    assert.match(localStamp(), /^\d{12}$/);
+    assert.equal(csvFileName({ kind: "text", text: "x" }, localStamp(d)), "flows_using_text_x_202611252307.csv");
+  });
+
+  await test("flow usage: starting a search drops the technical notes of the one before", () => {
+    const first = startSearchNotes(["Starting values: x"]);
+    assert.deepEqual(first.tech, ["Starting values: x"]);
+    assert.deepEqual(first.pending, []);
+    const second = startSearchNotes(first.pending); // a later search: nothing carried over
+    assert.deepEqual(second.tech, []);
+    const input = ["a"];
+    startSearchNotes(input).tech.push("b");
+    assert.deepEqual(input, ["a"], "the input list is not changed");
+    assert.match(RUN_ORDER_RULE, /^Flows run in this order\./);
   });
 
   await test("flow object: Process Builder and scheduled flows give their object from their own contents", () => {

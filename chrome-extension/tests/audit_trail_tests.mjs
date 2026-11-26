@@ -21,7 +21,7 @@ import {
   sortEntries, timeSpan, partialNote, statusLine, emptyText, progressText, ticketText, shownText, csvRows, copyWithFallback, demoRecords, demoApi, matchCounts, matchBreakdown, readingStatusLine, chooseFocus,
   continuationStart, buildCoverage, olderLabel, olderProgressText, coverageWords, OLDER_STALE_TEXT,
 } from "../tools/audit-trail/audit-trail-logic.js";
-import { readAuditTrail, buildQuery, buildCountQuery, buildWhere, plainProblem, plainUserSearchProblem, MAX_ENTRIES, MAX_HELD } from "../tools/audit-trail/audit-trail-read.js";
+import { readAuditTrail, buildQuery, buildCountQuery, buildWhere, plainProblem, plainUserSearchProblem, REQUEST_LIMIT_TEXT, MAX_ENTRIES, MAX_HELD } from "../tools/audit-trail/audit-trail-read.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const ext = (...p) => path.join(here, "..", ...p);
@@ -548,6 +548,21 @@ export async function run(test) {
     const api = fakeApi(records(5));
     await assert.rejects(readAuditTrail(api, { userId: "x' OR 1=1" }, {}), /not a user Id/);
     assert.equal(api.log.length, 0);
+  });
+
+  await test("audit: a daily API limit answer (403) is not shown as a missing permission", async () => {
+    const e = Object.assign(new Error("TotalRequests Limit exceeded."), { status: 403, errorCode: "REQUEST_LIMIT_EXCEEDED" });
+    const p = plainProblem(e);
+    assert.equal(p.message, REQUEST_LIMIT_TEXT);
+    assert.match(p.message, /not a missing permission/);
+    assert.ok(!/View Setup and Configuration/.test(p.message));
+    assert.equal(plainProblem(Object.assign(new Error("REQUEST_LIMIT_EXCEEDED"), { status: 403 })).message, REQUEST_LIMIT_TEXT);
+    assert.equal(plainUserSearchProblem(e).message, REQUEST_LIMIT_TEXT);
+    // Through the real client: the 403 keeps its error code.
+    const api = new SfApi({ apiHost: "x", sessionId: "S", fetchImpl: async () => ({ ok: false, status: 403, text: async () => JSON.stringify([{ message: "TotalRequests Limit exceeded.", errorCode: "REQUEST_LIMIT_EXCEEDED" }]) }) });
+    const r = await readAuditTrail(api, {});
+    assert.equal(r.status, "failed");
+    assert.equal(r.problem.message, REQUEST_LIMIT_TEXT);
   });
 
   await test("audit: errors are put in plain words with the raw text kept apart", () => {
@@ -1145,7 +1160,7 @@ export async function run(test) {
       assert.ok(y.includes("Extension 0.11.0, Chrome 131"), f);
     }
     const manifest = JSON.parse(read(ext("manifest.json")));
-    assert.equal(manifest.version, "0.11.0");
+    assert.equal(manifest.version, "0.11.1");
     assert.ok(manifest.description.length <= 132, `${manifest.description.length} characters`);
     assert.deepEqual(manifest.permissions, ["cookies", "activeTab", "tabs", "storage"], "no new permission");
     assert.match(read(ext("package.json")), /nine read-only tools/);

@@ -8,6 +8,11 @@ import { isLogId } from "./error-tracer-logic.js";
 
 export const LIST_LIMIT = 100;
 
+/** The line to show under the list when it may be cut at LIST_LIMIT (exactly that many logs came back), else "". */
+export function listNote(count) {
+  return count >= LIST_LIMIT ? `Showing the newest ${LIST_LIMIT} logs. Older ones are not listed.` : "";
+}
+
 const LIST_SOQL = "SELECT Id, LogUserId, LogUser.Name, Operation, Request, Application, Status, Location, StartTime, DurationMilliseconds, LogLength " +
   `FROM ApexLog ORDER BY StartTime DESC LIMIT ${LIST_LIMIT}`;
 
@@ -19,11 +24,18 @@ export class ReadProblem extends Error {
   }
 }
 
+export const REQUEST_LIMIT_TEXT = "Salesforce turned this request away because the org has used up its daily API request limit. This is not a missing permission. Try again later, or ask your Salesforce admin to check API usage.";
+/** True when Salesforce refused because the org's daily API request limit is used up (it answers 403 for this). */
+export function isRequestLimit(e) {
+  return /REQUEST_LIMIT_EXCEEDED/i.test(`${e?.errorCode || ""} ${e?.message || ""} ${e?.detail || ""}`);
+}
+
 /** Turn a failed read into a ReadProblem with plain words. `what` is "the list of logs" or "this log". */
 export function plainProblem(e, what) {
   const raw = String(e?.detail || e?.message || e || "");
   const status = e?.status;
   if (status === 401) return new ReadProblem(e.message, raw);
+  if (isRequestLimit(e)) return new ReadProblem(REQUEST_LIMIT_TEXT, raw);
   if (status === 403 || /INSUFFICIENT_ACCESS|NO_ACCESS/i.test(e?.errorCode || "")) {
     return new ReadProblem(`Salesforce did not let you read ${what}. Seeing logs may need extra permission in this org, and seeing other people's logs may need more. Ask your Salesforce administrator.`, raw);
   }

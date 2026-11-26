@@ -108,13 +108,13 @@ async function connect() {
       $("#org").textContent = `Connecting to ${HOST}…`;
       session = await findSession(HOST, chrome.cookies);
     } else {
-      $("#org").textContent = "No org connected. Open this page from the extension button on a Salesforce tab.";
+      $("#org").textContent = "No org connected. Open this page from the Salesforce Capability Pack button on a Salesforce tab.";
       $$(".org-only").forEach((n) => (n.hidden = true));
       return;
     }
     state.api = new SfApi(session);
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
-    showOrg(org, DEV ? "" : session.apiHost, DEV ? "DEV SERVER" : null);
+    showOrg(org, DEV ? "" : session.apiHost, DEV ? "Local dev server" : null);
     $("#input-a").focus();
   } catch (e) {
     $("#org").textContent = `Could not connect${HOST ? " to " + HOST : ""}.`;
