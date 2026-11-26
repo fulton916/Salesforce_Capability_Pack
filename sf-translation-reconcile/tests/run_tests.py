@@ -11,6 +11,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -264,6 +265,13 @@ class CorrectionTests(Base):
                         "--allow-not-found", *extra)
         self.assertEqual(code, 0, out)
         return sc, loc, pay
+
+    def test_api_version_in_locate_payload(self):
+        for extra, want in (((), "67.0"), (("--api-version", "61.0"), "61.0")):
+            shutil.rmtree(self.tmp / "payload", ignore_errors=True)
+            _sc, _loc, pay = self.flow(extra=extra)
+            self.assertIn(f"<version>{want}</version>", (pay / "package.xml").read_text(encoding="utf-8"))
+            self.assertNotIn("<version>62.0</version>", (pay / "package.xml").read_text(encoding="utf-8"))
 
     def test_scope_conflict_refused(self):
         d = self.tmp / "d.csv"
@@ -553,6 +561,38 @@ class UtilityTests(Base):
         self.assertTrue((self.tmp / "bak/objectTranslations/Widget__c-de/Color__c.fieldTranslation-meta.xml").is_file())
         self.assertFalse((dest / "objectTranslations/Widget__c-fr").exists())
         self.assertTrue((dest / "objectTranslations/Widget__c-de/ns__Pkg__c.fieldTranslation-meta.xml").is_file())
+
+    def test_api_version_default_and_override(self):
+        self.assertEqual(R.DEFAULT_API_VERSION, "67.0")
+        d = self.tmp / "d.csv"
+        d.write_text(DECISIONS, encoding="utf-8")
+        run(scope, d, "--out", self.tmp / "s.json")
+        code, out = run(manifest, self.tmp / "s.json", "--out", self.tmp / "m.xml")
+        self.assertEqual(code, 0, out)
+        self.assertIn("<version>67.0</version>", (self.tmp / "m.xml").read_text(encoding="utf-8"))
+        code, out = run(manifest, self.tmp / "s.json", "--out", self.tmp / "m2.xml", "--api-version", "62.0")
+        self.assertEqual(code, 0, out)
+        self.assertIn("<version>62.0</version>", (self.tmp / "m2.xml").read_text(encoding="utf-8"))
+
+    def test_api_version_read_manifests(self):
+        def versions(folder, pattern):
+            files = sorted(Path(folder).glob(pattern))
+            self.assertTrue(files, f"no {pattern} in {folder}")
+            return {re.search(r"<version>([^<]*)</version>", f.read_text(encoding="utf-8")).group(1)
+                    for f in files}
+
+        lists = self.tmp / "lists"
+        lists.mkdir()
+        for typ, names in (("CustomObject", ["Widget__c"]), ("Layout", []), ("GlobalValueSet", ["Colors"])):
+            (lists / f"list_{typ}.json").write_text(json.dumps(
+                {"status": 0, "result": [{"fullName": n} for n in names]}), encoding="utf-8")
+        for extra, want in (((), "67.0"), (("--api-version", "61.0"), "61.0")):
+            out_dir = self.tmp / f"rm_{want}"
+            code, out = run(read_manifests, "--lists", lists, "--langs", "de", "--objects", "Widget__c",
+                            "--out", out_dir, *extra)
+            self.assertEqual(code, 0, out)
+            self.assertEqual(versions(out_dir, "obj_*.xml"), {want})
+            self.assertEqual(versions(out_dir, "vs_labels.xml"), {want})
 
     def test_read_manifests(self):
         lists = self.tmp / "lists"

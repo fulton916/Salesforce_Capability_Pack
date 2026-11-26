@@ -19,5 +19,5 @@
         <members>*</members>
         <name>PermissionSetGroup</name>
     </types>
-    <version>62.0</version>
+    <version>67.0</version>
 </Package>

@@ -86,7 +86,7 @@ present it as the org's; a folder holding two orgs' files mixes their translatio
 | `standard_object_labels` | `{}` | A standard object's English name shows oddly. Example: `{"WorkOrder": ["Work Order", "Work Orders"]}`. Display only. |
 | `standard_value_sets` | `{}` | A standard picklist is reported as skipped. Example: `{"Case.Origin": "CaseOrigin"}`. |
 | `extra_languages` | `{}` | Salesforce added a language after this toolkit was built. Example: `{"xx": "New Language"}`. |
-| `api_version` | `62.0` | Only if Salesforce retires that version. |
+| `api_version` | `67.0` | You need a newer version. The default is one version for every org, one release behind the newest. |
 
 Languages are chosen per run. All 221 Salesforce language codes are in `scripts/sf_languages.py`.
 Use Salesforce's own codes: Dutch is `nl_NL` (plain `nl` is rejected), Hebrew is `iw`,

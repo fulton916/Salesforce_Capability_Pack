@@ -124,6 +124,13 @@ Use one run folder per push, for example `runs/2026-01-15_labels/`. `$W` is that
 package's `scripts/` folder, `my-prod` is the org alias. Any failed pass condition stops the run.
 Never fix a failure by loosening a flag.
 
+Keep one API version through the whole run. `make_manifests.py` (step 2) and `build_push.py` (step 4)
+both default to 67.0, and the retrieves in steps 3, 13 and 16 reuse the manifests made in step 2. A run
+started with an earlier copy of the tools (62.0) should be restarted from step 2 (`make_manifests.py`). To finish it
+instead, pass `--api-version 62.0` to `build_push.py`, and to `make_manifests.py` only if the manifests
+are made again. The tools do not detect a mixed run (the locks compare translation files, which do not
+record the version).
+
 | # | Step | Pass condition |
 |---|---|---|
 | 1 | `python $S/make_source.py --input <file> --out $W/source.json` | `RESULT: PASS` |

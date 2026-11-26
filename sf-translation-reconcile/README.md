@@ -127,6 +127,13 @@ NO TARGET. It exits 2 if any row did not land.
 
 Keep each run in its own folder (`run/`).
 
+Keep one API version through a run (`manifest.py`, the retrieve, and `locate.py --build` all default to
+67.0). A run started with an earlier copy (62.0) should be restarted from `manifest.py` (workflows (a) and (b): from `read_manifests.py`), or finished with
+`--api-version 62.0` on `manifest.py` (if the manifest is made again) and on `locate.py --build`. Older
+baseline folders read at another version, used by `provenance.py`, are evidence as read. The tools do not
+detect a mixed run (the locks compare translation files, which do not record the version). Workflows (a)
+and (b) use `read_manifests.py`, which takes the same `--api-version`.
+
 1. `python scripts/scope.py decisions.xlsx --out run/scope.json`. Values are kept exactly as
    given. It refuses conflicting values for one slot. Whitespace oddities produce warnings.
 2. `python scripts/manifest.py run/scope.json --out run/manifest.xml`

@@ -207,7 +207,7 @@ def main(argv=None):
     ap.add_argument("--out", default="payload")
     ap.add_argument("--report", default="push_report.json")
     ap.add_argument("--exclude-langs", default="en_US", help='comma-separated; "" to exclude none')
-    ap.add_argument("--api-version", default="62.0")
+    ap.add_argument("--api-version", default=L.DEFAULT_API_VERSION)
     ap.add_argument("--allow-unplaced", action="store_true", help="unplaced rows are reported but do not fail the build")
     ap.add_argument("--allow-unmatched-names", action="store_true",
                     help="a named overwrite that matched no held value, or was stale, does not fail the build")

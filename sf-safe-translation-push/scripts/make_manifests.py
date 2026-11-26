@@ -48,7 +48,7 @@ def main(argv=None):
     ap.add_argument("--exclude-langs", default="en_US")
     ap.add_argument("--layouts", help="sf org list metadata --metadata-type Layout --json output")
     ap.add_argument("--objects-per-batch", type=int, default=10)
-    ap.add_argument("--api-version", default="62.0")
+    ap.add_argument("--api-version", default=L.DEFAULT_API_VERSION)
     ap.add_argument("--target-org", default="<alias>", help="only used in the printed retrieve commands")
     a = ap.parse_args(argv)
 

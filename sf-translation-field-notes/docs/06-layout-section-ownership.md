@@ -53,14 +53,14 @@ Use `composite/batch` with an `Accept-Language` header and `describe/layouts` su
 {
   "haltOnError": false,
   "batchRequests": [
-    { "method": "GET", "url": "v62.0/sobjects/Widget__c/describe/layouts" },
-    { "method": "GET", "url": "v62.0/sobjects/Account/describe/layouts" }
+    { "method": "GET", "url": "v67.0/sobjects/Widget__c/describe/layouts" },
+    { "method": "GET", "url": "v67.0/sobjects/Account/describe/layouts" }
   ]
 }
 ```
 
 ```bash
-sf api request rest "/services/data/v62.0/composite/batch" --method POST \
+sf api request rest "/services/data/v67.0/composite/batch" --method POST \
   --body @batch.json --header "Content-Type: application/json" \
   --header "Accept-Language: ja" --target-org my-sandbox
 ```

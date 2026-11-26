@@ -60,7 +60,7 @@ python scripts/export_country_state_codes.py [--target-org ALIAS] [--output FILE
 | `--project-dir` | Retrieve into this existing DX project (needs `sfdx-project.json`). This **overwrites** the project's local `Address.settings-meta.xml`. If omitted, a temporary project is created and deleted afterwards. |
 | `--xml-path` | Read this XML instead of searching for it. |
 | `--skip-retrieve` | Do not call Salesforce. Use with `--xml-path` (or `--project-dir`). |
-| `--api-version` | Passed to the retrieve, for example `62.0`. |
+| `--api-version` | Passed to the retrieve, for example `67.0`. |
 
 Examples:
 
