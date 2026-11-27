@@ -44,7 +44,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 EXT = Path(__file__).resolve().parent.parent
 SKIP_DIRS = {".git", "node_modules", "__pycache__", "tests", "dev"}  # not part of the loaded extension
@@ -96,6 +96,34 @@ def tree_version() -> str:
             st = p.stat()
             h.update(f"{p.relative_to(EXT)}:{st.st_mtime_ns}:{st.st_size}".encode())
     return h.hexdigest()[:12]
+
+
+def forward_path_ok(api_path: str) -> bool:
+    """True only for a plain path under /services/data/. Fail-closed; only the path is checked, not the query.
+
+    Refused: a '.' or '..' segment (also percent-encoded, also encoded twice), a backslash, an encoded slash,
+    control characters, a ';' (path parameters such as '..;' that some servers treat as '..'), a '%' still
+    left after decoding (such as %u002e, which some servers decode), and anything that does not start with
+    /services/data/ once decoded. The query string after '?' is never checked.
+    """
+    path = api_path.split("?", 1)[0]
+    if "#" in path:
+        return False
+    slashes = path.count("/")
+    for _ in range(5):  # decode until stable, so %252e cannot hide a dot
+        decoded = unquote(path)
+        if decoded == path:
+            break
+        path = decoded
+    else:
+        return False
+    if ";" in path or "%" in path:
+        return False
+    if "\\" in path or path.count("/") != slashes or any(ord(c) < 32 or ord(c) == 127 for c in path):
+        return False
+    if any(seg in (".", "..") for seg in path.split("/")):
+        return False
+    return path.startswith("/services/data/")
 
 
 def make_handler(login: OrgLogin | None, port: int, login2: OrgLogin | None = None):
@@ -151,10 +179,10 @@ def make_handler(login: OrgLogin | None, port: int, login2: OrgLogin | None = No
             self.send(200, target.read_bytes(), ctype)
 
         def proxy(self, api_path: str, login: OrgLogin | None, missing: str):
+            if not forward_path_ok(api_path):  # first, so a bad path is refused even with no org
+                return self.refuse(403, "Only /services/data/ is forwarded")
             if login is None:
                 return self.refuse(503, missing)
-            if not api_path.startswith("/services/data/"):
-                return self.refuse(403, "Only /services/data/ is forwarded")
             for attempt in (1, 2):
                 req = urllib.request.Request(login.instance + api_path, headers={
                     "Authorization": f"Bearer {login.token}", "Accept": "application/json"})

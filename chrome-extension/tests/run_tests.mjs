@@ -42,6 +42,7 @@ await (await import("./error_tracer_tests.mjs")).run(test);
 await (await import("./who_grants_tests.mjs")).run(test);
 await (await import("./audit_trail_tests.mjs")).run(test);
 await (await import("./settings_tests.mjs")).run(test);
+await (await import("./dev_server_tests.mjs")).run(test);
 
 // ---------- fakes ----------
 
