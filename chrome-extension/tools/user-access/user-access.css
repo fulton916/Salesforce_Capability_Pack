@@ -15,6 +15,11 @@
 /* One fact per line in the detail text (how a permission set is reached, license, muting). */
 .how { white-space: pre-line; }
 .chip.u { color: var(--muted); }
+/* "Named differently": a calm violet, apart from the yellow "Different". */
+.chip.rn { background: #efe9fb; color: #503391; }
+@media (prefers-color-scheme: dark) {
+  .chip.rn { background: #2a2342; color: #cdbdf5; }
+}
 
 /* Everyone's email and calendar connection */
 .eac-summary { font-weight: 600; margin: 12px 0 8px; }

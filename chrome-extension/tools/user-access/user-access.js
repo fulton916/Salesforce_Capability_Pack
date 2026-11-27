@@ -495,7 +495,7 @@ function renderCards() {
         lines.push(el("div", { class: l.cls }, l.segs.map((g) => g.bold ? el("b", { text: g.text }) : g.side ? el("span", { class: `who-${g.side}`, text: g.text }) : g.text)));
       }
       const c = state.result.counts[k];
-      ok = !(c.onlyA + c.onlyB + c.differ + (c.unread || 0));
+      ok = !(c.onlyA + c.onlyB + c.differ + (c.renamed || 0) + (c.unread || 0));
     } else {
       const rows = singleRows(state.sides.a.access, k);
       if (SINGLE_VALUE_KEYS.includes(k)) lines.push(el("div", { class: "one", text: rows[0]?.label || `No ${s.one}` }));
@@ -527,7 +527,7 @@ function openTab(k, scroll = false) {
 function tabCount(k) {
   if (state.result) {
     const c = state.result.counts[k];
-    const n = c.onlyA + c.onlyB + c.differ;
+    const n = c.onlyA + c.onlyB + c.differ + (c.renamed || 0);
     return { n, title: plural(n, "difference", "differences") };
   }
   const n = itemsOf(state.sides.a.access, k).length;
@@ -554,12 +554,14 @@ const NO = "—";
 
 function statusChip(r) {
   if (r.status === "same") return el("span", { class: "chip same", text: "Same" });
-  const cls = { onlyA: "a", onlyB: "b", differ: "d", unreadA: "u", unreadB: "u" }[r.status];
+  const cls = { onlyA: "a", onlyB: "b", differ: "d", renamed: "rn", unreadA: "u", unreadB: "u" }[r.status];
   return el("span", { class: `chip ${cls}`, text: statusText(r.status, nameOf("a"), nameOf("b")) });
 }
 
 function itemCell(r) {
-  return el("td", { class: "item" }, el("span", { text: r.label }), state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
+  return el("td", { class: "item" }, el("span", { text: r.labelA || r.label }),
+    r.labelNote ? el("div", { class: "how", text: r.labelNote }) : null,
+    state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
 }
 
 /** On the email and calendar tab, "Show API names" adds the status's API name under the details. */
@@ -594,7 +596,10 @@ function settingCell(item, detail) {
 function settingNameCell(r, part) {
   const it = r.a || r.b || r.item;
   const x = it[part];
-  return el("td", { class: "item" }, el("span", { text: x.label }), state.showApi ? el("div", { class: "api", text: x.api }) : null);
+  const note = part === "setting" ? r.settingNote : r.fieldNote;
+  return el("td", { class: "item" }, el("span", { text: x.label }),
+    note ? el("div", { class: "how", text: note }) : null,
+    state.showApi ? el("div", { class: "api", text: x.api }) : null);
 }
 
 function currentRows() {
@@ -633,7 +638,7 @@ function visibleRows() {
   return rows.filter((r) => {
     if (state.diffOnly && state.result && state.tab !== "overview" && r.status === "same") return false;
     if (!words.length) return true;
-    const hay = [r.key, r.label, r.detail, r.detailA, r.detailB].filter(Boolean).join(" ").toLowerCase();
+    const hay = [r.key, r.label, r.labelB, r.detail, r.detailA, r.detailB].filter(Boolean).join(" ").toLowerCase();
     return words.every((w) => hay.includes(w));
   });
 }

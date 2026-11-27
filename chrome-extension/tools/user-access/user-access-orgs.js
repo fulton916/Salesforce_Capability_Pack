@@ -13,7 +13,7 @@ export const NO_OTHER_ORG_TEXT = "No other org is open. Open the other org in an
 export const SAME_ORG_TEXT = "You picked the same org on both sides, so there is nothing to compare across orgs. Pick the other org.";
 export const NO_SECOND_DEV_ORG_TEXT = "There is no second org on this dev server. Start it with --second-org <alias>.";
 export const SAME_DEV_ORG_TEXT = "The second dev server org is the same org as this one, so there is nothing to compare across orgs. Start the dev server with a different --second-org.";
-export const CROSS_ORG_NOTE = "Items are matched by API name, not Id, so the same profile, group or permission set in both orgs shows as the same. A custom setting only shows when its value differs from that org's own default.";
+export const CROSS_ORG_NOTE = "Items are matched by API name, not Id. If the same item has a different name (label) in each org, it is flagged as named differently. A custom setting only shows when its value differs from that org's own default.";
 
 /** First 15 characters of an Id (15 and 18 character forms of one Id are equal). */
 export const id15 = (v) => (v ? String(v).slice(0, 15) : "");
