@@ -19,10 +19,11 @@ import {
   eacApiLine, assignedText, flagText, syncCell, SHOW_CHOICES, NO_CONFIG_TITLE, INACTIVE_TEXT, EAC_KEY, EAC_OFF_TEXT, EMPTY_CONFIG_NOTE, NO_EAC_USER_TEXT,
 } from "./user-access-eac.js";
 import {
-  SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, singleRows,
+  SECTIONS, SECTION_KEYS, SECTION_TITLES, SECTION_HELP, validateAccess, compareUsers, compareAcrossOrgs, singleRows,
   statusText, plural, countText, toRows, toRowsSingle, toCsv, itemsOf, hasDetails,
   userCardLines, orgParts, SINGLE_VALUE_KEYS, customSettingsLine, customSettingsSkippedNote, customSettingsFailedNote, customSettingsHiddenNote,
 } from "./user-access-logic.js";
+import { groupTabsByOrg, choiceLabel, sameOrg, id15, orgListMessage, crossPickerLabels, SAME_ORG_TEXT, SAME_DEV_ORG_TEXT, NO_SECOND_DEV_ORG_TEXT } from "./user-access-orgs.js";
 import { startLiveReload } from "../../shared/livereload.js";
 import { issueUrl, FEEDBACK_TOOLS, versionText } from "../../shared/feedback.js";
 
@@ -51,8 +52,14 @@ function el(tag, attrs = {}, ...children) {
   return n;
 }
 
+// The made-up org A of the demo (the made-up second org is in samples/user_access_other_org.json).
+const DEMO_ORG_A = { id: "00DDEMOPRD00001", name: "Example Production", host: "example.my.example.com", isSandbox: false };
+
 const state = {
   api: null,
+  orgA: null, // {id, name, host}: the connected org
+  // Compare the same person in another org. `api` is a second SfApi, in memory for this page session only.
+  cross: { on: false, choices: [], chosen: null, api: null, demoUsers: [], demoOrgs: [], skipped: [], loading: false },
   demoUsers: [], // demo mode: the sample access objects
   sides: { a: { user: null, access: null, token: 0 }, b: { user: null, access: null, token: 0 } },
   result: null, // compare result when both users are loaded
@@ -62,6 +69,11 @@ const state = {
   search: "",
   eac: { rows: [], profileAssignments: [], profileRows: [], noConfig: null, sel: new Map(), plan: null, notFound: [], demoUsers: [], demoPermissions: [], accessNote: "", note: "", show: "all", search: "", showApi: false, loaded: false, limits: new Map() },
 };
+
+/** The org a side reads from: side B reads from the other org when comparing across orgs. */
+const sideApi = (side) => (side === "b" && state.cross.on ? state.cross.api : state.api);
+/** Demo: the made-up users a side can pick from. */
+const demoPool = (side) => (side === "b" && state.cross.on ? state.cross.demoUsers : state.demoUsers);
 
 const compareMode = () => !!(state.sides.a.access && state.sides.b.access);
 const nameOf = (side) => (state.result ? state.result.names[side] : state.sides[side].access?.user.name || side.toUpperCase());
@@ -96,6 +108,7 @@ function showOrg(o, host, via) {
 async function connect() {
   if (DEMO) {
     $("#org").replaceChildren(el("span", { class: "badge demo", text: "DEMO" }), " Made-up sample users, no org connected");
+    state.orgA = DEMO_ORG_A;
     await loadDemo();
     return;
   }
@@ -114,6 +127,7 @@ async function connect() {
     }
     state.api = new SfApi(session);
     const org = await readOrg(state.api, DEV ? "local dev server" : session.apiHost);
+    state.orgA = { id: org.id, name: org.name, host: DEV ? "local dev server" : session.apiHost, isSandbox: org.isSandbox };
     showOrg(org, DEV ? "" : session.apiHost, DEV ? "Local dev server" : null);
     $("#input-a").focus();
   } catch (e) {
@@ -127,6 +141,8 @@ async function loadDemo() {
     const res = await fetch(`../../samples/user_${side}.json`);
     state.demoUsers.push(validateAccess(await res.json()));
   }
+  const other = await (await fetch("../../samples/user_access_other_org.json")).json();
+  state.cross.demoOrgs = (other.orgs || []).map((o) => ({ ...o, users: (o.users || []).map(validateAccess) }));
   await pick("a", summaryOf(state.demoUsers[0]), { quiet: true });
   await pick("b", summaryOf(state.demoUsers[1]), { quiet: true });
 }
@@ -152,13 +168,13 @@ function setupCombo(side) {
     const chosen = state.sides[side].user;
     const text = (chosen && input.value === chosen.name ? "" : input.value).trim();
     c.seq++;
-    if (DEMO) { draw(matchUsers(state.demoUsers.map((a) => summaryOf(a)), text)); return; }
+    if (DEMO) { draw(matchUsers(demoPool(side).map((a) => summaryOf(a)), text)); return; }
     if (text.length < MIN_CHARS) { c.items = []; c.active = -1; drawMessage(`Type at least ${MIN_CHARS} letters of a name or username.`); return; }
     drawMessage("Searching…");
     const mine = c.seq;
     c.timer = setTimeout(async () => {
       try {
-        const res = await searchUsers(state.api, text);
+        const res = await searchUsers(sideApi(side), text);
         if (mine === c.seq) draw(res);
       } catch (e) {
         if (mine === c.seq) {
@@ -204,7 +220,12 @@ function setupCombo(side) {
     input.removeAttribute("aria-activedescendant");
   };
 
-  input.addEventListener("focus", () => { input.select(); c.open(); });
+  input.addEventListener("focus", () => {
+    // Comparing across orgs: start the search for the other org with the first person's name.
+    if (side === "b" && state.cross.on && !state.sides.b.user && !input.value && state.sides.a.user) input.value = state.sides.a.user.name;
+    input.select();
+    c.open();
+  });
   input.addEventListener("click", () => { if (list.hidden) c.open(); });
   input.addEventListener("input", c.open);
   input.addEventListener("blur", () => {
@@ -242,10 +263,10 @@ async function pick(side, u, { quiet = false } = {}) {
   try {
     let access;
     if (DEMO) {
-      access = state.demoUsers.find((a) => a.user.id === u.id);
+      access = demoPool(side).find((a) => a.user.id === u.id);
     } else {
       setProgress(`Reading ${u.name}…`);
-      access = await readUserAccess(state.api, u.id, { progress: (t) => setProgress(`${u.name}: ${t.toLowerCase()}…`) });
+      access = await readUserAccess(sideApi(side), u.id, { progress: (t) => setProgress(`${u.name}: ${t.toLowerCase()}…`) });
     }
     if (token !== s.token) return; // another pick replaced this one
     s.access = access;
@@ -282,6 +303,126 @@ function renderChosen(side) {
 
 for (const side of ["a", "b"]) setupCombo(side);
 
+// ---------- the same person in another org ----------
+
+/** The orgs (other than this one) that can be compared with, as choices {id, name, host, api, isSandbox, users?}. */
+async function findOtherOrgs() {
+  const skipped = [];
+  const choices = [];
+  let message = "";
+  if (DEMO) {
+    for (const o of state.cross.demoOrgs) choices.push({ id: o.id, name: o.name, host: o.host, isSandbox: o.isSandbox, users: o.users });
+  } else if (DEV) {
+    // The dev server holds the second login (--second-org) under /sf2/.
+    try {
+      const res = await fetch(`${location.origin}/sf2/services/data/`);
+      if (!res.ok) { message = NO_SECOND_DEV_ORG_TEXT; skipped.push({ host: "/sf2/", reason: `HTTP ${res.status}` }); } else {
+        const api = new SfApi({ apiHost: location.host, sessionId: "dev", base: `${location.origin}/sf2` });
+        const org = await readOrg(api, "second dev server org");
+        choices.push({ id: org.id, name: org.name, host: "second dev server org", isSandbox: org.isSandbox, api });
+      }
+    } catch (e) {
+      message = NO_SECOND_DEV_ORG_TEXT;
+      skipped.push({ host: "/sf2/", reason: e?.message || String(e) });
+    }
+  } else if (typeof chrome !== "undefined" && chrome.tabs && chrome.cookies) {
+    const tabs = await chrome.tabs.query({});
+    const g = await groupTabsByOrg(tabs, (h) => findSession(h, chrome.cookies), { skipOrgId: state.orgA?.id });
+    skipped.push(...g.skipped);
+    await Promise.all(g.orgs.map(async (o) => {
+      try {
+        const api = new SfApi(o.session);
+        const org = await readOrg(api, o.apiHost);
+        choices.push({ id: org.id || o.orgId, name: org.name, host: o.apiHost, isSandbox: org.isSandbox, api });
+      } catch (e) {
+        // The session was found but the org could not be read (for example it expired): the page names this org.
+        skipped.push({ host: o.apiHost, reason: e?.message || String(e), unreadable: true });
+      }
+    }));
+    choices.sort((x, y) => String(x.host).localeCompare(String(y.host)));
+  } else {
+    skipped.push({ host: "(this page)", reason: "The browser's tab list is not available here." });
+  }
+  // Never offer the org that is already open (by Id).
+  const own = choices.filter((c) => sameOrg(c.id, state.orgA?.id));
+  if (own.length && own.length === choices.length && DEV) message = SAME_DEV_ORG_TEXT;
+  return { choices: choices.filter((c) => !sameOrg(c.id, state.orgA?.id)), skipped, message };
+}
+
+async function refreshOrgs() {
+  const x = state.cross;
+  x.loading = true;
+  $("#orgRefresh").disabled = true;
+  $("#orgStatus").textContent = "Looking for other open orgs…";
+  let found = { choices: [], skipped: [], message: "" };
+  try {
+    found = await findOtherOrgs();
+  } catch (e) {
+    found.skipped.push({ host: "(tabs)", reason: e?.message || String(e) });
+  }
+  x.loading = false;
+  x.choices = found.choices;
+  x.skipped = found.skipped;
+  if (x.chosen && !x.choices.some((c) => sameOrg(c.id, x.chosen.id))) chooseOrg(null);
+  $("#orgRefresh").disabled = false;
+  $("#orgStatus").textContent = "";
+  const sel = $("#orgB");
+  sel.replaceChildren(
+    el("option", { value: "", text: x.choices.length ? "Choose the other org…" : "No other org found" }),
+    ...x.choices.map((c) => el("option", { value: id15(c.id), text: choiceLabel(c) })));
+  if (x.chosen) sel.value = id15(x.chosen.id);
+  $("#orgMsg").textContent = orgListMessage(x.choices.length, x.skipped, found.message);
+  // A tab whose session could not be found is skipped quietly; the raw reason is only here.
+  $("#orgTech").hidden = !x.skipped.length;
+  $("#orgTechText").textContent = x.skipped.map((s) => `${s.host}: ${s.reason}`).join("\n");
+}
+
+/** Choose (or clear) the other org. Side B is emptied: the person must be picked again in the new org. */
+function chooseOrg(choice) {
+  const x = state.cross;
+  if (choice && sameOrg(choice.id, state.orgA?.id)) {
+    $("#orgMsg").textContent = SAME_ORG_TEXT;
+    $("#orgB").value = x.chosen ? id15(x.chosen.id) : "";
+    return;
+  }
+  x.chosen = choice;
+  x.api = choice?.api || null;
+  x.demoUsers = choice?.users || [];
+  removeSide("b");
+  $("#orgMsg").textContent = orgListMessage(x.choices.length, x.skipped); // keeps any "could not be read" lines
+  setCrossLabels();
+  combos.b.input.disabled = !choice;
+  combos.b.input.placeholder = choice ? "Start typing a name or username" : "Choose the other org first";
+  if (choice && state.sides.a.user) combos.b.input.focus();
+}
+
+function setCrossLabels() {
+  const x = state.cross;
+  const l = crossPickerLabels(state.orgA, x.chosen);
+  $("#labelA").textContent = x.on ? l.a : "First user";
+  $("#labelB").textContent = x.on ? l.b : "Second user (optional, to compare)";
+}
+
+function setMode(cross) {
+  const x = state.cross;
+  if (x.on === cross) return;
+  x.on = cross;
+  $("#modeSame").setAttribute("aria-pressed", String(!cross));
+  $("#modeOther").setAttribute("aria-pressed", String(cross));
+  $("#orgPick").hidden = !cross;
+  Object.assign(x, { chosen: null, api: null, demoUsers: [] });
+  removeSide("b");
+  setCrossLabels();
+  combos.b.input.disabled = cross;
+  combos.b.input.placeholder = cross ? "Choose the other org first" : "Start typing a name or username";
+  if (cross) refreshOrgs();
+}
+
+$("#modeSame").addEventListener("click", () => setMode(false));
+$("#modeOther").addEventListener("click", () => setMode(true));
+$("#orgRefresh").addEventListener("click", refreshOrgs);
+$("#orgB").addEventListener("change", (e) => chooseOrg(state.cross.choices.find((c) => id15(c.id) === e.target.value) || null));
+
 // ---------- results ----------
 
 const TAB_ORDER = ["overview", ...SECTION_KEYS];
@@ -289,7 +430,7 @@ const TAB_ORDER = ["overview", ...SECTION_KEYS];
 function refresh() {
   const a = state.sides.a.access;
   const b = state.sides.b.access;
-  state.result = a && b ? compareUsers(a, b) : null;
+  state.result = a && b ? (state.cross.on ? compareAcrossOrgs(a, b, state.orgA, state.cross.chosen) : compareUsers(a, b)) : null;
   $("#results").hidden = !a;
   renderChosen("b");
   if (!a) return;
@@ -307,11 +448,13 @@ function who(access, side) {
   const u = access.user;
   const profile = itemsOf(access, "profile")[0]?.label;
   const role = itemsOf(access, "role")[0]?.label;
+  const org = state.result?.crossOrg?.[side] || (state.cross.on ? (side === "a" ? state.orgA : state.cross.chosen) : null);
   return [
-    el("div", { class: "who-name" }, nameOf(side), el("span", { class: u.isActive ? "tag-active" : "tag-inactive", text: u.isActive ? "Active" : "Inactive" })),
+    org ? el("div", { class: "who-org", text: [org.name, org.host ? `(${org.host})` : ""].filter(Boolean).join(" ") }) : null,
+    el("div", { class: "who-name" }, state.cross.on ? u.name : nameOf(side), el("span", { class: u.isActive ? "tag-active" : "tag-inactive", text: u.isActive ? "Active" : "Inactive" })),
     el("div", { class: "who-sub", text: u.username }),
     el("div", { class: "who-line", text: `Profile: ${profile || "No profile"} · ${role ? `Role: ${role}` : "No role"}` }),
-  ];
+  ].filter(Boolean); // replaceChildren(null) would print "null"
 }
 
 function renderHero() {
@@ -352,7 +495,7 @@ function renderCards() {
         lines.push(el("div", { class: l.cls }, l.segs.map((g) => g.bold ? el("b", { text: g.text }) : g.side ? el("span", { class: `who-${g.side}`, text: g.text }) : g.text)));
       }
       const c = state.result.counts[k];
-      ok = !(c.onlyA + c.onlyB + c.differ + (c.unread || 0));
+      ok = !(c.onlyA + c.onlyB + c.differ + (c.renamed || 0) + (c.unread || 0));
     } else {
       const rows = singleRows(state.sides.a.access, k);
       if (SINGLE_VALUE_KEYS.includes(k)) lines.push(el("div", { class: "one", text: rows[0]?.label || `No ${s.one}` }));
@@ -384,7 +527,7 @@ function openTab(k, scroll = false) {
 function tabCount(k) {
   if (state.result) {
     const c = state.result.counts[k];
-    const n = c.onlyA + c.onlyB + c.differ;
+    const n = c.onlyA + c.onlyB + c.differ + (c.renamed || 0);
     return { n, title: plural(n, "difference", "differences") };
   }
   const n = itemsOf(state.sides.a.access, k).length;
@@ -401,7 +544,7 @@ function renderTabs() {
   }));
   $("#help").textContent = state.tab === "overview" && !state.result ? "A quick look at each area. Click a tab to see the list." : SECTION_HELP[state.tab] || "";
   if (state.result && state.tab !== "overview" && state.diffOnly) $("#help").textContent += " The list shows only differences. Choose “Everything” to see all.";
-  $(".seg").hidden = state.tab === "overview" || !state.result;
+  $("#detail .seg").hidden = state.tab === "overview" || !state.result;
 }
 
 // ---------- the list ----------
@@ -411,12 +554,14 @@ const NO = "—";
 
 function statusChip(r) {
   if (r.status === "same") return el("span", { class: "chip same", text: "Same" });
-  const cls = { onlyA: "a", onlyB: "b", differ: "d", unreadA: "u", unreadB: "u" }[r.status];
+  const cls = { onlyA: "a", onlyB: "b", differ: "d", renamed: "rn", unreadA: "u", unreadB: "u" }[r.status];
   return el("span", { class: `chip ${cls}`, text: statusText(r.status, nameOf("a"), nameOf("b")) });
 }
 
 function itemCell(r) {
-  return el("td", { class: "item" }, el("span", { text: r.label }), state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
+  return el("td", { class: "item" }, el("span", { text: r.labelA || r.label }),
+    r.labelNote ? el("div", { class: "how", text: r.labelNote }) : null,
+    state.showApi && r.key !== r.label ? el("div", { class: "api", text: r.key }) : null);
 }
 
 /** On the email and calendar tab, "Show API names" adds the status's API name under the details. */
@@ -451,7 +596,10 @@ function settingCell(item, detail) {
 function settingNameCell(r, part) {
   const it = r.a || r.b || r.item;
   const x = it[part];
-  return el("td", { class: "item" }, el("span", { text: x.label }), state.showApi ? el("div", { class: "api", text: x.api }) : null);
+  const note = part === "setting" ? r.settingNote : r.fieldNote;
+  return el("td", { class: "item" }, el("span", { text: x.label }),
+    note ? el("div", { class: "how", text: note }) : null,
+    state.showApi ? el("div", { class: "api", text: x.api }) : null);
 }
 
 function currentRows() {
@@ -490,7 +638,7 @@ function visibleRows() {
   return rows.filter((r) => {
     if (state.diffOnly && state.result && state.tab !== "overview" && r.status === "same") return false;
     if (!words.length) return true;
-    const hay = [r.key, r.label, r.detail, r.detailA, r.detailB].filter(Boolean).join(" ").toLowerCase();
+    const hay = [r.key, r.label, r.labelB, r.detail, r.detailA, r.detailB].filter(Boolean).join(" ").toLowerCase();
     return words.every((w) => hay.includes(w));
   });
 }
@@ -563,6 +711,7 @@ function csv(onlySection) {
 function baseName() {
   const a = state.sides.a.access.user.username;
   const b = state.sides.b.access?.user.username;
+  if (state.result?.crossOrg) return `access_${safe(a)}_${safe(state.result.names.a)}_vs_${safe(state.result.names.b)}_${stamp()}`;
   return b ? `access_${safe(a)}_vs_${safe(b)}_${stamp()}` : `access_${safe(a)}_${stamp()}`;
 }
 

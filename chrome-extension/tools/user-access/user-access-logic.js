@@ -8,6 +8,7 @@
 
 import { toCsv } from "../../shared/csv.js";
 import { EAC_KEY, EAC_TITLE, EAC_ONE, EAC_NOUN, EAC_HELP, eacDetailText } from "./user-access-eac.js";
+import { sameOrg, orgSideNames, SAME_ORG_TEXT, CROSS_ORG_NOTE } from "./user-access-orgs.js";
 
 export { toCsv };
 export const ACCESS_SCHEMA = "sf-user-access/1";
@@ -220,6 +221,12 @@ export function howText(item) {
   return through ? `Through ${through}` : "";
 }
 
+/** How the user gets a permission set, by API name (never by label): the same in any org. Used for compares across orgs. */
+export function howKey(item) {
+  const groups = (item.groups || []).map((g) => g.key).sort();
+  return `${item.direct ? "direct" : ""}|${groups.join(",")}`;
+}
+
 /** Extra words shown next to an item (how it was given, licence, muting). */
 export function detailText(sectionKey, item, other = null) {
   if (!item) {
@@ -270,14 +277,21 @@ export function displayNames(a, b) {
 
 export function statusText(status, nameA = "A", nameB = "B") {
   return {
-    same: "Same", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Different",
+    same: "Same", renamed: "Named differently", onlyA: `Only ${nameA}`, onlyB: `Only ${nameB}`, differ: "Different",
     unreadA: `Could not be read for ${nameA}`, unreadB: `Could not be read for ${nameB}`,
   }[status] || status;
 }
 
-/** Compare two users. Rows are matched by API name, so users from different orgs compare cleanly. */
-export function compareUsers(a, b) {
-  const names = displayNames(a, b);
+/**
+ * Compare two users. Rows are matched by API name (item.key), never by Id, so users from different orgs compare cleanly.
+ * `opts.crossOrg = {a: {id, name, host}, b: {id, name, host}}` (the org Ids must differ, else it throws the plain SAME_ORG_TEXT) marks a compare of one person in two orgs: the two sides are
+ * named by org, and "assigned differently" is judged by group API names instead of labels (labels may differ).
+ */
+export function compareUsers(a, b, opts = {}) {
+  const cross = opts.crossOrg || null;
+  if (cross && sameOrg(cross.a?.id, cross.b?.id)) throw new Error(SAME_ORG_TEXT);
+  const names = cross ? orgSideNames(cross.a, cross.b) : displayNames(a, b);
+  const how = cross ? howKey : howText;
   const sections = {};
   const counts = {};
   const unavailable = {};
@@ -293,24 +307,65 @@ export function compareUsers(a, b) {
       else if (k === "customSettings" && !ia && ib && settingUnread(a, ib.setting?.api)) status = "unreadA";
       else if (ia && !ib) status = "onlyA";
       else if (!ia && ib) status = "onlyB";
-      else if (k === "permissionSets" && howText(ia) !== howText(ib)) status = "differ";
+      else if (k === "permissionSets" && how(ia) !== how(ib)) status = "differ";
       else if (k === "customSettings" && !sameItemValue(ia, ib)) status = "differ";
       else if (k === EAC_KEY && eacDetailText(ia) !== eacDetailText(ib)) status = "differ";
       let detailA = detailText(k, ia, ib);
       let detailB = detailText(k, ib, ia);
       if (status === "unreadA") detailA = `Could not be read for ${names.a}`;
       if (status === "unreadB") detailB = `Could not be read for ${names.b}`;
-      rows.push({ key, label: (ia || ib).label || key, a: ia, b: ib, status, detailA, detailB });
+      const row = { key, label: (ia || ib).label || key, a: ia, b: ib, status, detailA, detailB };
+      // Across orgs the same API name can carry a different label: that is a difference to fix.
+      if (cross && ia && ib) {
+        const la = (ia.label || ia.key || "").trim();
+        const lb = (ib.label || ib.key || "").trim();
+        const part = (it, p) => (it[p]?.label || "").trim();
+        if (k === "customSettings" && ia.setting && ib.setting && ia.field && ib.field) {
+          // A custom setting has two names: say which one differs, so each note sits under its own column.
+          const sa = part(ia, "setting"), sb = part(ib, "setting"), fa = part(ia, "field"), fb = part(ib, "field");
+          if (sa !== sb || fa !== fb) {
+            row.labelA = la;
+            row.labelB = lb;
+            if (sa !== sb) row.settingNote = `Setting called “${sb}” in ${names.b}`;
+            if (fa !== fb) row.fieldNote = `Field called “${fb}” in ${names.b}`;
+            row.labelNote = [row.settingNote, row.fieldNote].filter(Boolean).join("; ");
+            row.labelCsv = [sa !== sb ? `setting “${sb}”` : "", fa !== fb ? `field “${fb}”` : ""].filter(Boolean).join(", ");
+            if (status === "same") row.status = "renamed";
+          }
+        } else if (la !== lb) {
+          row.labelA = la;
+          row.labelB = lb;
+          row.labelNote = `Called “${lb}” in ${names.b}`;
+          row.labelCsv = lb;
+          if (status === "same") row.status = "renamed";
+        }
+      }
+      rows.push(row);
     }
     rows.sort((x, y) => x.label.localeCompare(y.label));
     sections[k] = rows;
     const n = (s) => rows.filter((r) => r.status === s).length;
     counts[k] = { onlyA: n("onlyA"), onlyB: n("onlyB"), same: n("same"), differ: n("differ"), unread: n("unreadA") + n("unreadB"), total: rows.length, totalA: ma.size, totalB: mb.size };
+    if (cross) counts[k].renamed = n("renamed");
     const ua = a.unavailable?.[k] || null;
     const ub = b.unavailable?.[k] || null;
     if (ua || ub) unavailable[k] = { a: ua, b: ub };
   }
-  return { a, b, names, sections, counts, unavailable, verdict: verdict(counts, names), notes: notesOf(a, b, names) };
+  const result = { a, b, names, sections, counts, unavailable, verdict: verdict(counts, names, cross ? personName(a, b) : null), notes: notesOf(a, b, names) };
+  if (cross) result.notes.push(CROSS_ORG_NOTE);
+  if (cross) result.crossOrg = cross;
+  return result;
+}
+
+/** The person's name for a sentence: the name when both sides have the same one, else "This person". */
+const personName = (a, b) => (a.user.name === b.user.name ? a.user.name : "This person");
+
+/**
+ * One person in two orgs. `orgA` and `orgB` are {id, name, host}. Refuses the same org on both sides (by org Id)
+ * with an Error that holds a plain sentence.
+ */
+export function compareAcrossOrgs(a, b, orgA, orgB) {
+  return compareUsers(a, b, { crossOrg: { a: orgA, b: orgB } });
 }
 
 const fmt = (n) => Number(n).toLocaleString("en-US");
@@ -333,22 +388,27 @@ export function userCardLines(result, key) {
     const vb = itemsOf(result.b, key)[0]?.label || "None";
     if (va === vb) return [line("same", T(`✓ Same in both: ${va === "None" ? `no ${sec.one}` : va}`))];
     const show = (v) => (v === "None" ? `no ${sec.one}` : v);
-    return [line("", { text: A, side: "a" }, T(`: ${show(va)}`)), line("", { text: B, side: "b" }, T(`: ${show(vb)}`))];
+    const both = [line("", { text: A, side: "a" }, T(`: ${show(va)}`)), line("", { text: B, side: "b" }, T(`: ${show(vb)}`))];
+    // Same API name, other label (cross-org only): say why this is not a tick.
+    if (c.renamed) both.push(line("", T("Named differently in the two orgs")));
+    return both;
   }
   const failed = key !== "customSettings" ? [] : [["a", A, result.a], ["b", B, result.b]]
     .filter(([, , acc]) => customSettingsFailedNote(acc))
     .map(([side, name, acc]) => line("", { text: name, side }, T(`: ${customSettingsFailedNote(acc)}`)));
   if (!c.totalA && !c.totalB) return [line("same", T("Neither has any")), ...failed];
+  const ren = c.renamed || 0;
   const lines = [
-    line("", { text: fmt(c.same + c.differ), bold: true }, T(` ${c.same + c.differ === 1 ? sec.one : sec.noun} both have`)),
+    line("", { text: fmt(c.same + c.differ + ren), bold: true }, T(` ${c.same + c.differ + ren === 1 ? sec.one : sec.noun} both have`)),
     line("", { text: fmt(c.onlyA), bold: true }, T(" only "), { text: A, side: "a" }, T(" has")),
     line("", { text: fmt(c.onlyB), bold: true }, T(" only "), { text: B, side: "b" }, T(" has")),
   ];
   if (key === "permissionSets") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those assigned differently (directly or through a group)")));
   if (key === "customSettings") lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those with a different value for each")));
   if (key === EAC_KEY) lines.push(line("", { text: fmt(c.differ), bold: true }, T(" of those with a different status or settings")));
+  if (ren) lines.push(line("", { text: fmt(ren), bold: true }, T(` of those named differently in the two orgs`)));
   if (c.unread) lines.push(line("", { text: fmt(c.unread), bold: true }, T(` not compared (a setting could not be read for one user)`)));
-  if (!c.onlyA && !c.onlyB && !c.differ && !c.unread) lines.push(line("same", T("✓ Same in both")));
+  if (!c.onlyA && !c.onlyB && !c.differ && !ren && !c.unread) lines.push(line("same", T("✓ Same in both")));
   return [...lines, ...failed];
 }
 
@@ -364,10 +424,20 @@ export function orgParts(org, host, via) {
   ].filter((p) => p && p.text);
 }
 
-function verdict(counts, names) {
-  let onlyA = 0, onlyB = 0, differ = 0;
-  for (const c of Object.values(counts)) { onlyA += c.onlyA; onlyB += c.onlyB; differ += c.differ; }
+function verdict(counts, names, person = null) {
+  let onlyA = 0, onlyB = 0, differ = 0, renamed = 0;
+  for (const c of Object.values(counts)) { onlyA += c.onlyA; onlyB += c.onlyB; differ += c.differ; renamed += c.renamed || 0; }
   const { a, b } = names;
+  if (person) {
+    // Items named differently in the two orgs (cross-org only) are a difference of their own.
+    const ren = renamed ? ` ${plural(renamed, "item is", "items are")} named differently in the two orgs.` : "";
+    if (!onlyA && !onlyB && !differ && !renamed) return { text: `${person} has the same access in ${a} and ${b}.`, level: "good" };
+    if (!onlyA && !onlyB && !differ) return { text: `${person} has the same access in ${a} and ${b}, but${ren}`, level: "" };
+    if (!onlyA && !onlyB) return { text: `${person} has the same access in ${a} and ${b}, but some of it comes to them in different ways.${ren}`, level: renamed ? "" : "good" };
+    if (!onlyB) return { text: `${a} gives ${person} everything ${b} does, and more.${ren}`, level: "" };
+    if (!onlyA) return { text: `${b} gives ${person} everything ${a} does, and more.${ren}`, level: "" };
+    return { text: `Each org gives ${person} access the other does not (${plural(onlyA + onlyB + differ + renamed, "difference", "differences")} in total).`, level: "" };
+  }
   if (!onlyA && !onlyB && !differ) return { text: `${a} and ${b} have the same access.`, level: "good" };
   if (!onlyA && !onlyB) return { text: `${a} and ${b} have the same access, but some of it comes to them in different ways.`, level: "good" };
   if (!onlyB) return { text: `${a} has everything ${b} has, and more.`, level: "" };
@@ -395,7 +465,8 @@ function oneLine(text) {
 /** Rows for CSV, comparing two users. `onlySection` limits it to one area. */
 export function toRows(result, onlySection = null) {
   const { a: A, b: B } = result.names;
-  const rows = [["Area", "Item", "API name", "Difference", A, B]];
+  const head = result.crossOrg ? [`${A} (${result.a.user.name})`, `${B} (${result.b.user.name})`] : [A, B];
+  const rows = [["Area", "Item", "API name", "Difference", ...head]];
   for (const k of SECTION_KEYS) {
     if (onlySection && k !== onlySection) continue;
     if (k === "customSettings") {
@@ -407,7 +478,8 @@ export function toRows(result, onlySection = null) {
       line(customSettingsHiddenNote(result.a, result.b), "");
     }
     for (const r of result.sections[k]) {
-      rows.push([SECTION_TITLES[k], r.label, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : oneLine(r.detailA) || "No", r.b ? oneLine(r.detailB) || "Yes" : oneLine(r.detailB) || "No"]);
+      const item = r.labelNote ? `${r.labelA} (${B}: ${r.labelCsv})` : r.label;
+      rows.push([SECTION_TITLES[k], item, r.key, statusText(r.status, A, B), r.a ? oneLine(r.detailA) || "Yes" : oneLine(r.detailA) || "No", r.b ? oneLine(r.detailB) || "Yes" : oneLine(r.detailB) || "No"]);
     }
   }
   return rows;
