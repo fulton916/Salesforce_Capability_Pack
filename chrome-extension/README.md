@@ -478,7 +478,15 @@ needed, and nothing is added to what the extension may access. A tab whose login
 quietly (the reason is under "Technical details"). Choosing the same org on both sides is refused.
 Items are matched by API name (profile name, role, group and permission set names, license, public group and
 queue, territory, call center, custom setting and field, configuration name), never by Id or label, so the same
-thing in both orgs shows as "Same" even when its Id or label differs. A permission set is "Different" only when it is
+thing in both orgs is found even when its Id differs. If the two orgs give it a different label (for example "Sales
+Standard" in production and "Sales Standard User" in the sandbox), that is itself a difference to fix: the row says
+"Named differently", counts in the totals, the cards and "Only differences", and shows both labels (a line "Called
+“Sales Standard User” in Example Sandbox" under the item; in the CSV the Item column reads "Sales Standard (Example
+Sandbox: Sales Standard User)"). A custom setting says which part differs, under its own column ("Setting called
+“X” in Example Sandbox" under Setting, "Field called “Y” ..." under Field). The Profile and Role cards add "Named
+differently in the two orgs". The status is shown in its own calm violet, apart from "Different". Labels are compared after trimming spaces; a change of letter case counts. If the item
+also differs in another way the row stays "Different" and still shows both labels. Comparing two users in one org is
+unchanged. A permission set is "Different" only when it is
 reached differently (directly or through which group, judged by the group's API name). A custom setting only
 appears when its value differs from that org's own default, so an item can show as only in one org when the
 other org's default already has the same value. Not checked in a real Chrome yet: the tab list and login lookup of

@@ -9,7 +9,7 @@ import path from "node:path";
 
 import { readUserAccess } from "../tools/user-access/user-access-read.js";
 import {
-  compareUsers, compareAcrossOrgs, validateAccess, toRows, toCsv, settingItems, SECTION_KEYS, HIDDEN_TEXT, howKey, howText,
+  compareUsers, compareAcrossOrgs, validateAccess, toRows, toCsv, settingItems, SECTION_KEYS, statusText, userCardLines, HIDDEN_TEXT, howKey, howText,
 } from "../tools/user-access/user-access-logic.js";
 import {
   groupTabsByOrg, hostOfTab, sameOrg, choiceLabel, orgSideNames, SAME_ORG_TEXT, NO_OTHER_ORG_TEXT, CROSS_ORG_NOTE,
@@ -61,14 +61,14 @@ export async function run(test) {
     const r = compareAcrossOrgs(a, b, ORG_A, ORG_B);
     const st = (k) => Object.fromEntries(r.sections[k].map((x) => [x.key, x.status]));
     assert.deepEqual(st("profile"), { "Sales Standard": "same" });
-    assert.deepEqual(st("role"), { Sales_Rep: "same" }, "role label differs, DeveloperName is the same");
-    assert.deepEqual(st("permissionSetGroups"), { Sales_Core: "same" }, "group label differs");
-    assert.equal(st("permissionSets").Opportunity_Edit, "same", "label differs, assigned the same way (by API name)");
-    assert.equal(st("permissionSets").Sales_Reports, "same");
+    assert.deepEqual(st("role"), { Sales_Rep: "renamed" }, "role label differs, DeveloperName is the same");
+    assert.deepEqual(st("permissionSetGroups"), { Sales_Core: "renamed" }, "group label differs");
+    assert.equal(st("permissionSets").Opportunity_Edit, "renamed", "label differs, assigned the same way (by API name)");
+    assert.equal(st("permissionSets").Sales_Reports, "renamed");
     assert.equal(st("permissionSets").acme__Lead_Convert, "onlyA", "only in org A (and the namespace is part of the name)");
-    assert.deepEqual(st("permissionSetLicenses"), { EinsteinPsl: "same" });
-    assert.deepEqual(st("publicGroups"), { All_Sales: "same", QA_Testers: "onlyB" });
-    assert.deepEqual(st("queues"), { Lead_Triage: "same" });
+    assert.deepEqual(st("permissionSetLicenses"), { EinsteinPsl: "renamed" });
+    assert.deepEqual(st("publicGroups"), { All_Sales: "renamed", QA_Testers: "onlyB" });
+    assert.deepEqual(st("queues"), { Lead_Triage: "renamed" });
     assert.deepEqual(st("territories"), { North: "onlyA", South: "onlyB" });
     assert.equal(r.counts.permissionSets.onlyA, 1);
   });
@@ -246,6 +246,142 @@ export async function run(test) {
     }
   });
 
+  // ---- a different label for the same API name (cross-org only) ----
+
+  const labelAccess = (id, label, extra = {}) => validateAccess({
+    schema: "sf-user-access/1", user: { id, name: "Pat Example", username: `${id}@example.com`, isActive: true },
+    sections: { ...Object.fromEntries(SECTION_KEYS.map((k) => [k, []])),
+      permissionSets: [{ key: "Sales_Standard", label, direct: true, groups: [], ...extra }] },
+  });
+
+  await test("across orgs: same API name, different label is 'Named differently' and counts as a difference", () => {
+    const x = labelAccess("u1", "Sales Standard");
+    const y = labelAccess("u2", "Sales Standard User");
+    const r = compareAcrossOrgs(x, y, ORG_A, ORG_B);
+    const row = r.sections.permissionSets[0];
+    assert.equal(row.status, "renamed");
+    assert.equal(statusText("renamed"), "Named differently");
+    assert.equal(row.labelNote, "Called “Sales Standard User” in Example Sandbox");
+    assert.equal(r.counts.permissionSets.renamed, 1);
+    assert.equal(r.counts.permissionSets.same, 0);
+    assert.match(r.verdict.text, /same access in Example Production and Example Sandbox, but 1 item is named differently/);
+    assert.notEqual(r.verdict.level, "good");
+    // with one item only in each org, the renamed one is counted in the total
+    const z = labelAccess("u3", "Sales Standard");
+    z.sections.permissionSets.push({ key: "Extra", label: "Extra", direct: true, groups: [] });
+    const w = labelAccess("u4", "Sales Standard User");
+    w.sections.permissionSets.push({ key: "Other", label: "Other", direct: true, groups: [] });
+    const r2 = compareAcrossOrgs(z, w, ORG_A, ORG_B);
+    assert.match(r2.verdict.text, /\(3 differences in total\)/, "one only in each org, plus the renamed one");
+    // the CSV Item column carries both labels, the API name stays in its column
+    const line = toRows(r).find((q) => q[2] === "Sales_Standard");
+    assert.deepEqual(line.slice(0, 4), ["Permission sets", "Sales Standard (Example Sandbox: Sales Standard User)", "Sales_Standard", "Named differently"]);
+    // the cards count it
+    const lines = userCardLines(r, "permissionSets").map((l) => l.segs.map((g) => g.text).join(""));
+    assert.ok(lines.some((t) => /1 of those named differently/.test(t)));
+    assert.ok(!lines.some((t) => /Same in both/.test(t)));
+  });
+
+  await test("across orgs: same label stays 'Same'; a change in letter case or spacing around it is judged as written", () => {
+    const r = compareAcrossOrgs(labelAccess("u1", "Sales Standard"), labelAccess("u2", "  Sales Standard "), ORG_A, ORG_B);
+    assert.equal(r.sections.permissionSets[0].status, "same", "trimmed before comparing");
+    assert.equal(r.sections.permissionSets[0].labelNote, undefined);
+    assert.equal(r.counts.permissionSets.renamed, 0);
+    assert.equal(r.verdict.text, "Pat Example has the same access in Example Production and Example Sandbox.");
+    const c = compareAcrossOrgs(labelAccess("u1", "Sales Standard"), labelAccess("u2", "sales standard"), ORG_A, ORG_B);
+    assert.equal(c.sections.permissionSets[0].status, "renamed", "letter case counts");
+  });
+
+  await test("across orgs: a label difference plus another difference stays 'Different' and still shows both labels", () => {
+    const x = labelAccess("u1", "Sales Standard", { direct: true });
+    const y = labelAccess("u2", "Sales Standard User", { direct: false, groups: [{ key: "G", label: "G" }] });
+    const r = compareAcrossOrgs(x, y, ORG_A, ORG_B);
+    const row = r.sections.permissionSets[0];
+    assert.equal(row.status, "differ");
+    assert.equal(row.labelNote, "Called “Sales Standard User” in Example Sandbox");
+    assert.equal(r.counts.permissionSets.differ, 1);
+    assert.equal(r.counts.permissionSets.renamed, 0);
+    assert.equal(toRows(r).find((q) => q[2] === "Sales_Standard")[1], "Sales Standard (Example Sandbox: Sales Standard User)");
+  });
+
+  await test("same-org compares are unchanged: a different label is still 'Same', no new fields", () => {
+    const x = labelAccess("u1", "Sales Standard");
+    const y = labelAccess("u2", "Sales Standard User");
+    const r = compareUsers(x, y);
+    assert.equal(r.sections.permissionSets[0].status, "same");
+    assert.equal(r.sections.permissionSets[0].labelNote, undefined);
+    assert.equal("renamed" in r.counts.permissionSets, false);
+    assert.equal(toRows(r).find((q) => q[2] === "Sales_Standard")[1], "Sales Standard");
+  });
+
+  await test("the cross-org note and the page hint no longer say a renamed item shows as the same", () => {
+    assert.equal(CROSS_ORG_NOTE.startsWith("Items are matched by API name, not Id. If the same item has a different name (label) in each org, it is flagged as named differently."), true);
+    assert.ok(!/shows as the same/.test(CROSS_ORG_NOTE));
+    const html = readFileSync(ext("tools", "user-access", "user-access.html"), "utf-8");
+    assert.ok(html.includes("If the same item has a different name (label) in each org, it is flagged as named differently."));
+    assert.ok(!/shows as the same/.test(html));
+  });
+
+  const csAccess = (id, setting, field) => validateAccess({
+    schema: "sf-user-access/1", user: { id, name: "Pat Example", username: `${id}@example.com`, isActive: true },
+    sections: { ...Object.fromEntries(SECTION_KEYS.map((k) => [k, []])),
+      customSettings: [{ key: "Auto__c.Bypass__c", label: `${setting}: ${field}`, setting: { api: "Auto__c", label: setting }, field: { api: "Bypass__c", label: field },
+        value: true, valueText: "Yes", orgDefault: false, orgDefaultText: "No", source: "user", sourceText: "Set for this user" }] },
+    customSettingsInfo: { found: 1, examined: 1, hierarchy: 1, failed: 0, failedSettings: [], skippedFields: 0, capped: false },
+  });
+
+  await test("across orgs: a custom setting says which part is named differently (setting, field or both)", () => {
+    const base = csAccess("u1", "Automation Settings", "Bypass validation rules");
+    const f = compareAcrossOrgs(base, csAccess("u2", "Automation Settings", "Bypass validation rules X"), ORG_A, ORG_B).sections.customSettings[0];
+    assert.equal(f.status, "renamed");
+    assert.equal(f.settingNote, undefined);
+    assert.equal(f.fieldNote, "Field called “Bypass validation rules X” in Example Sandbox");
+    const s = compareAcrossOrgs(base, csAccess("u3", "Automation Config", "Bypass validation rules"), ORG_A, ORG_B).sections.customSettings[0];
+    assert.equal(s.settingNote, "Setting called “Automation Config” in Example Sandbox");
+    assert.equal(s.fieldNote, undefined);
+    const rb = compareAcrossOrgs(base, csAccess("u4", "Automation Config", "Bypass validation rules X"), ORG_A, ORG_B);
+    const b = rb.sections.customSettings[0];
+    assert.ok(b.settingNote && b.fieldNote);
+    const line = toRows(rb).find((q) => q[2] === "Auto__c.Bypass__c");
+    assert.equal(line[1], "Automation Settings: Bypass validation rules (Example Sandbox: setting “Automation Config”, field “Bypass validation rules X”)");
+    assert.equal(line[3], "Named differently");
+    const one = toRows(compareAcrossOrgs(base, csAccess("u5", "Automation Settings", "Bypass validation rules X"), ORG_A, ORG_B)).find((q) => q[2] === "Auto__c.Bypass__c");
+    assert.equal(one[1], "Automation Settings: Bypass validation rules (Example Sandbox: field “Bypass validation rules X”)");
+    const same = compareAcrossOrgs(base, csAccess("u6", "Automation Settings", "Bypass validation rules"), ORG_A, ORG_B).sections.customSettings[0];
+    assert.equal(same.status, "same");
+    assert.equal(same.settingNote, undefined);
+  });
+
+  await test("across orgs: the Profile and Role cards say 'Named differently in the two orgs' when only the label differs", () => {
+    const mk = (id, role, profile) => validateAccess({
+      schema: "sf-user-access/1", user: { id, name: "Pat Example", username: `${id}@example.com`, isActive: true },
+      sections: { ...Object.fromEntries(SECTION_KEYS.map((k) => [k, []])),
+        role: [{ key: "Sales_Rep", label: role }], profile: [{ key: "Sales Standard", label: profile }] },
+    });
+    const r = compareAcrossOrgs(mk("u1", "Sales Rep", "Sales Standard"), mk("u2", "Sales Representative", "Sales Standard"), ORG_A, ORG_B);
+    const text = (k) => userCardLines(r, k).map((l) => l.segs.map((g) => g.text).join(""));
+    assert.ok(text("role").includes("Named differently in the two orgs"));
+    assert.ok(!text("profile").some((t) => /Named differently/.test(t)));
+    assert.deepEqual(text("profile"), ["✓ Same in both: Sales Standard"]);
+    // a different role (other API name) is not "named differently"
+    const d = compareAcrossOrgs(mk("u1", "Sales Rep", "Sales Standard"), validateAccess({
+      schema: "sf-user-access/1", user: { id: "u3", name: "Pat Example", username: "u3@example.com", isActive: true },
+      sections: { ...Object.fromEntries(SECTION_KEYS.map((k) => [k, []])), role: [{ key: "Other_Role", label: "Other" }] },
+    }), ORG_A, ORG_B);
+    assert.ok(!userCardLines(d, "role").some((l) => l.segs.some((g) => /Named differently/.test(g.text))));
+    // same-org compare is unchanged
+    const so = compareUsers(mk("u1", "Sales Rep", "Sales Standard"), mk("u2", "Sales Representative", "Sales Standard"));
+    assert.ok(!userCardLines(so, "role").some((l) => l.segs.some((g) => /Named differently/.test(g.text))));
+  });
+
+  await test("the 'Named differently' chip has its own class, apart from 'Different', in light and dark", () => {
+    const js = readFileSync(ext("tools", "user-access", "user-access.js"), "utf-8");
+    assert.ok(/renamed: "rn"/.test(js) && /differ: "d"/.test(js));
+    const css = readFileSync(ext("tools", "user-access", "user-access.css"), "utf-8");
+    assert.ok(/\.chip\.rn \{[^}]*background[^}]*color/.test(css));
+    assert.ok(/prefers-color-scheme: dark\) \{\s*\.chip\.rn/.test(css));
+  });
+
   // ---- the demo sample ----
 
   await test("the made-up second org for the demo has the same person, some matching items and some in one org only, and stays synthetic", () => {
@@ -265,9 +401,9 @@ export async function run(test) {
     assert.ok(!sameOrg(org.id, "00DDEMOPRD00001"), "a different org Id than the demo's org A");
     const r = compareAcrossOrgs(validateAccess(demoA), same, { id: "00DDEMOPRD00001", name: "Example Production" }, org);
     const all = Object.values(r.sections).flat();
-    for (const s of ["same", "onlyA", "onlyB", "differ"]) assert.ok(all.some((x) => x.status === s), `the demo has a row that is ${s}`);
+    for (const s of ["same", "renamed", "onlyA", "onlyB", "differ"]) assert.ok(all.some((x) => x.status === s), `the demo has a row that is ${s}`);
     const profile = r.sections.profile[0];
-    assert.ok(profile.status === "same" && profile.a.label !== profile.b.label, "same API name, other label");
+    assert.ok(profile.status === "renamed" && profile.a.label !== profile.b.label, "same API name, other label");
   });
 
   await test("the cross-org code uses only reads: no POST, no PATCH, no storage, no HTML strings", () => {
