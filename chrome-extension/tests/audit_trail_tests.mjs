@@ -1160,7 +1160,7 @@ export async function run(test) {
       assert.ok(y.includes("Extension 0.11.0, Chrome 131"), f);
     }
     const manifest = JSON.parse(read(ext("manifest.json")));
-    assert.equal(manifest.version, "0.11.1");
+    assert.equal(manifest.version, "0.12.0");
     assert.ok(manifest.description.length <= 132, `${manifest.description.length} characters`);
     assert.deepEqual(manifest.permissions, ["cookies", "activeTab", "tabs", "storage"], "no new permission");
     assert.match(read(ext("package.json")), /nine read-only tools/);
