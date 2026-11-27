@@ -340,7 +340,7 @@ Try it: `python dev/dev_server.py --no-org`, then open
 
 ## Install (unpacked, for your own browser)
 
-New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#install-the-chrome-extension-developer-mode-about-2-minutes) in the main README.
+New to GitHub or to loading an extension? Follow the [step-by-step instructions](../README.md#get-the-chrome-extension) in the main README.
 
 **Easiest: the one-click download.** Download
 <https://github.com/fulton916/Salesforce_Capability_Pack/releases/latest/download/salesforce-capability-pack-extension.zip>

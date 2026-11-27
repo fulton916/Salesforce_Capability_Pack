@@ -89,7 +89,7 @@ echo "== chrome-extension"; (cd chrome-extension && node tests/run_tests.mjs) ||
 ```
 
 CI (`.github/workflows/tests.yml`) runs every package's offline tests on each pull request and on pushes to main:
-Python packages on 3.10 and 3.12 (one job per Python version, all packages in it), `chrome-extension` on Node 20. No org or secrets needed.
+Python packages on Ubuntu with 3.10 and 3.12, plus Windows with 3.12 (UTF-8 mode off), all packages in each job; `chrome-extension` on Node 20. No org or secrets needed.
 
 Extension dev server: `python chrome-extension/dev/dev_server.py --no-org`, then
 `http://127.0.0.1:8765/tools/compare-groups/compare-groups.html?demo=1` (or `--target-org <alias>` with `?dev=1`).
