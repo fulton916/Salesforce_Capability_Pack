@@ -1,0 +1,250 @@
+{
+  "schema": "sf-user-access-demo-orgs/1",
+  "note": "Made-up second org for the demo of comparing one person across two orgs. Synthetic: example.com addresses, fake Ids.",
+  "orgs": [
+    {
+      "id": "00DDEMOSBX00001",
+      "name": "Example Sandbox",
+      "host": "example--demo.sandbox.my.example.com",
+      "isSandbox": true,
+      "edition": "Enterprise Edition",
+      "users": [
+        {
+          "schema": "sf-user-access/1",
+          "takenAt": "2026-01-15T09:30:00.000Z",
+          "user": {
+            "id": "005DEMOSBX00001AAA",
+            "name": "Alex Example",
+            "username": "alex.example@example.com.sandbox",
+            "isActive": true
+          },
+          "sections": {
+            "profile": [
+              {
+                "key": "Sales_Standard",
+                "label": "Sales Standard User",
+                "licence": "Salesforce"
+              }
+            ],
+            "role": [
+              {
+                "key": "Regional_Sales_Rep",
+                "label": "Regional Sales Representative"
+              }
+            ],
+            "permissionSetGroups": [
+              {
+                "key": "Sales_Core",
+                "label": "Sales Core (sandbox copy)",
+                "status": "Updated",
+                "muting": [
+                  "Mute Delete Access"
+                ]
+              }
+            ],
+            "permissionSets": [
+              {
+                "key": "Lead_Convert",
+                "label": "Convert Leads",
+                "licence": null,
+                "direct": false,
+                "groups": [
+                  {
+                    "key": "Sales_Core",
+                    "label": "Sales Core (sandbox copy)"
+                  }
+                ]
+              },
+              {
+                "key": "Opportunity_Edit",
+                "label": "Opportunity Edit",
+                "licence": null,
+                "direct": true,
+                "groups": [
+                  {
+                    "key": "Sales_Core",
+                    "label": "Sales Core (sandbox copy)"
+                  }
+                ]
+              },
+              {
+                "key": "Sales_Reports",
+                "label": "Sales Reports",
+                "licence": null,
+                "direct": true,
+                "groups": []
+              },
+              {
+                "key": "Sandbox_Debug",
+                "label": "Sandbox Debug",
+                "licence": null,
+                "direct": true,
+                "groups": []
+              }
+            ],
+            "permissionSetLicenses": [
+              {
+                "key": "SalesCloudEinsteinPsl",
+                "label": "Sales Cloud Einstein (license)"
+              }
+            ],
+            "publicGroups": [
+              {
+                "key": "All_Sales_Staff",
+                "label": "Everyone in Sales"
+              },
+              {
+                "key": "QA_Testers",
+                "label": "QA Testers"
+              }
+            ],
+            "queues": [
+              {
+                "key": "Lead_Triage",
+                "label": "Lead Triage Queue"
+              }
+            ],
+            "territories": [],
+            "callCenter": [],
+            "eac": [
+              {
+                "key": "Sales Team Standard",
+                "label": "Sales Team Standard",
+                "status": "ACTIVE",
+                "statusText": "Connected",
+                "hasRow": true,
+                "connected": true,
+                "recommendedTitle": null,
+                "recommendedDescription": null,
+                "contactsSynced": true,
+                "eventsSynced": false,
+                "termsAccepted": true,
+                "globalTerms": "ACCEPTED",
+                "via": "user",
+                "profileName": null
+              }
+            ],
+            "customSettings": [
+              {
+                "key": "Automation_Settings__c.Bypass_Validation_Rules__c",
+                "label": "Automation Settings: Bypass validation rules",
+                "setting": {
+                  "api": "Automation_Settings__c",
+                  "label": "Automation Settings"
+                },
+                "field": {
+                  "api": "Bypass_Validation_Rules__c",
+                  "label": "Bypass validation rules"
+                },
+                "type": "boolean",
+                "value": true,
+                "valueText": "Checked",
+                "source": "user",
+                "sourceText": "This user",
+                "orgDefault": false,
+                "orgDefaultText": "Not checked"
+              },
+              {
+                "key": "Integration_Settings__c.Batch_Size__c",
+                "label": "Integration Settings: Batch size",
+                "setting": {
+                  "api": "Integration_Settings__c",
+                  "label": "Integration Settings"
+                },
+                "field": {
+                  "api": "Batch_Size__c",
+                  "label": "Batch size"
+                },
+                "type": "double",
+                "value": 75,
+                "valueText": "75",
+                "source": "profile",
+                "sourceText": "Their profile",
+                "orgDefault": 50,
+                "orgDefaultText": "50"
+              },
+              {
+                "key": "Integration_Settings__c.Api_Token__c",
+                "label": "Integration Settings: Api Token",
+                "setting": {
+                  "api": "Integration_Settings__c",
+                  "label": "Integration Settings"
+                },
+                "field": {
+                  "api": "Api_Token__c",
+                  "label": "Api Token"
+                },
+                "type": "string",
+                "hidden": true,
+                "value": null,
+                "valueId": "demo-a-1",
+                "valueText": "Hidden (looks like a key)",
+                "source": "user",
+                "sourceText": "This user",
+                "orgDefault": null,
+                "orgDefaultText": "Hidden (looks like a key)"
+              }
+            ]
+          },
+          "unavailable": {},
+          "warnings": [],
+          "customSettingsInfo": {
+            "found": 4,
+            "examined": 4,
+            "hierarchy": 2,
+            "failed": 0,
+            "capped": false
+          }
+        },
+        {
+          "schema": "sf-user-access/1",
+          "takenAt": "2026-01-15T09:30:00.000Z",
+          "user": {
+            "id": "005DEMOSBX00002AAA",
+            "name": "Alexis Sample",
+            "username": "alexis.sample@example.com.sandbox",
+            "isActive": true
+          },
+          "sections": {
+            "profile": [
+              {
+                "key": "Support_Standard",
+                "label": "Support Standard",
+                "licence": "Salesforce"
+              }
+            ],
+            "role": [
+              {
+                "key": "Regional_Sales_Rep",
+                "label": "Regional Sales Rep"
+              }
+            ],
+            "permissionSetGroups": [],
+            "permissionSets": [],
+            "permissionSetLicenses": [
+              {
+                "key": "SalesCloudEinsteinPsl",
+                "label": "Sales Cloud Einstein"
+              }
+            ],
+            "publicGroups": [],
+            "queues": [],
+            "territories": [],
+            "callCenter": [],
+            "eac": [],
+            "customSettings": []
+          },
+          "unavailable": {},
+          "warnings": [],
+          "customSettingsInfo": {
+            "found": 4,
+            "examined": 4,
+            "hierarchy": 2,
+            "failed": 0,
+            "capped": false
+          }
+        }
+      ]
+    }
+  ]
+}

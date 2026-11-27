@@ -52,10 +52,10 @@ function fakeFetch(routes, log = []) {
   };
 }
 
-const apiFor = (routes, log) => new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl: fakeFetch(routes, log) });
+export const apiFor = (routes, log) => new SfApi({ apiHost: "test.example.com", sessionId: "sid", fetchImpl: fakeFetch(routes, log) });
 
 // A synthetic org for readUserAccess.
-function userRoutes(over = {}) {
+export function userRoutes(over = {}) {
   const routes = [
     [/SELECT CallCenterId FROM User/, () => [{ CallCenterId: "04vCC0000000001AAA" }]],
     [/FROM CallCenter WHERE Id = '04vCC0000000001AAA'/, () => [{ Id: "04vCC0000000001AAA", Name: "Demo Line", InternalName: "Demo_Line" }]],
@@ -895,7 +895,7 @@ export async function run(test) {
   });
 
   await test("the new files never use innerHTML, localStorage or chrome.storage", () => {
-    for (const f of [["tools/user-access/user-access.js"], ["tools/user-access/user-access-read.js"], ["tools/user-access/user-access-logic.js"]]) {
+    for (const f of [["tools/user-access/user-access.js"], ["tools/user-access/user-access-read.js"], ["tools/user-access/user-access-logic.js"], ["tools/user-access/user-access-orgs.js"]]) {
       const text = readFileSync(ext(...f), "utf-8");
       for (const bad of ["innerHTML", "insertAdjacentHTML", "outerHTML", "localStorage", "chrome.storage"]) {
         assert.ok(!text.includes(bad), `${f.join("/")} contains ${bad}`);

@@ -21,6 +21,10 @@ Usage:
     python dev/dev_server.py                      # sf default org
     python dev/dev_server.py --target-org my-sbx  # a specific org alias
     python dev/dev_server.py --no-org             # pages and demo only, no org
+    python dev/dev_server.py --target-org a --second-org b   # a second org under /sf2/ (user access: same person in two orgs)
+
+The second org is forwarded the same read-only way (GET only, /services/data/ only) under /sf2/. Without
+--second-org, /sf2/ answers 503.
 
 Listens on 127.0.0.1 only.
 """
@@ -94,7 +98,7 @@ def tree_version() -> str:
     return h.hexdigest()[:12]
 
 
-def make_handler(login: OrgLogin | None, port: int):
+def make_handler(login: OrgLogin | None, port: int, login2: OrgLogin | None = None):
     allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
 
     class Handler(BaseHTTPRequestHandler):
@@ -126,7 +130,9 @@ def make_handler(login: OrgLogin | None, port: int):
                 return self.send(200, json.dumps({"v": tree_version()}).encode(), "application/json",
                                  {"Access-Control-Allow-Origin": "*"})
             if path.startswith("/sf/"):
-                return self.proxy(self.path[3:])
+                return self.proxy(self.path[3:], login, "Dev server started with --no-org")
+            if path.startswith("/sf2/"):
+                return self.proxy(self.path[4:], login2, "Dev server started without --second-org")
             return self.static(path)
 
         def do_POST(self):
@@ -144,9 +150,9 @@ def make_handler(login: OrgLogin | None, port: int):
                 ctype = "text/javascript"
             self.send(200, target.read_bytes(), ctype)
 
-        def proxy(self, api_path: str):
+        def proxy(self, api_path: str, login: OrgLogin | None, missing: str):
             if login is None:
-                return self.refuse(503, "Dev server started with --no-org")
+                return self.refuse(503, missing)
             if not api_path.startswith("/services/data/"):
                 return self.refuse(403, "Only /services/data/ is forwarded")
             for attempt in (1, 2):
@@ -169,12 +175,16 @@ def make_handler(login: OrgLogin | None, port: int):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("-o", "--target-org", help="sf org alias or username (default: the sf default org)")
+    ap.add_argument("--second-org", help="a second sf org alias, forwarded read-only under /sf2/ (for comparing one person across two orgs)")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-org", action="store_true", help="serve pages only; no org connection")
     a = ap.parse_args()
 
+    if a.no_org and a.second_org:
+        sys.exit("--second-org needs an org: drop --no-org.")
     login = None if a.no_org else OrgLogin(a.target_org)
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(login, a.port))
+    login2 = OrgLogin(a.second_org) if a.second_org else None
+    srv = ThreadingHTTPServer(("127.0.0.1", a.port), make_handler(login, a.port, login2))
     print(f"Live org:  http://127.0.0.1:{a.port}/tools/compare-groups/compare-groups.html?dev=1")
     print(f"Demo:      http://127.0.0.1:{a.port}/tools/compare-groups/compare-groups.html?demo=1")
     print(f"Hierarchy: http://127.0.0.1:{a.port}/tools/hierarchy/hierarchy.html?demo=1")

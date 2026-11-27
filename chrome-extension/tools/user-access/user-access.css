@@ -51,3 +51,15 @@
 .eac-load { margin: 6px 0 12px; padding-left: 10px; border-left: 3px solid var(--line, #ccc); }
 .eac-load h5 { margin: 6px 0 2px; font-size: 1em; }
 .eac-warn-text { font-weight: 600; }
+
+/* The same person in another org */
+.mode { margin: 0 0 12px; }
+.orgpick { border: 1px solid var(--line, #ddd); border-radius: 8px; padding: 10px 12px; margin: 0 0 14px; }
+.orgpick .actions { margin-top: 6px; }
+.orgpick select { min-width: 280px; max-width: 100%; }
+.orgpick details.tech { font-size: 12px; margin-top: 6px; }
+.orgpick details.tech summary { cursor: pointer; }
+.orgpick details.tech div { margin-top: 4px; font-family: var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.who-org { font-size: 13px; font-weight: 600; }
+
+#orgMsg { white-space: pre-line; }
